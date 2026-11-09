@@ -58,7 +58,13 @@ export const RefereeSchema = z.object({
       playerAttacks: z.boolean().describe("True if the character's own action is an attack on one of them"),
       sneakAttack: z.boolean().describe('True if the character attacks unseen, from hiding')
     })
-    .default({ starts: false, foes: [], playerAttacks: false, sneakAttack: false })
+    .default({ starts: false, foes: [], playerAttacks: false, sneakAttack: false }),
+  work: z
+    .object({
+      kind: z.enum(['none', 'gather', 'craft']).describe('gather: mining, chopping wood, fishing, hunting game, picking herbs. craft: cooking, brewing, fletching, sewing, tanning, smithing'),
+      what: z.string().describe('What they gather or make, in a few words ("iron ore", "fish", "healing draught", "arrows"); empty if none')
+    })
+    .default({ kind: 'none', what: '' })
 })
 export type RefereeOutput = z.infer<typeof RefereeSchema>
 
@@ -76,6 +82,8 @@ Difficulty: ${DIFFICULTIES.map((d) => `${d} (${DIFFICULTY_LABEL[d]})`).join(', '
 Risk: "none" when failure just means it doesn't work. "light" for scrapes, bruises, a small fall. "serious" for a real fight, a bad fall, a dangerous animal. "deadly" for lethal danger: a dragon, a long fall, an armed killer. Attacks against armed enemies are at least "serious". Be honest about danger; do not protect the player.
 
 Fights: if the character attacks someone, or their action makes someone attack them right now, set fight.starts and list everyone who will fight them, as the story has them: what they are, how many, and how tough (tier). Only foes who are actually there. playerAttacks: whether the character's own action is the attack. sneakAttack: whether they strike unseen, from hiding. Also put the attack in checks as usual (melee, ranged or spellcasting, with its risk): it's used when the fight is told in prose instead of on the tracker.
+
+Gathering and crafting: if the character gathers resources (mining, chopping wood, fishing, hunting game, picking herbs) or makes something (cooking, brewing, fletching, sewing, tanning, smithing), set work to what they gather or make. The engine rolls that work itself, so don't also put it in checks. Only when they do the work this turn, not when they set off to do it later. Hunting an animal for meat or hide (tracking it and bringing it down) is gather work ("deer", "rabbits", "game"), not a fight and not a Survival check.
 
 Speech in "quotes" is what the character says; social checks only when they are trying to change someone's mind (persuade, lie, threaten, haggle). Social checks normally have risk "none": a failed persuasion means they aren't convinced. Only give a social check risk if failing means violence breaks out at that very moment, and then the harm comes from the people present (riskSource "sentient"), and then a fight starts too.`
 
@@ -132,10 +140,12 @@ export async function runReferee(
     .filter((f) => f.kind.trim())
     .slice(0, 6)
     .map((f) => ({ kind: f.kind.trim().slice(0, 60), count: Math.max(1, Math.min(6, Math.round(f.count || 1))), tier: f.tier, name: f.name.trim().slice(0, 60) || undefined }))
+  const work = out.work.kind !== 'none' && out.work.what.trim() ? { kind: out.work.kind, what: out.work.what.trim().slice(0, 80) } : undefined
   return {
     checks: out.checks.slice(0, 2).map(toRequest),
     intent: out.intent,
-    fight: { starts: fight.starts && foes.length > 0, foes, playerAttacks: fight.playerAttacks, sneakAttack: fight.sneakAttack }
+    fight: { starts: fight.starts && foes.length > 0, foes, playerAttacks: fight.playerAttacks, sneakAttack: fight.sneakAttack },
+    work
   }
 }
 

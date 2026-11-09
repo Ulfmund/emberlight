@@ -118,7 +118,12 @@ export function applyRename(
     edits.push({ type: 'note', id: newId('note'), text: `The player character, formerly known as ${from}, now goes by ${to}.` })
   }
 
-  if (opts.target.kind === 'player') {
+  if (opts.target.kind === 'player' && campaigns.state(c).fallen.length && c.head_id) {
+    // Someone who took up the tale after a death: their build lives in the story's events.
+    const cur = campaigns.state(c).character.build
+    const swap = (s: string) => (opts.mode === 'retcon' ? renameIn(s, from, to).text : s)
+    campaigns.db.addEvents(id, c.head_id, newId('grp'), 'player', [{ type: 'build_edit', name: to, appearance: swap(cur.appearance), personality: swap(cur.personality) }])
+  } else if (opts.target.kind === 'player') {
     const swap = (s: string) => (opts.mode === 'retcon' ? renameIn(s, from, to).text : s)
     campaigns.db.updateCampaign(id, {
       build: { ...c.build, name: to, appearance: swap(c.build.appearance), personality: swap(c.build.personality) },

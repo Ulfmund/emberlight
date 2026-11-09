@@ -191,7 +191,19 @@ ${gear}
 ${carrying}${body}
 ${c.status === 'downed' ? 'STATUS: DOWNED: unconscious and dying.\n' : c.status === 'dead' ? 'STATUS: DEAD.\n' : ''}
 WHERE AND WHEN
-Day ${state.time.day}, ${timeOfDay}${state.location ? `, at ${state.location}` : ''}.${memoryBlock(memory)}${companionBlock(cast)}${loreBlock(lore)}`
+Day ${state.time.day}, ${timeOfDay}${state.location ? `, at ${state.location}` : ''}.${memoryBlock(memory)}${fallenBlock(state, third)}${companionBlock(cast)}${loreBlock(lore)}`
+}
+
+/** Earlier characters of this story who died (the Hall of the Fallen). */
+function fallenBlock(state: GameState, third: boolean): string {
+  const fallen = state.fallen ?? []
+  if (!fallen.length) return ''
+  const me = state.character.build.name
+  const lines = fallen.map((f) => {
+    const kin = f.heirIsChild && f.heir === me ? ` ${third ? `${me}'s` : "The player character's"} ${f.sex === 'female' ? 'mother' : 'father'}.` : ''
+    return `- ${f.name}, ${RACES[f.race].label.toLowerCase()} ${BACKGROUNDS[f.background].label.toLowerCase()}, died on day ${f.day}: ${f.cause}.${f.deeds.length ? ` Known for: ${f.deeds.slice(-2).join('; ')}.` : ''}${kin}`
+  })
+  return `\n\nTHE FALLEN (earlier adventurers of this story, now dead; the world remembers them, and they may come up: a grave, a rumour, a debt, a belonging found)\n${lines.join('\n')}`
 }
 
 function renownGuide(tier: string, sex: 'male' | 'female', settings: CampaignSettings) {

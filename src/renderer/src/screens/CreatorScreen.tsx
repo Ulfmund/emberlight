@@ -116,10 +116,20 @@ function normalize(b0: CharacterBuild, sexMode: SexMode): CharacterBuild {
 }
 
 export function CreatorScreen() {
-  const { go, create } = useGame()
-  const [settings, setSettings] = useState<CampaignSettings>({ ...DEFAULT_SETTINGS })
+  const { go, create, heir, takeUp, cancelHeir } = useGame()
+  /** After a death, this makes whoever takes up the tale in the same story (no world to pick). */
+  const steps = heir ? STEPS.slice(0, STEPS.length - 1) : STEPS
+  const [settings, setSettings] = useState<CampaignSettings>(() => (heir ? { ...heir.settings } : { ...DEFAULT_SETTINGS }))
   const [build, setBuild] = useState<CharacterBuild>(() => {
-    const b = randomBuild(rng, DEFAULT_SETTINGS.sexModifiers, '')
+    const mode = heir?.settings.sexModifiers ?? DEFAULT_SETTINGS.sexModifiers
+    const b = randomBuild(rng, mode, '')
+    if (heir?.child) {
+      // Their parent's people and family name; grown, and only lately on the road.
+      const surname = heir.dead.trim().split(/\s+/).slice(1).join(' ')
+      const given = heir.child.name.trim()
+      const name = given.split(/\s+/).length === 1 && surname ? `${given} ${surname}` : given
+      return normalize({ ...b, race: heir.race ?? b.race, age: 'young', name, appearance: '', personality: '' }, mode)
+    }
     return { ...b, name: generateName(rng, b.race, b.sex), appearance: '', personality: '' }
   })
   const [step, setStep] = useState(0)
@@ -191,7 +201,9 @@ export function CreatorScreen() {
 
   const rollAdventurer = () => {
     const b = randomBuild(rng, sexMode, '')
-    setBuild({ ...b, name: generateName(rng, b.race, b.sex), appearance: pickOne(APPEARANCE), personality: pickOne(PERSONALITY) })
+    const rolled = { ...b, name: generateName(rng, b.race, b.sex), appearance: pickOne(APPEARANCE), personality: pickOne(PERSONALITY) }
+    // A child keeps their name and their parent's people.
+    setBuild(heir?.child ? normalize({ ...rolled, name: build.name, race: build.race, age: 'young' }, sexMode) : rolled)
     setPlayerCard(null)
     setRolling((r) => r + 1)
     setStep(4)
@@ -201,6 +213,7 @@ export function CreatorScreen() {
     setStarting(true)
     setError('')
     try {
+      if (heir) return await takeUp(withSyncedName(build))
       const greet = useGreeting && (companions[0]?.greetings ?? 0) > 0
       await create(withSyncedName(build), settings, { playerCard: playerCard?.id, companions: companions.map((c) => c.id), useGreeting: greet, world: world ?? undefined, lorebooks })
     } catch (err) {
@@ -234,10 +247,10 @@ export function CreatorScreen() {
 
       {/* Steps */}
       <nav className="relative z-10 flex shrink-0 items-center gap-0.5 overflow-x-auto border-b border-gold-500/15 bg-ink-950/60 p-2 md:w-56 md:gap-1 md:flex-col md:items-stretch md:overflow-visible md:border-r md:border-b-0 md:p-4">
-        <Button variant="ghost" size="sm" icon="back" onClick={() => go('title')} className="shrink-0 px-2 md:mb-3 md:self-start md:px-3" aria-label="Back">
+        <Button variant="ghost" size="sm" icon="back" onClick={() => (heir ? void cancelHeir() : go('title'))} className="shrink-0 px-2 md:mb-3 md:self-start md:px-3" aria-label="Back">
           <span className="hidden md:inline">Back</span>
         </Button>
-        {STEPS.map((s, i) => (
+        {steps.map((s, i) => (
           <button
             key={s.id}
             onClick={() => setStep(i)}
@@ -257,9 +270,11 @@ export function CreatorScreen() {
         ))}
         {/* Phones: the same two as small icon buttons. */}
         <div className="ml-auto flex shrink-0 gap-1 pl-1 md:hidden">
-          <button onClick={() => setLibrary({ open: true, dropped: [] })} className="no-drag grid h-9 w-9 cursor-pointer place-items-center rounded-lg border border-gold-500/25 text-gold-300" aria-label="Character cards">
-            <Icon name="cards" size={19} />
-          </button>
+          {!heir && (
+            <button onClick={() => setLibrary({ open: true, dropped: [] })} className="no-drag grid h-9 w-9 cursor-pointer place-items-center rounded-lg border border-gold-500/25 text-gold-300" aria-label="Character cards">
+              <Icon name="cards" size={19} />
+            </button>
+          )}
           <motion.button whileTap={{ scale: 0.9, rotate: -20 }} onClick={rollAdventurer} className="no-drag grid h-9 w-9 cursor-pointer place-items-center rounded-lg border border-ember-500/50 bg-ember-500/15 text-ember-400" aria-label="Roll a new adventurer">
             <Icon name="d20" size={20} />
           </motion.button>
@@ -268,6 +283,7 @@ export function CreatorScreen() {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.97 }}
+            style={heir ? { display: 'none' } : undefined}
             onClick={() => setLibrary({ open: true, dropped: [] })}
             className="no-drag focus-ring flex w-full cursor-pointer items-center gap-3 rounded-xl border border-gold-500/25 bg-ink-900/80 p-3 text-left hover:border-gold-400/60"
           >
@@ -297,6 +313,19 @@ export function CreatorScreen() {
       {/* Step content */}
       <div className="relative z-10 min-w-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-4xl px-4 pt-5 pb-24 md:px-8 md:pt-8">
+          {heir && (
+            <div className="mb-6 rounded-xl border border-gold-500/25 bg-ink-900/70 px-4 py-3">
+              <div className="flex items-center gap-2 font-display text-sm tracking-[0.14em] text-gold-300 uppercase">
+                <Icon name="laurel" size={16} />
+                {heir.child ? `${heir.child.name} takes up the tale` : 'Who takes up the tale?'}
+              </div>
+              <p className="mt-1 text-sm text-parchment-400">
+                {heir.child
+                  ? `Ten years after ${heir.dead} fell, their child sets out: they keep the family name and inherit their parent's savings, a share of their renown, and their weapon.`
+                  : `A few days after ${heir.dead} fell, someone new comes to the same lands. The world, its people and its history carry on.`}
+              </p>
+            </div>
+          )}
           <AnimatePresence mode="wait">
             <motion.div key={step} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.22 }}>
               {step === 0 && <OriginStep build={build} update={update} settings={settings} setSettings={(s) => { setSettings(s); setBuild((b) => normalize(b, s.sexModifiers)) }} />}
@@ -325,19 +354,19 @@ export function CreatorScreen() {
           <div className="mt-10 flex items-center gap-3 border-t border-gold-500/15 pt-6">
             {step > 0 && (
               <Button variant="ghost" icon="left" onClick={() => setStep(step - 1)}>
-                {STEPS[step - 1].label}
+                {steps[step - 1].label}
               </Button>
             )}
             <div className="ml-auto flex items-center gap-3">
-              {(error || (step === STEPS.length - 1 && errors[0])) && <span className="text-sm text-blood-400">{error || errors[0]}</span>}
-              {step < STEPS.length - 1 ? (
+              {(error || (step === steps.length - 1 && errors[0])) && <span className="text-sm text-blood-400">{error || errors[0]}</span>}
+              {step < steps.length - 1 ? (
                 <Button variant="secondary" onClick={() => setStep(step + 1)}>
-                  {STEPS[step + 1].label}
+                  {steps[step + 1].label}
                   <Icon name="right" size={16} />
                 </Button>
               ) : (
                 <Button variant="primary" size="lg" icon="d20" onClick={() => void begin()} disabled={errors.length > 0 || starting}>
-                  {starting ? 'Setting the scene…' : 'Begin the Adventure'}
+                  {starting ? 'Setting the scene…' : heir ? 'Take up the tale' : 'Begin the Adventure'}
                 </Button>
               )}
             </div>

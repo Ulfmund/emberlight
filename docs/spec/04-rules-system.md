@@ -290,6 +290,8 @@ Bleeding, Poisoned, Diseased, Burning, Stunned, Prone, Frightened, Exhausted (st
 - **Instant death:** if damage would take you to −(half max HP) or lower.
 - Allies or NPCs can stabilize a downed character with Medicine (DC 12) or healing.
 
+*Built (0.10.0)*: what happens after a death is in [03](03-characters-and-cards.md#when-a-character-dies).
+
 **Mercy setting** (DM settings):
 - **Brutal:** 0 HP = dead.
 - **Harsh** (default): the rules above.
@@ -322,6 +324,12 @@ Renown is how widely and how well the character is known. It changes how people 
 - **Items:** name, icon, type, weight, value, slot, stats (damage die, armor, effects), and an optional image. Item templates live in `tables/items.ts`. The DM can create unique items through a request; the engine checks their stats against limits for the character's level.
 - **Money:** stored as copper. Displayed as gold / silver / copper (10 copper = 1 silver, 10 silver = 1 gold).
 - **Crafting recipes** (`tables/recipes.ts`): inputs, tool, skill + minimum level, DC, output, XP. **Gathering nodes** (`tables/nodes.ts`): skill, level, DC, yield.
+
+*Built (0.10.0)* (`src/shared/rules/crafting.ts`): 16 **gathering spots** (ores, coal and gems; logs, oak and yew; fish and eels; game, fowl and hides; herbs, healing moss and nightshade), each with the kinds of place it's found in, a minimum skill level and a difficulty; and 28 **recipes** across Cooking, Alchemy, Fletching, Crafting (leather and cloth) and Smithing, each with inputs, a minimum level, a difficulty, and sometimes a station (a fire: anywhere in town, or with a tinderbox; a forge: in a town or village).
+
+- **Gathering:** the Referee names the work ("firewood", "iron ore", "game"), and the engine finds the spot: what the words name, else the skill the words suggest, preferring spots that suit the place (the place is a hint, not a wall: the story may be on its way there). Then one roll: a narrow success brings the low end of the yield, a clean one the middle, an overwhelming one the top, a critical one a bit more. Mining, woodcutting and hunting can hurt a little on a failure. A plain gathering-skill check from the Referee counts as gathering too.
+- **Crafting:** from the Referee ("I brew a healing draught", "I roast the meat": what it makes, or how and from what) or the Bag's **Make** list, which shows what the character can make now, has materials for or is trained in, with what's missing. Too little skill, missing materials or no station: nothing is rolled or used, and the narrator says why. Otherwise one roll: success uses the materials and makes the thing (a critical success makes extra of anything stackable); a narrow failure wastes only time; a worse one spoils half the materials, a critical one all of them. No proper tools: disadvantage, as for every tool skill.
+- The engine moves the items and tells the narrator ("GATHERING: the character gets 2 × Logs"), and the Scribe is told not to record them again.
 
 ## Spells (v1, simple)
 

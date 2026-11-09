@@ -21,6 +21,8 @@ import {
   needs,
   templateOf,
   foeRoster,
+  validateBuild,
+  type Fallen,
   type Slot,
   type CampaignSettings,
   type CombatOutcome,
@@ -37,6 +39,17 @@ import type { World } from '@shared/worlds'
 import { GameDb, newId, type CampaignRow, type EventRow, type MessageRow } from '../store/db'
 
 export const OPENING_TEXT = '((Begin the adventure: set an opening scene for my character.))'
+
+/** A child takes up the tale this many years after their parent's death. */
+export const HEIR_YEARS = 10
+
+/** The hidden nudge that opens a successor's story. */
+export function successorOpening(f: Fallen, build: CharacterBuild, child: boolean): string {
+  const who = `${build.name.trim()}, ${RACES[build.race].label.toLowerCase()} ${BACKGROUNDS[build.background].label.toLowerCase()}`
+  return `((A new chapter. ${f.name} is dead: ${f.cause}. ${
+    child ? `${HEIR_YEARS} years later, their child ${who}, takes up the road.` : `A few days later, a new adventurer comes to the same lands: ${who}.`
+  } Set an opening scene for them, somewhere that fits who they are. The world goes on: its people and places are still there and remember what happened, and ${f.name} may turn up in the story again, in a grave, a rumour or a belonging found.))`
+}
 
 export function openingText(cast: CastMember[], world?: World): string {
   const names = cast.filter((m) => m.role === 'companion').map((m) => m.name)
@@ -71,10 +84,10 @@ export class Campaigns {
       return {
         id: c.id,
         name: c.name,
-        characterName: c.build.name,
-        race: RACES[c.build.race].label,
-        sex: SEXES[c.settings.sexModifiers][c.build.sex].label,
-        background: BACKGROUNDS[c.build.background].label,
+        characterName: st.character.build.name,
+        race: RACES[st.character.build.race].label,
+        sex: SEXES[c.settings.sexModifiers][st.character.build.sex].label,
+        background: BACKGROUNDS[st.character.build.background].label,
         level: st.character.level,
         status: st.character.status,
         location: st.location,
@@ -190,14 +203,16 @@ export class Campaigns {
     })
 
     const d = derived(state, c.settings)
-    const sCaps = skillCaps(c.build, c.settings.sexModifiers)
+    // The character now playing: the one the story began with, or whoever took up the tale.
+    const build = state.character.build
+    const sCaps = skillCaps(build, c.settings.sexModifiers)
     const level = state.character.level
     const last = path[path.length - 1]
     return {
       id: c.id,
       name: c.name,
       settings: c.settings,
-      build: c.build,
+      build,
       state,
       derived: {
         ...d,
@@ -224,6 +239,91 @@ export class Campaigns {
 
   delete(id: string) {
     this.db.deleteCampaign(id)
+  }
+
+  /**
+   * After a death, a new character takes up the tale in the same world (docs/spec/03-characters-
+   * and-cards.md#when-a-character-dies). A child of the dead inherits half their renown, their
+   * savings and their weapon, years later; anyone else arrives a few days on with what their
+   * calling gives them. The people of the world remember the dead, and the new character's
+   * opening scene waits to be narrated.
+   */
+  successor(id: string, build: CharacterBuild, childId?: string) {
+    const c = this.get(id)
+    const path = this.path(c)
+    const state = this.state(c, { path })
+    const dead = state.character
+    if (dead.status !== 'dead') throw new Error('Only a fallen character can be succeeded.')
+    const head = path[path.length - 1]
+    if (!head) throw new Error('This story has no messages yet.')
+    const errors = validateBuild(build, c.settings.sexModifiers)
+    if (errors.length) throw new Error(errors[0])
+    const rows = this.activeEvents(c, path)
+    const memory = projectMemory(rows.map((e) => e.event))
+    const child = childId ? memory.entities.find((e) => e.id === childId && e.kind === 'person' && e.relation === 'child' && e.status !== 'dead') : undefined
+    if (childId && !child) throw new Error('That child is no longer in the story.')
+
+    const death = [...rows].reverse().find((e) => e.event.type === 'status' && e.event.status === 'dead')?.event as { reason?: string } | undefined
+    const cause = death?.reason?.trim() || 'fell'
+    const b = dead.build
+    const fallen: Fallen = {
+      name: b.name,
+      race: b.race,
+      sex: b.sex,
+      background: b.background,
+      level: dead.level,
+      renown: dead.renown,
+      deeds: dead.deeds.map((x) => x.text),
+      day: state.time.day,
+      cause,
+      epitaph: dead.epitaph,
+      heir: build.name.trim(),
+      heirIsChild: Boolean(child)
+    }
+    const weapon = mainWeapon(dead)
+    const first = b.name.trim().split(/\s+/)[0]
+    const inherit = child
+      ? { coins: dead.coins, renown: Math.floor(dead.renown / 2), items: weapon.unarmed ? [] : [{ name: `${first}'s ${weapon.name.toLowerCase()}`, qty: 1 }] }
+      : undefined
+    const days = child ? HEIR_YEARS * 365 : 3
+
+    const events: (GameEvent | MemoryEvent)[] = [{ type: 'new_character', build, days, fallen, inherit }]
+    // The world remembers the dead…
+    events.push({
+      type: 'entity',
+      kind: 'person',
+      name: b.name,
+      summary: `${RACES[b.race].label} ${BACKGROUNDS[b.background].label.toLowerCase()}, an adventurer who died on day ${state.time.day}`,
+      facts: [`Died: ${cause}`, ...fallen.deeds.slice(-3)],
+      status: 'dead',
+      relation: child ? 'parent' : undefined,
+      day: state.time.day
+    })
+    // …but ties to the dead aren't ties to the newcomer. A child keeps the family, re-labelled.
+    for (const e of memory.entities) {
+      if (e.kind !== 'person' || e.id === child?.id) continue
+      if (child) {
+        const r = e.relation
+        const next = r === 'child' ? 'sibling' : r === 'spouse' ? 'parent' : r === 'lover' || r === 'parent' || r === 'sibling' ? null : undefined
+        if (next !== undefined) events.push({ type: 'entity_edit', id: e.id, relation: next, ...(r === 'parent' ? { facts: [...e.facts, `Grandparent of ${build.name.trim()}`] } : {}) })
+      } else if (e.relation || e.attitude) events.push({ type: 'entity_edit', id: e.id, relation: null, attitude: null })
+    }
+    // The child is the player character now, not someone in the Journal.
+    if (child) events.push({ type: 'entity_forget', id: child.id })
+
+    // The new chapter starts with its own (hidden) opening message, so rewinding to the death
+    // shows the death, and the heir's story is a branch from there.
+    const opening = this.db.addMessage({
+      id: newId('msg'),
+      campaign_id: id,
+      parent_id: head.id,
+      role: 'user',
+      content: successorOpening(fallen, build, Boolean(child)),
+      thinking: '',
+      meta: { hidden: true, kind: 'opening' }
+    })
+    this.db.addEvents(id, opening.id, newId('grp'), 'player', events as GameEvent[])
+    this.db.setHead(id, opening.id)
   }
 
   /** Show a different version of a DM message (and whatever came after it on that branch). */

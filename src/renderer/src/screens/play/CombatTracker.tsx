@@ -26,7 +26,7 @@ export function CombatTracker({ view }: { view: CampaignView }) {
   const off = busy || live.hold || !chosen
   const send = (text: string, move: CombatAction) => {
     setConfirmYield(false)
-    void act(text, move)
+    void act(text, { combat: move })
   }
 
   type Move = { id: string; label: string; icon: string; tip: string; go: () => void; disabled?: boolean; tone?: 'danger' }

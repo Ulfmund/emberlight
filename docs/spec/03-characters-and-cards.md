@@ -66,6 +66,15 @@ Other edits (appearance, personality) update the character's entity record, so t
 3. Options: **New adventurer in this world** (quick create; the world, NPCs and history carry on), **Continue as your child** (only if the character had children: pick one; they inherit the family name, a share of their parent's Renown, and whatever the story left them), **Rewind** (go back to before the fatal turn; the player chooses to cheat), or **End campaign**.
 4. In the same world, the dead character can become part of the story: a grave, a rumor, a lost item that turns up again.
 
+*Built (0.10.0)*: when a character dies, the DM writes an **epitaph** (a separate small AI job), shown on the death screen. The choices:
+
+- **A new adventurer in this world** opens the creator without the world step. They arrive a few days later with what their calling gives them. People and places stay in the Journal, but their ties and feelings toward the dead don't carry over.
+- **Continue as *name*, their child**, for each living person the Journal has as the character's child. Ten years later, the child (human or not, as their parent; young; the family name filled in) inherits their parent's savings, half their Renown, and their weapon ("Brenna's shortbow"). The family is re-labelled: the dead one's other children become siblings, their spouse a parent, their parents grandparents.
+- **Rewind before the fatal moment**, unless Ironman.
+- **Back to the menu.**
+
+The dead character joins the **Hall of the Fallen** (a Journal section once anyone has died): who they were, how and when they died, their deeds, the epitaph, and who took up the tale. They are also added to the Journal as a dead person, so the DM remembers them, and the narrator's prompt lists the fallen as people the world may bring up again. The successor's story starts from its own hidden opening message after the death, so rewinding to the death still shows the death, and the old branch is kept.
+
 ## Image generation
 
 Optional. Configured once under *Settings → Images*.

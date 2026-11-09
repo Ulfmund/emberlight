@@ -119,6 +119,26 @@ export type CharacterState = {
   /** Minutes since the last proper meal, and since the last long sleep (survival needs). */
   hungerMins: number
   awakeMins: number
+  /** Words for the dead, written by the DM when they fall. */
+  epitaph?: string
+}
+
+/** A character who died, remembered in the Hall of the Fallen. */
+export type Fallen = {
+  name: string
+  race: CharacterBuild['race']
+  sex: CharacterBuild['sex']
+  background: CharacterBuild['background']
+  level: number
+  renown: number
+  deeds: string[]
+  /** The day they died, and how. */
+  day: number
+  cause: string
+  epitaph?: string
+  /** Who took up the tale after them, and whether that was their child. */
+  heir?: string
+  heirIsChild?: boolean
 }
 
 export type GameState = {
@@ -129,6 +149,8 @@ export type GameState = {
   placeKind: PlaceKind | null
   /** A fight on the turn tracker, if one is going on (see combat.ts). */
   combat: Combat | null
+  /** Earlier characters of this story who died (the Hall of the Fallen). */
+  fallen: Fallen[]
 }
 
 /** One recorded change. Every event belongs to the message that caused it. */
@@ -171,6 +193,15 @@ export type GameEvent =
   | { type: 'foe_attack'; id: string; roll: number; total: number; defense: number; hit: boolean; crit: boolean; damage: number; name?: string }
   /** A random event happened this turn (kept so they don't pile up). */
   | { type: 'world_event'; id: string; text: string }
+  /** The DM's words for a character who just died. */
+  | { type: 'epitaph'; text: string }
+  /**
+   * After a death, a new character takes up the tale in the same world, some days (or years)
+   * later. The dead one joins the Hall of the Fallen; a child may inherit savings and renown.
+   */
+  | { type: 'new_character'; build: CharacterBuild; days: number; fallen: Fallen; inherit?: { coins: number; renown: number; items: { name: string; qty: number; icon?: string }[] } }
+  /** The player renamed or redescribed a character who took over the tale. */
+  | { type: 'build_edit'; name?: string; appearance?: string; personality?: string }
   /** Long-term memory: people, places and summaries (see shared/memory.ts). */
   | MemoryEvent
 
@@ -219,7 +250,7 @@ export function initialState(build: CharacterBuild, settings: CampaignSettings):
     awakeMins: 120
   }
   for (const k of bg.kit) addItem(character, k.name, 'qty' in k && k.qty ? k.qty : 1, k.icon)
-  return { character, time: { day: 1, minute: 8 * 60 }, location: null, placeKind: null, combat: null }
+  return { character, time: { day: 1, minute: 8 * 60 }, location: null, placeKind: null, combat: null, fallen: [] }
 }
 
 /** A proper meal (12 hours of food or more) leaves you fed whatever came before; a snack takes the edge off. */
@@ -446,6 +477,30 @@ export function applyEvent(prev: GameState, ev: GameEvent, settings: CampaignSet
     case 'foe_attack':
     case 'world_event':
       break
+    case 'epitaph':
+      c.epitaph = ev.text.trim().slice(0, 600)
+      break
+    case 'build_edit':
+      c.build = {
+        ...c.build,
+        ...(ev.name?.trim() ? { name: ev.name.trim() } : {}),
+        ...(ev.appearance !== undefined ? { appearance: ev.appearance } : {}),
+        ...(ev.personality !== undefined ? { personality: ev.personality } : {})
+      }
+      break
+    case 'new_character': {
+      const fresh = initialState(ev.build, settings).character
+      if (ev.inherit) {
+        fresh.coins += Math.max(0, ev.inherit.coins)
+        fresh.renown = Math.min(RENOWN_MAX, fresh.renown + Math.max(0, ev.inherit.renown))
+        for (const it of ev.inherit.items) addItem(fresh, it.name, it.qty, it.icon)
+      }
+      s.fallen = [...(s.fallen ?? []), ev.fallen]
+      s.character = fresh
+      s.combat = null
+      s.time = { day: s.time.day + Math.max(0, ev.days), minute: 8 * 60 }
+      break
+    }
     case 'status':
       c.status = ev.status
       if (ev.status !== 'downed') c.deathRolls = { success: 0, fail: 0 }

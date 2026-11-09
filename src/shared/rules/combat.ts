@@ -4,6 +4,7 @@ import { ENEMY_TIERS, enemyTemplate, findEnemy, HARM_FROM, TIER_MODS, TIER_WORDS
 import { ammoFor, defenseValue, mainWeapon } from './gear'
 import { itemTemplate } from './items'
 import { applyEvent, type CampaignSettings, type CombatMode, type GameEvent, type GameState } from './state'
+import type { Work } from './crafting'
 import { TIER_INFO } from './tables'
 
 /**
@@ -70,6 +71,8 @@ export type RefereeCall = {
   checks: CheckRequest[]
   intent: Intent
   fight: { starts: boolean; foes: FoeSpec[]; playerAttacks: boolean; sneakAttack: boolean }
+  /** Gathering or crafting: the engine rolls it and moves the items. */
+  work?: Work
 }
 
 export const NO_FIGHT: RefereeCall['fight'] = { starts: false, foes: [], playerAttacks: false, sneakAttack: false }

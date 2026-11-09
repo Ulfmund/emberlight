@@ -43,7 +43,7 @@ export function Toasts() {
 
 /** Shown when the character dies (docs/spec/03-characters-and-cards.md#when-a-character-dies). */
 export function DeathScreen({ view }: { view: CampaignView }) {
-  const { go, rewind, busy } = useGame()
+  const { go, rewind, busy, startHeir } = useGame()
   const c = view.state.character
   if (c.status !== 'dead' || busy) return null
   // Rewind to just before the fatal turn: the DM message before the last player action.
@@ -52,6 +52,10 @@ export function DeathScreen({ view }: { view: CampaignView }) {
   for (let i = msgs.length - 1; i >= 0; i--) if (msgs[i].role === 'user' && msgs[i].kind !== 'roll_response') { lastUser = i; break }
   const before = lastUser > 0 ? msgs[lastUser - 1] : null
   const cause = [...msgs].reverse().flatMap((m) => m.changes).find((ch) => ch.text.startsWith('Died'))?.text.replace(/^Died: /, '')
+  // Their children in the story can take up the tale.
+  const children = view.memory.entities.filter((e) => e.kind === 'person' && e.relation === 'child' && e.status !== 'dead')
+  const before_ = view.state.fallen ?? []
+  const heir = { campaignId: view.id, settings: view.settings, dead: view.build.name }
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1.2 }} className="absolute inset-0 z-40 grid place-items-center bg-[radial-gradient(circle,rgb(11_8_9/0.75),rgb(0_0_0/0.96))] backdrop-grayscale">
@@ -63,10 +67,20 @@ export function DeathScreen({ view }: { view: CampaignView }) {
           {cause ?? 'Fallen'} · level {c.level} · day {view.state.time.day}
           {c.deeds.length ? ` · remembered for having ${c.deeds[c.deeds.length - 1].text}` : ''}
         </p>
-        <div className="mt-8 flex flex-col gap-3">
-          <Button variant="primary" icon="d20" onClick={() => go('creator')}>
-            A new adventurer
+        {c.epitaph && (
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.8, duration: 1.2 }} className="mt-5 max-w-sm font-story text-xl leading-relaxed text-parchment-200 italic">
+            “{c.epitaph}”
+          </motion.p>
+        )}
+        <div className="mt-8 flex w-full max-w-xs flex-col gap-3 px-4">
+          <Button variant="primary" icon="d20" onClick={() => startHeir(heir)}>
+            A new adventurer in this world
           </Button>
+          {children.map((ch) => (
+            <Button key={ch.id} variant="secondary" icon="laurel" onClick={() => startHeir({ ...heir, child: { id: ch.id, name: ch.name }, race: view.build.race })}>
+              Continue as {ch.name}, their child
+            </Button>
+          ))}
           {before && !view.settings.ironman && (
             <Button variant="secondary" icon="rewind" onClick={() => void rewind(before.id)}>
               Rewind before the fatal moment
@@ -76,9 +90,9 @@ export function DeathScreen({ view }: { view: CampaignView }) {
             Back to the menu
           </Button>
         </div>
-        <p className="mt-6 text-xs text-parchment-500">
+        <p className="mt-6 max-w-sm px-4 text-xs leading-relaxed text-parchment-500">
           <Icon name="laurel" size={12} className="mr-1 inline -translate-y-px" />
-          Continuing the tale as their child arrives with family tracking in a later update.
+          {view.build.name} will be remembered in the Hall of the Fallen{before_.length ? `, beside ${before_.map((f) => f.name).join(', ')}` : ''}. Whoever comes next finds the same world, its people and its history.
         </p>
       </motion.div>
     </motion.div>

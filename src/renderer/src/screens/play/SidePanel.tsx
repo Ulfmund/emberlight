@@ -22,6 +22,7 @@ import { useGame } from '../../store'
 import { Icon } from '../../components/Icon'
 import { Tip } from '../../components/Tip'
 import { Button } from '../../components/Button'
+import { CraftList } from './Crafting'
 
 export type Tab = 'sheet' | 'bag' | 'log' | 'saves'
 const TABS: { id: Tab; label: string; icon: string }[] = [
@@ -274,6 +275,8 @@ function BagTab({ view }: { view: CampaignView }) {
         </div>
         <p className="mt-3 text-xs text-parchment-500">Things you find, buy or lose in the story are added here by themselves. Tap an item to equip, use or drop it.</p>
       </section>
+
+      <CraftList view={view} />
     </div>
   )
 }

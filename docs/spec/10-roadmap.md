@@ -36,10 +36,10 @@ Built in milestones. Each one ends with something playable, so the artist can te
 ## Milestone 3 — Game depth
 - Combat modes (narrative / turn-based / mixed), ambush and initiative, enemy templates ✅ 0.9.0 (24 templates, the tracker, one-tap moves, DM-started fights)
 - Inventory, equipment slots, encumbrance, money ✅ 0.8.0
-- Gathering and crafting skills with recipes and nodes
+- Gathering and crafting skills with recipes and nodes ✅ 0.10.0 (16 gathering spots, 28 recipes, the Bag's Make list)
 - Conditions, survival needs, rest rules (auto-detected sleep) ✅ 0.8.0
 - Random event tables and DM-initiated rolls (hidden checks) ✅ 0.9.0
-- Death flow, Hall of the Fallen, quick new adventurer in the same world
+- Death flow, Hall of the Fallen, quick new adventurer in the same world ✅ 0.10.0 (epitaphs; continue as your child)
 - DM style settings, DM persona cards ✅ 0.8.0 (event frequency ✅ 0.9.0)
 
 ## Milestone 4 — Polish and reach

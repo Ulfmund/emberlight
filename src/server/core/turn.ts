@@ -9,11 +9,14 @@ import {
   project,
   resolveCheck,
   resolveRound,
+  resolveWork,
   rollWorldEvent,
+  workFromChecks,
   shouldTrack,
   SKILLS,
   startCombat,
   TIER_INFO,
+  WORK_SKILLS,
   WORLD_EVENTS,
   type Attr,
   type CampaignSettings,
@@ -22,7 +25,8 @@ import {
   type CombatAction,
   type GameEvent,
   type GameState,
-  type TurnPlan
+  type TurnPlan,
+  type Work
 } from '@shared/rules'
 import type { ChatMessage, Connection } from '@shared/types'
 import type { MessageView, TurnEvent } from '@shared/view'
@@ -35,6 +39,7 @@ import { summarizeChapter, summarizeScene, updateArc } from '../ai/jobs/summariz
 import { createProvider, type Provider } from '../ai/providers'
 import { runCombatReferee, runReferee } from '../ai/jobs/referee'
 import { runScribe } from '../ai/jobs/scribe'
+import { writeEpitaph } from '../ai/jobs/epitaph'
 import { engineNotes, extractFight, extractRollRequest, fitHistory, NameFilter, narratorSystem, pastRollNote, type PersonaText } from '../ai/narrator'
 import { newId, type CampaignRow, type EventRow, type MessageRow } from '../store/db'
 import type { Campaigns } from './campaigns'
@@ -129,9 +134,9 @@ export class TurnEngine {
 
   // ---- public actions ------------------------------------------------------------------
 
-  /** The player acts (free text; in a fight, maybe a move picked on the tracker). */
-  async *act(id: string, text: string, signal: AbortSignal, combat?: CombatAction): AsyncGenerator<TurnEvent> {
-    yield* this.playTurn(id, { text, kind: 'action', combat }, signal)
+  /** The player acts (free text; or a move picked on the tracker, or "Make" in the Bag). */
+  async *act(id: string, text: string, signal: AbortSignal, picked: { combat?: CombatAction; work?: Work } = {}): AsyncGenerator<TurnEvent> {
+    yield* this.playTurn(id, { text, kind: 'action', ...picked }, signal)
   }
 
   /** The player answers a roll the DM asked for. */
@@ -294,10 +299,18 @@ export class TurnEngine {
           fought = true
         }
       } else {
-        // Everything else, fights told in prose included: the checks, with their risks.
-        const r = this.resolve(working, settings, ref.checks)
+        // Everything else, fights told in prose included: the checks, with their risks. Gathering
+        // and crafting roll their own check (and move the items), so it isn't rolled twice.
+        const work = ref.work ?? workFromChecks(ref.checks)
+        const r = this.resolve(working, settings, work ? ref.checks.filter((ch) => !WORK_SKILLS.has(ch.skill)) : ref.checks)
         take(r.events, r.after)
         checks.push(...r.results)
+        if (work && alive()) {
+          const w = resolveWork(working, settings, work, this.rng)
+          take(w.events, w.state)
+          checks.push(...w.results)
+          log.push(...w.log)
+        }
       }
     }
 
@@ -336,7 +349,7 @@ export class TurnEngine {
 
   private async *playTurn(
     id: string,
-    input: { text: string; kind: 'action' | 'roll_response'; hidden?: boolean; forced?: CheckRequest; answers?: string; combat?: CombatAction },
+    input: { text: string; kind: 'action' | 'roll_response'; hidden?: boolean; forced?: CheckRequest; answers?: string; combat?: CombatAction; work?: Work },
     signal: AbortSignal
   ): AsyncGenerator<TurnEvent> {
     let ctx: Ctx
@@ -382,6 +395,7 @@ export class TurnEngine {
     const recent = path.filter((m) => !m.meta.hidden).slice(-4).map((m) => ({ role: m.role, content: m.content }))
     const plan: TurnPlan = {}
     if (input.forced) plan.ref = { checks: [input.forced], intent: 'other', fight: NO_FIGHT }
+    else if (input.work && working.character.status === 'alive' && !working.combat) plan.ref = { checks: [], intent: input.work.kind, fight: NO_FIGHT, work: input.work }
     else if (working.character.status === 'alive' && working.combat) {
       plan.combat = input.combat
       if (!plan.combat) {
@@ -449,7 +463,8 @@ export class TurnEngine {
     // mentions their keywords. The newest message includes the engine's notes for this turn.
     const loreEntries = [...this.campaigns.loreEntries(c), ...c.cast.flatMap((m) => m.book.map(normalizeEntry))]
     const lore = selectLore(loreEntries, history.map((m) => m.content), { budgetChars: tier.lore, rng: this.rng })
-    const people = relevantEntities(memory, path.slice(-6).map((m) => m.content).join('\n'), after.location, tier.people, [c.build.name])
+    const me = after.character.build.name
+    const people = relevantEntities(memory, path.slice(-6).map((m) => m.content).join('\n'), after.location, tier.people, [me])
       .map((e) => entityLine(e, tier.facts))
       .join('\n')
     const index = new Map(path.map((m, i) => [m.id, i]))
@@ -491,7 +506,7 @@ export class TurnEngine {
       })
     }
 
-    const filter = new NameFilter(id, [c.build.name, ...c.cast.map((m) => m.name)])
+    const filter = new NameFilter(id, [me, ...after.fallen.map((f) => f.name), ...c.cast.map((m) => m.name)])
     let text = ''
     let thinking = ''
     let error: string | undefined
@@ -553,6 +568,17 @@ export class TurnEngine {
       } catch {
         // Bookkeeping failing must never break the story; the next turn tries again.
       }
+      // A death: the DM's last words for them, for the death screen and the Hall of the Fallen.
+      if (after.character.status === 'dead' && !after.character.epitaph) {
+        try {
+          const death = [...events].reverse().find((e) => e.event.type === 'status' && (e.event as { status: string }).status === 'dead')?.event as { reason?: string } | undefined
+          const recent = [...path.filter((m) => !m.meta.hidden).slice(-3).map((m) => ({ role: m.role, content: m.content })), { role: 'assistant' as const, content: clean }]
+          const words = await writeEpitaph(ctx.provider, ctx.model, after, death?.reason || 'fell', recent)
+          if (words) this.campaigns.db.addEvents(id, dm.id, newId('grp'), 'ai', [{ type: 'epitaph', text: words }])
+        } catch {
+          // The death screen does without.
+        }
+      }
       this.remember(id, ctx)
     }
     yield { type: 'view', view: this.campaigns.view(id) }
@@ -582,7 +608,7 @@ export class TurnEngine {
     const memory = projectMemory(all.map((e) => e.event))
     const index = new Map(path.map((m, i) => [m.id, i]))
     const at = (msgId: string) => index.get(msgId) ?? -1
-    const player = c.build.name
+    const player = this.campaigns.state(c, { path }).character.build.name
 
     // A chapter, once enough scenes have piled up since the last one.
     const lastChapterTo = memory.chapters.length ? Math.max(...memory.chapters.map((s) => at(s.to))) : -1

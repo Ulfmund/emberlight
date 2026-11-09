@@ -1,11 +1,14 @@
 import { create } from 'zustand'
 import type { SettingsView } from '@shared/types'
-import type { Attr, CampaignSettings, CharacterBuild, CheckResult, CombatAction } from '@shared/rules'
+import type { Attr, CampaignSettings, CharacterBuild, CheckResult, CombatAction, RaceId, Work } from '@shared/rules'
 import type { CampaignSummary, CampaignView, MessageView, TurnEvent } from '@shared/view'
 import { api, type CreateOptions } from './api'
 import type { MemoryEvent } from '@shared/memory'
 
 export type Screen = 'title' | 'connect' | 'creator' | 'play' | 'load'
+
+/** After a death: whoever takes up the tale is made in the creator (a stranger, or a child). */
+export type Heir = { campaignId: string; settings: CampaignSettings; dead: string; child?: { id: string; name: string }; race?: RaceId }
 
 /** Something worth celebrating or warning about, shown as a toast. */
 export type Toast = { id: number; title: string; text?: string; tone: 'good' | 'bad' | 'level' | 'info'; icon: string }
@@ -36,6 +39,8 @@ type State = {
   toasts: Toast[]
   /** A finished turn's results, held back until the player has thrown the dice. */
   pendingView: CampaignView | null
+  /** The creator is making a successor for a story whose character died. */
+  heir: Heir | null
 
   go(screen: Screen): void
   loadSettings(): Promise<void>
@@ -44,8 +49,15 @@ type State = {
   open(id: string): Promise<void>
   create(build: CharacterBuild, settings: CampaignSettings, opts?: CreateOptions): Promise<void>
   remove(id: string): Promise<void>
+  /** After a death: open the creator for whoever takes up the tale. */
+  startHeir(h: Heir): void
+  /** Back to the story without a successor. */
+  cancelHeir(): Promise<void>
+  /** The successor joins the story, and their opening scene is narrated. */
+  takeUp(build: CharacterBuild): Promise<void>
 
-  act(text: string, combat?: CombatAction): Promise<void>
+  /** Free text, or a move picked on the combat tracker, or a recipe from the Bag. */
+  act(text: string, picked?: { combat?: CombatAction; work?: Work }): Promise<void>
   answer(messageId: string): Promise<void>
   regenerate(): Promise<void>
   reroll(checkId: string): Promise<void>
@@ -177,8 +189,9 @@ export const useGame = create<State>((set, get) => {
     abort: null,
     toasts: [],
     pendingView: null,
+    heir: null,
 
-    go: (screen) => set({ screen }),
+    go: (screen) => set({ screen, heir: null }),
 
     loadSettings: async () => {
       // The local server may still be starting when the page first loads, so retry briefly.
@@ -210,13 +223,29 @@ export const useGame = create<State>((set, get) => {
       await get().open(id)
     },
 
+    startHeir: (h) => set({ heir: h, screen: 'creator' }),
+    cancelHeir: async () => {
+      const h = get().heir
+      set({ heir: null })
+      if (h) await get().open(h.campaignId)
+      else set({ screen: 'title' })
+    },
+    takeUp: async (build) => {
+      const h = get().heir
+      if (!h) return
+      const view = await api.successor(h.campaignId, build, h.child?.id)
+      set({ heir: null, view, screen: 'play', live: idleLive })
+      void get().loadCampaigns()
+      if (view.awaitingNarration) void get().narrateHead()
+    },
+
     remove: async (id) => {
       await api.deleteCampaign(id)
       if (get().view?.id === id) set({ view: null })
       await get().loadCampaigns()
     },
 
-    act: (text, combat) => run('act', { text, combat }),
+    act: (text, picked) => run('act', { text, ...picked }),
     answer: (messageId) => run('answer', { messageId }),
     regenerate: () => run('regenerate', {}),
     reroll: (checkId) => run('reroll', { checkId }),

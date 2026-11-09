@@ -12,11 +12,13 @@ import type { Provider, CompleteOptions } from '../ai/providers/types'
 import { CardLibrary } from '../cards/library'
 import { LoreLibrary } from '../lore/library'
 import { findWorld } from '@shared/worlds'
+import { applyRename } from './rename'
 
 /** A scripted stand-in for a model: the test decides what the Referee, Narrator and Scribe say. */
 class FakeProvider implements Provider {
   referee: unknown = { checks: [] }
   combatReferee: unknown = { action: 'attack', target: '', item: '', checks: [] }
+  epitaph = 'She never looked back, and the river never gave her up.'
   scribe: unknown = blankScribe()
   narration = 'The rain keeps falling. [[ROLL: perception | hard | something moves in the reeds]]'
   calls: string[] = []
@@ -37,6 +39,7 @@ class FakeProvider implements Provider {
     if (opts.name === 'summarize_chapter') return opts.schema.parse({ title: `Chapter ${n}`, summary: `A chapter passed (${n}).` })
     if (opts.name === 'story_so_far') return opts.schema.parse({ storySoFar: `The tale so far (${n}).` })
     if (opts.name === 'combat_referee') return opts.schema.parse(this.combatReferee)
+    if (opts.name === 'epitaph') return opts.schema.parse({ epitaph: this.epitaph })
     return opts.schema.parse(opts.name === 'referee' ? this.referee : this.scribe)
   }
   async *chat(_m: string, opts: { system: string; messages: { role: string; content: string }[] }): AsyncIterable<StreamEvent> {
@@ -441,7 +444,7 @@ describe('turn engine', () => {
 
     // A move picked on the tracker needs no Referee at all.
     fake.calls = []
-    await run(engine.act(id, 'I attack Bandit 2.', signal, { kind: 'attack', target: 'f2' }))
+    await run(engine.act(id, 'I attack Bandit 2.', signal, { combat: { kind: 'attack', target: 'f2' } }))
     expect(fake.calls).not.toContain('referee')
     expect(fake.calls).not.toContain('combat_referee')
     v = campaigns.view(id)
@@ -468,7 +471,7 @@ describe('turn engine', () => {
     await run(engine.act(id, 'I shoot the nearer bandit.', signal))
     setRolls(0.05) // a miss
     fake.calls = []
-    await run(engine.act(id, 'I shoot Bandit 1 again.', signal, { kind: 'attack', target: 'f1' }))
+    await run(engine.act(id, 'I shoot Bandit 1 again.', signal, { combat: { kind: 'attack', target: 'f1' } }))
     let v = campaigns.view(id)
     expect(v.state.combat!.round).toBe(3)
     const miss = v.messages.at(-2)!.checks[0]
@@ -553,6 +556,112 @@ describe('turn engine', () => {
     fake.narration = 'The night stays quiet.'
     await run(engine.regenerate(id, signal))
     expect(campaigns.view(id).state.combat).toBeNull()
+  })
+
+  it('gathers and crafts through the engine; the Make button needs no Referee', async () => {
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    fake.scribe = { ...blankScribe(), placeKind: 'forest' }
+    await run(engine.act(id, 'I walk into the woods.', signal))
+    fake.scribe = blankScribe()
+
+    // Hunting: the Referee names the work; its own Hunting check isn't rolled on top.
+    fake.referee = {
+      intent: 'gather',
+      checks: [{ skill: 'hunting', difficulty: 'moderate', modifier: 0, advantage: 'none', reason: 'hunting', dramatic: false, withStrangers: false, risk: 'light', riskSource: 'beast' }],
+      work: { kind: 'gather', what: 'game' }
+    }
+    setRolls(0.99)
+    const out = await run(engine.act(id, 'I go hunting for something to eat.', signal))
+    expect((out.find((e) => e.type === 'checks') as { checks: unknown[] }).checks).toHaveLength(1)
+    let v = campaigns.view(id)
+    expect(v.state.character.inventory.find((i) => i.name === 'Raw meat')?.qty).toBe(4)
+    expect(v.state.character.inventory.find((i) => i.name === 'Animal hide')?.qty).toBe(1)
+    expect(lastNotes()).toContain('GATHERING: the character gets 4 × Raw meat, 1 × Animal hide.')
+
+    // Make (from the Bag): tanning the hide, straight to the engine.
+    fake.calls = []
+    await run(engine.act(id, 'I tan an animal hide.', signal, { work: { kind: 'craft', what: 'leather' } }))
+    expect(fake.calls).not.toContain('referee')
+    v = campaigns.view(id)
+    expect(v.state.character.inventory.find((i) => i.name === 'Leather')?.qty).toBeGreaterThanOrEqual(1)
+    expect(v.state.character.inventory.some((i) => i.name === 'Animal hide')).toBe(false)
+    expect(lastNotes()).toMatch(/CRAFTING: used 1 × Animal hide; made \d × Leather/)
+  })
+
+  // ---- death and what comes after (docs/spec/03-characters-and-cards.md#when-a-character-dies) ----
+
+  /** Plays to a death: a daughter and a friend in the story, then a fatal fall. */
+  async function toDeath() {
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    const person = (name: string, who: string, relation: string) => ({ name, otherNames: [], who, newFacts: [], status: 'alive', attitude: 'devoted', relation })
+    fake.scribe = { ...blankScribe(), people: [person('Wenna', "Brenna's daughter, waiting at home", 'child'), person('Old Tam', 'The ferryman', 'friend')] }
+    await run(engine.act(id, 'I think of home, and of Wenna.', signal))
+    fake.scribe = blankScribe()
+    await run(engine.act(id, 'I climb the Gallows Cliff path.', signal))
+    const player = campaigns.view(id).messages.at(-2)!
+    db.addEvents(id, player.id, 'grp_fall', 'engine', [{ type: 'status', status: 'dead', reason: 'Fell from the Gallows Cliff' }])
+    await run(engine.regenerate(id, signal))
+    return id
+  }
+
+  it('writes an epitaph when a character dies; their child can take up the tale', async () => {
+    const id = await toDeath()
+    let v = campaigns.view(id)
+    expect(v.state.character.status).toBe('dead')
+    expect(v.state.character.epitaph).toBe(fake.epitaph)
+    const deathMsg = v.messages.at(-1)!.id
+    const coins = v.state.character.coins
+    const wenna = v.memory.entities.find((e) => e.name === 'Wenna')!
+    expect(wenna.relation).toBe('child')
+
+    campaigns.successor(id, { ...build, name: 'Wenna Rook' }, wenna.id)
+    v = campaigns.view(id)
+    expect(v.build.name).toBe('Wenna Rook')
+    expect(v.state.character.status).toBe('alive')
+    expect(v.state.fallen).toEqual([expect.objectContaining({ name: 'Brenna Rook', cause: 'Fell from the Gallows Cliff', epitaph: fake.epitaph, heir: 'Wenna Rook', heirIsChild: true })])
+    // Her savings and her bow came down to her daughter; ten years have passed.
+    expect(v.state.character.coins).toBe(50 + coins)
+    expect(v.state.character.inventory.some((i) => i.name === "Brenna's shortbow")).toBe(true)
+    expect(v.state.time.day).toBe(1 + 3650)
+    // The world remembers the dead; the daughter is the player now, not a Journal entry.
+    expect(v.memory.entities.find((e) => e.name === 'Wenna')).toBeUndefined()
+    expect(v.memory.entities.find((e) => e.name === 'Brenna Rook')).toMatchObject({ status: 'dead', relation: 'parent' })
+    expect(v.memory.entities.find((e) => e.name === 'Old Tam')?.relation).toBe('friend')
+    expect(v.awaitingNarration).toBe(true)
+
+    await run(engine.narrateHead(id, signal))
+    expect(fake.lastSystem).toContain('THE FALLEN (earlier adventurers of this story')
+    expect(fake.lastSystem).toContain("Fell from the Gallows Cliff. The player character's mother.")
+    expect(fake.lastSystem).toContain('Wenna Rook: human')
+    expect(fake.lastMessages.at(-1)!.content).toContain('10 years later, their child Wenna Rook, human hunter, takes up the road.')
+    expect(campaigns.list().find((x) => x.id === id)?.characterName).toBe('Wenna Rook')
+
+    // Rewind to the death, and Brenna is back (dead): the other branch is kept.
+    campaigns.rewind(id, deathMsg)
+    expect(campaigns.view(id).build.name).toBe('Brenna Rook')
+    expect(campaigns.view(id).state.fallen).toHaveLength(0)
+  })
+
+  it('a stranger takes up the tale with no ties to the dead; renaming them changes the story, not the save', async () => {
+    const id = await toDeath()
+    expect(() => campaigns.successor(id, { ...build, name: '' })).toThrow()
+    campaigns.successor(id, { ...build, name: 'Tobin Marsh', sex: 'male' })
+    let v = campaigns.view(id)
+    expect(v.build.name).toBe('Tobin Marsh')
+    expect(v.state.time.day).toBe(1 + 3)
+    expect(v.state.character.coins).toBe(50)
+    const tam = v.memory.entities.find((e) => e.name === 'Old Tam')!
+    expect(tam.relation).toBeUndefined()
+    expect(tam.attitude).toBeUndefined()
+    // Only after a death.
+    expect(() => campaigns.successor(id, { ...build, name: 'Someone Else' })).toThrow(/fallen/)
+
+    applyRename(campaigns, id, { from: 'Tobin Marsh', to: 'Tobin Reed', mode: 'story', target: { kind: 'player' } })
+    v = campaigns.view(id)
+    expect(v.build.name).toBe('Tobin Reed')
+    expect(campaigns.get(id).build.name).toBe('Brenna Rook')
   })
 
   it('brings random events now and then, and not one after another', async () => {

@@ -161,6 +161,17 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
     return r.ok ? c.json(r.value) : c.json({ error: r.error }, 404)
   })
 
+  /** After a death: a new character takes up the tale (a stranger, or the dead one's child). */
+  app.post('/api/campaigns/:id/successor', async (c) => {
+    const b = await body(c, z.object({ build: BuildSchema, childId: z.string().max(80).optional() }))
+    if (!b) return c.json({ error: 'Invalid character.' }, 400)
+    const r = guard(() => {
+      campaigns.successor(c.req.param('id'), b.build, b.childId)
+      return campaigns.view(c.req.param('id'))
+    })
+    return r.ok ? c.json(r.value) : c.json({ error: r.error }, 400)
+  })
+
   app.put('/api/campaigns/:id/name', async (c) => {
     const s = await body(c, z.object({ name: z.string().min(1).max(80) }))
     if (!s) return c.json({ error: 'Invalid name.' }, 400)
@@ -181,12 +192,14 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
     z.object({ kind: z.literal('use_item'), item: z.string().min(1).max(80) }),
     z.object({ kind: z.literal('surrender') })
   ])
+  /** "Make" in the Bag: a recipe, by id. */
+  const WorkSchema = z.object({ kind: z.literal('craft'), what: z.string().min(1).max(60) })
 
   app.post('/api/campaigns/:id/act', async (c) => {
-    const b = await body(c, z.object({ text: z.string().min(1).max(4000), combat: CombatMoveSchema.optional() }))
+    const b = await body(c, z.object({ text: z.string().min(1).max(4000), combat: CombatMoveSchema.optional(), work: WorkSchema.optional() }))
     const id = c.req.param('id')
     return stream(c, (signal) =>
-      b ? turns.act(id, b.text, signal, b.combat) : (async function* () { yield { type: 'error', message: 'Write something first.' } as TurnEvent })()
+      b ? turns.act(id, b.text, signal, { combat: b.combat, work: b.work }) : (async function* () { yield { type: 'error', message: 'Write something first.' } as TurnEvent })()
     )
   })
 

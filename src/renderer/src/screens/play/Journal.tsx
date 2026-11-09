@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { ATTITUDES, MAX_FACTS, sameName, type Attitude, type Entity, type EntityStatus, type MemoryEvent, type Summary } from '@shared/memory'
 import { cardImageUrl } from '@shared/cards'
+import { BACKGROUNDS, RACES } from '@shared/rules'
 import type { CampaignView } from '@shared/view'
 import { useGame } from '../../store'
 import { Button } from '../../components/Button'
@@ -16,7 +17,7 @@ import { RenameDialog } from './RenameDialog'
  * correction to what the DM knows.
  */
 
-type Section = 'people' | 'places' | 'story' | 'notes' | 'lore'
+type Section = 'people' | 'places' | 'story' | 'notes' | 'lore' | 'fallen'
 
 const ATTITUDE_INFO: Record<Attitude, { label: string; color: string }> = {
   hostile: { label: 'Hostile', color: '#d9574c' },
@@ -50,7 +51,8 @@ export function Journal({ view, open, onClose }: { view: CampaignView; open: boo
     { id: 'places', label: 'Places', icon: 'map', count: places.length },
     { id: 'story', label: 'Story', icon: 'scroll', count: m.scenes.length + m.chapters.length || undefined },
     { id: 'notes', label: 'Pinned', icon: 'pin', count: m.notes.length || undefined },
-    { id: 'lore', label: 'Lore', icon: 'book', count: view.lorebooks.length || undefined }
+    { id: 'lore', label: 'Lore', icon: 'book', count: view.lorebooks.length || undefined },
+    ...(view.state.fallen?.length ? [{ id: 'fallen' as const, label: 'Fallen', icon: 'skull', count: view.state.fallen.length }] : [])
   ]
 
   return (
@@ -108,6 +110,7 @@ export function Journal({ view, open, onClose }: { view: CampaignView; open: boo
                 {section === 'story' && <StorySection view={view} />}
                 {section === 'notes' && <NotesSection view={view} />}
                 {section === 'lore' && <LoreSection view={view} />}
+                {section === 'fallen' && <FallenSection view={view} />}
               </div>
             </div>
           </motion.div>
@@ -118,6 +121,32 @@ export function Journal({ view, open, onClose }: { view: CampaignView; open: boo
 }
 
 const bySeen = (a: Entity, b: Entity) => Number(a.status === 'dead') - Number(b.status === 'dead') || b.lastSeen - a.lastSeen
+
+/** The Hall of the Fallen: everyone this story has lost, and who came after them. */
+function FallenSection({ view }: { view: CampaignView }) {
+  const fallen = [...(view.state.fallen ?? [])].reverse()
+  return (
+    <>
+      <Heading title="Hall of the Fallen" text="The adventurers this story has lost. The world remembers them, and so does the DM." />
+      <div className="space-y-3">
+        {fallen.map((f, i) => (
+          <div key={`${f.name}-${i}`} className="rounded-xl border border-gold-500/15 bg-ink-900/60 p-4">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="font-display text-lg tracking-wider text-parchment-100">{f.name}</span>
+              <span className="shrink-0 text-xs text-parchment-500">day {f.day} · level {f.level}</span>
+            </div>
+            <div className="mt-0.5 text-sm text-parchment-400">
+              {RACES[f.race].label} {BACKGROUNDS[f.background].label.toLowerCase()}: {f.cause}
+            </div>
+            {f.epitaph && <p className="mt-2 font-story text-lg leading-relaxed text-parchment-200 italic">“{f.epitaph}”</p>}
+            {f.deeds.length > 0 && <p className="mt-2 text-xs text-parchment-400">Remembered for: {f.deeds.slice(-3).join('; ')}</p>}
+            {f.heir && <p className="mt-1 text-xs text-gold-300">{f.heirIsChild ? `${f.heir}, their child, took up the tale.` : `${f.heir} took up the tale.`}</p>}
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
 
 function Heading({ title, text }: { title: string; text: string }) {
   return (
