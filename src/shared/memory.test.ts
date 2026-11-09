@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { entityLine, mentions, projectMemory, relevantEntities, sameName, storySoFar, type MemoryEvent, type Summary } from './memory'
 import { scribeToEvents, type ScribeOutput } from '../server/ai/jobs/scribe'
-import { DEFAULT_SETTINGS, initialState, type CharacterBuild } from './rules'
+import { DEFAULT_SETTINGS, initialState, storyMinute, type CharacterBuild } from './rules'
 
 const person = (name: string, extra: Partial<Extract<MemoryEvent, { type: 'entity' }>> = {}): MemoryEvent => ({ type: 'entity', kind: 'person', name, day: 1, ...extra })
 
@@ -163,7 +163,8 @@ describe('Scribe memory output', () => {
     ate: 'none',
     itemsUsed: [],
     itemsEquipped: [],
-    spellsLearned: []
+    spellsLearned: [],
+    weather: 'unchanged' as const
   }
 
   it('records people and places, but never the player character or nameless extras', () => {
@@ -184,5 +185,16 @@ describe('Scribe memory output', () => {
     const mem = evs.filter((e) => e.type === 'entity')
     expect(mem.map((e) => (e as { name: string }).name)).toEqual(['Old Tam', 'Millbrook Crossing', 'The Wicker Goose'])
     expect(mem[0]).toMatchObject({ kind: 'person', aliases: ['the ferryman'], attitude: 'friendly', status: 'alive', facts: ['owes Brenna a favour'] })
+  })
+
+  it('notes the weather when the story changes it, and only then', () => {
+    const state = initialState(build, DEFAULT_SETTINGS)
+    expect(scribeToEvents({ ...blank, weather: 'rain' }, state)).toContainEqual({ type: 'weather', weather: 'rain' })
+    expect(scribeToEvents(blank, state).some((e) => e.type === 'weather')).toBe(false)
+    expect(scribeToEvents({ ...blank, weather: 'rain' }, { ...state, weather: 'rain' }).some((e) => e.type === 'weather')).toBe(false)
+    // Rain that has had its time is over: rain again is new weather, and the sun coming out ends it.
+    const longAgo = { ...state, weather: 'rain' as const, weatherAt: storyMinute(state.time) - 9 * 60 }
+    expect(scribeToEvents({ ...blank, weather: 'rain' }, longAgo)).toContainEqual({ type: 'weather', weather: 'rain' })
+    expect(scribeToEvents({ ...blank, weather: 'clear' }, { ...state, weather: 'rain' })).toContainEqual({ type: 'weather', weather: 'clear' })
   })
 })

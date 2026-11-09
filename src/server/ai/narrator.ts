@@ -31,7 +31,10 @@ import {
   type FoeSpec,
   type GameState,
   type Rng,
-  type SkillId
+  type SkillId,
+  type Weather,
+  weatherNow,
+  weatherPassed
 } from '@shared/rules'
 import type { ChatMessage } from '@shared/types'
 import type { CardBookEntry, CastMember } from '@shared/cards'
@@ -204,7 +207,20 @@ ${gear}
 ${carrying}${body}${magic}
 ${c.status === 'downed' ? 'STATUS: DOWNED: unconscious and dying.\n' : c.status === 'dead' ? 'STATUS: DEAD.\n' : ''}
 ${loreAt(lore, 'after_char')}WHERE AND WHEN
-Day ${state.time.day}, ${timeOfDay}${state.location ? `, at ${state.location}` : ''}.${memoryBlock(memory)}${fallenBlock(state, third)}${companionBlock(cast)}${loreBlock(lore)}`
+Day ${state.time.day}, ${timeOfDay}${state.location ? `, at ${state.location}` : ''}.${skyLine(state)}${memoryBlock(memory)}${fallenBlock(state, third)}${companionBlock(cast)}${loreBlock(lore)}`
+}
+
+const SKY: Record<Weather, string> = { clear: '', rain: 'It is raining', storm: 'A storm is raging', fog: 'Thick fog lies over everything', snow: 'Snow is falling' }
+const SKY_PASSED: Record<Weather, string> = { clear: '', rain: 'The rain has stopped', storm: 'The storm has blown over', fog: 'The fog has lifted', snow: 'The snow has stopped falling' }
+
+/** The weather, so the story keeps to it (and lets it pass when its time is up). */
+function skyLine(state: GameState): string {
+  if (state.placeKind === 'underground') return ''
+  const outside = state.placeKind === 'indoors' ? ' outside' : ''
+  const now = weatherNow(state)
+  if (now && SKY[now]) return ` ${SKY[now]}${outside}.`
+  const passed = weatherPassed(state)
+  return passed ? ` ${SKY_PASSED[passed]}.` : ''
 }
 
 /** Earlier characters of this story who died (the Hall of the Fallen). */

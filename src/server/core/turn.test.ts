@@ -761,4 +761,22 @@ describe('turn engine', () => {
     await run(engine.act(id, 'I keep walking.', signal))
     expect(lastNotes()).not.toContain('RANDOM EVENT')
   })
+
+  it('keeps the story to the weather until it blows over', async () => {
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    fake.referee = { intent: 'other', checks: [] }
+    fake.scribe = { ...blankScribe(), weather: 'rain', placeKind: 'road' }
+    await run(engine.act(id, 'I walk on.', signal))
+    fake.scribe = blankScribe()
+    await run(engine.act(id, 'I keep walking.', signal))
+    expect(fake.lastSystem).toContain('It is raining.')
+    expect(campaigns.view(id).state.weather).toBe('rain')
+    fake.scribe = { ...blankScribe(), minutesPassed: 9 * 60 }
+    await run(engine.act(id, 'I walk on through the day.', signal))
+    fake.scribe = blankScribe()
+    await run(engine.act(id, 'And on.', signal))
+    expect(fake.lastSystem).toContain('The rain has stopped.')
+    expect(fake.lastSystem).not.toContain('It is raining')
+  })
 })

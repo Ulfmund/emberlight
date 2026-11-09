@@ -16,13 +16,17 @@ export type Prefs = {
   /** Sound effects, and how loud (0 to 1). */
   sound: boolean
   volume: number
+  /** Music and ambient sound, how loud (0 to 1); and everything off at once. */
+  musicVolume: number
+  ambienceVolume: number
+  muted: boolean
   /** Phones: shake to throw the dice. */
   shake: boolean
 }
 
 const KEY = 'emberlight.prefs'
 const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-const DEFAULTS: Prefs = { ghost: false, effects: reduced ? 'subtle' : 'full', screenShake: !reduced, sound: true, volume: 0.6, shake: true }
+const DEFAULTS: Prefs = { ghost: false, effects: reduced ? 'subtle' : 'full', screenShake: !reduced, sound: true, volume: 0.6, shake: true, musicVolume: 0.5, ambienceVolume: 0.6, muted: false }
 
 function load(): Prefs {
   try {

@@ -1,4 +1,5 @@
 import { usePrefs } from './prefs'
+import { duck, getAudio } from './audio/context'
 
 /**
  * Sound effects, made on the spot with the Web Audio API: no audio files to download, and
@@ -7,31 +8,15 @@ import { usePrefs } from './prefs'
 
 export type Sound = 'roll' | 'land' | 'crit' | 'fumble' | 'success' | 'fail' | 'hit' | 'heal' | 'level' | 'coin' | 'item' | 'death' | 'tick'
 
-let ctx: AudioContext | null = null
-let master: GainNode | null = null
-
+/** The shared context, and the effects channel (its volume follows the device's settings). */
 function audio(): { c: AudioContext; out: GainNode } | null {
-  try {
-    if (!ctx) {
-      const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-      if (!AC) return null
-      ctx = new AC()
-      master = ctx.createGain()
-      // A gentle limiter so stacked sounds never clip.
-      const comp = ctx.createDynamicsCompressor()
-      comp.threshold.value = -14
-      master.connect(comp).connect(ctx.destination)
-    }
-    if (ctx.state === 'suspended') void ctx.resume()
-    return { c: ctx, out: master! }
-  } catch {
-    return null
-  }
+  const a = getAudio()
+  return a ? { c: a.ctx, out: a.sfx } : null
 }
 
 /** Browsers only allow sound after the player has touched or clicked something. */
 export function unlockAudio() {
-  if (usePrefs.getState().sound) audio()
+  getAudio()
 }
 
 type Tone = { freq: number; to?: number; type?: OscillatorType; at?: number; dur: number; gain?: number; attack?: number }
@@ -136,13 +121,13 @@ const SOUNDS: Record<Sound, (c: AudioContext, out: AudioNode) => void> = {
 }
 
 export function play(s: Sound) {
-  const { sound, volume } = usePrefs.getState()
-  if (!sound || volume <= 0) return
+  const { sound, volume, muted } = usePrefs.getState()
+  if (!sound || volume <= 0 || muted) return
   const a = audio()
   if (!a) return
   try {
-    a.out.gain.value = volume
     SOUNDS[s](a.c, a.out)
+    if (s === 'level' || s === 'death' || s === 'crit' || s === 'fumble') duck(s === 'death' ? 3 : 1.8)
   } catch {
     /* sound is a nicety */
   }

@@ -15,6 +15,8 @@ import { Campaigns } from './core/campaigns'
 import { TurnEngine } from './core/turn'
 import { registerGameRoutes } from './routes/game'
 import { registerMediaRoutes } from './routes/media'
+import { registerAudioRoutes } from './routes/audio'
+import { AudioLibrary } from './audio/library'
 import { registerCardRoutes } from './routes/cards'
 import { CardLibrary } from './cards/library'
 import { LoreLibrary } from './lore/library'
@@ -226,6 +228,7 @@ export async function startServer(opts: ServerOptions): Promise<{ port: number; 
   registerLoreRoutes(app, new LoreLibrary(db))
   registerGameRoutes(app, campaigns, turns, library)
   registerMediaRoutes(app, campaigns, turns, settings, secrets)
+  registerAudioRoutes(app, new AudioLibrary(opts.dataDir))
 
   // ---- The UI itself (production) ------------------------------------------------------
   if (opts.staticDir) {

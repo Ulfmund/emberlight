@@ -87,6 +87,35 @@ export const PLACE_KINDS = ['town', 'village', 'indoors', 'road', 'forest', 'hil
 export type PlaceKind = (typeof PLACE_KINDS)[number]
 export const SETTLED: PlaceKind[] = ['town', 'village', 'indoors']
 
+/** The weather, as the story last told it (for the soundscape, and the DM's sense of the scene). */
+export const WEATHERS = ['clear', 'rain', 'storm', 'fog', 'snow'] as const
+export type Weather = (typeof WEATHERS)[number]
+
+/** How long weather lasts once it turns (in-story minutes), unless the story brings it back. */
+export const WEATHER_LASTS: Record<Weather, number> = { clear: Number.POSITIVE_INFINITY, rain: 8 * 60, storm: 3 * 60, fog: 5 * 60, snow: 12 * 60 }
+
+/** Minutes since the story began (day 1, midnight). */
+export const storyMinute = (t: { day: number; minute: number }) => (t.day - 1) * 1440 + t.minute
+
+type WeatherState = { weather?: Weather | null; weatherAt?: number; time: { day: number; minute: number } }
+
+/** Minutes past the weather's natural end (negative: it's still going). */
+function weatherOver(s: WeatherState): number {
+  if (!s.weather || s.weather === 'clear' || s.weatherAt === undefined) return -1
+  return storyMinute(s.time) - s.weatherAt - WEATHER_LASTS[s.weather]
+}
+
+/** The weather now: what the story last said, until it has had time to blow over. */
+export function weatherNow(s: WeatherState): Weather | null {
+  return weatherOver(s) > 0 ? 'clear' : (s.weather ?? null)
+}
+
+/** Weather that blew over in the last three hours (so the DM can say so), else null. */
+export function weatherPassed(s: WeatherState): Weather | null {
+  const over = weatherOver(s)
+  return over > 0 && over <= 180 ? s.weather! : null
+}
+
 export type InventoryItem = {
   name: string
   qty: number
@@ -152,6 +181,10 @@ export type GameState = {
   time: { day: number; minute: number }
   location: string | null
   placeKind: PlaceKind | null
+  /** Last weather the story mentioned (null: never said); see weatherNow for whether it lasts. */
+  weather?: Weather | null
+  /** When it turned (storyMinute). */
+  weatherAt?: number
   /** A fight on the turn tracker, if one is going on (see combat.ts). */
   combat: Combat | null
   /** Earlier characters of this story who died (the Hall of the Fallen). */
@@ -200,6 +233,8 @@ export type GameEvent =
   | { type: 'world_event'; id: string; text: string }
   /** The DM's words for a character who just died. */
   | { type: 'epitaph'; text: string }
+  /** The weather turned (the story said so, or a random event brought it). */
+  | { type: 'weather'; weather: Weather }
   /**
    * After a death, a new character takes up the tale in the same world, some days (or years)
    * later. The dead one joins the Hall of the Fallen; a child may inherit savings and renown.
@@ -492,6 +527,10 @@ export function applyEvent(prev: GameState, ev: GameEvent, settings: CampaignSet
       break
     case 'epitaph':
       c.epitaph = ev.text.trim().slice(0, 600)
+      break
+    case 'weather':
+      s.weather = ev.weather
+      s.weatherAt = storyMinute(s.time)
       break
     case 'portrait':
       c.portrait = ev.media ?? undefined

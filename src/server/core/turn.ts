@@ -363,6 +363,7 @@ export class TurnEngine {
       if (ev) {
         eventId = ev.id
         events.push({ type: 'world_event', id: ev.id, text: ev.text })
+        if (ev.weather) events.push({ type: 'weather', weather: ev.weather })
         // A band met on the road is rabble for a new adventurer, and real trouble later on.
         const specs = (ev.foes ?? []).map((f) => (working.character.level <= 3 && (f.count ?? 1) >= 2 && !f.tier ? { ...f, tier: 'minion' as const } : f))
         const foes = specs.length ? buildFoes(specs, working.character.level, this.rng) : []

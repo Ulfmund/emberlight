@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { CONDITION_IDS, findSpell, findTemplate, PLACE_KINDS, SPELLS, templateOf, type ConditionId, type GameEvent, type GameState, type InventoryItem } from '@shared/rules'
+import { CONDITION_IDS, findSpell, findTemplate, PLACE_KINDS, SPELLS, templateOf, weatherNow, type ConditionId, type GameEvent, type GameState, type InventoryItem } from '@shared/rules'
 import type { Provider } from '../providers'
 import { entityLine, findEntity, relevantEntities, RELATIONS, sameName, samePlace, type Memory } from '@shared/memory'
 
@@ -21,6 +21,7 @@ export const ScribeSchema = z.object({
   placeKind: z
     .enum([...PLACE_KINDS, 'unknown'] as [string, ...string[]])
     .describe('What sort of place the character is in now: town, village, indoors (inside a building), road, forest, hills (hills or mountains), water (river, lake, coast, at sea), ruin, underground (caves, mines, dungeons), wild (open country); unknown if unclear'),
+  weather: z.enum(['clear', 'rain', 'storm', 'fog', 'snow', 'unchanged']).default('unchanged').describe('The weather now, if this exchange shows or changes it (clear skies, rain, a storm, fog, snow); unchanged if it says nothing about it, or the character is indoors'),
   ate: z.enum(['none', 'snack', 'meal', 'feast']).describe('Did the character eat food that is not from their own pack? snack = a bite or a drink; meal = a proper meal; feast = a big hot meal or banquet'),
   itemsUsed: z
     .array(z.object({ name: z.string(), qty: z.number().int() }))
@@ -138,6 +139,7 @@ export function scribeToEvents(out: ScribeOutput, state: GameState, memory?: Mem
   }
   const loc = out.location.trim()
   if (loc && loc.toLowerCase() !== (state.location ?? '').toLowerCase() && loc.length < 60) events.push({ type: 'location', name: loc })
+  if (out.weather && out.weather !== 'unchanged' && out.weather !== weatherNow(state)) events.push({ type: 'weather', weather: out.weather })
   if (out.placeKind && out.placeKind !== 'unknown' && out.placeKind !== state.placeKind && (PLACE_KINDS as readonly string[]).includes(out.placeKind)) {
     events.push({ type: 'place_kind', kind: out.placeKind as (typeof PLACE_KINDS)[number] })
   }

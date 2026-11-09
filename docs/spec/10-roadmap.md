@@ -54,7 +54,7 @@ Built in milestones. Each one ends with something playable, so the artist can te
 - UI sound effects ✅ 0.12.0
 
 ## v1.x
-- Ambient audio and dynamic music ([09](09-audio.md))
+- Ambient audio and dynamic music ([09](09-audio.md)) ✅ 0.16.0 (made on the spot, or from your own tagged tracks)
 - Semantic (embedding) memory search
 - Faction reputation
 - Location art; a simple map of visited places

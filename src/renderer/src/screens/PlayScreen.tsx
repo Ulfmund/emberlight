@@ -18,6 +18,7 @@ import { Tip } from '../components/Tip'
 import { api } from '../api'
 import { isTouch, useEffectsLevel, usePrefs } from '../prefs'
 import { LevelUpPillar, useFx } from '../fx'
+import { useSoundscape } from '../audio/mixer'
 
 export function PlayScreen() {
   const { view, busy, act, stop, live } = useGame()
@@ -27,6 +28,8 @@ export function PlayScreen() {
   /** Phones: the character and side panels live in a drawer. */
   const [drawer, setDrawer] = useState(false)
   const portraits = useMemo(() => (view ? portraitMap(view) : {}), [view])
+  // The music and the sounds of the place follow the story.
+  useSoundscape(view)
   // A big hit jolts the screen (Full effects, if screen shake is on).
   const [shakeScope, shake] = useAnimate()
   const hitAt = useFx((f) => f.hitAt)

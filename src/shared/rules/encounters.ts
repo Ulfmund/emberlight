@@ -1,6 +1,6 @@
 import type { Rng } from './character'
 import type { FoeSpec } from './combat'
-import { SETTLED, type CampaignSettings, type EventFrequency, type GameState, type PlaceKind } from './state'
+import { SETTLED, type CampaignSettings, type EventFrequency, type GameState, type PlaceKind, type Weather } from './state'
 
 /**
  * Random events (docs/spec/06-ai-dm.md#5-random-events): the world doesn't wait for the player.
@@ -24,15 +24,17 @@ export type WorldEvent = {
   ambush?: boolean
   /** Can happen while the character sleeps. */
   atRest?: boolean
+  /** Weather events: what the sky does (the soundscape follows). */
+  weather?: Weather
 }
 
 export const WORLD_EVENTS: WorldEvent[] = [
   // ---- anywhere ------------------------------------------------------------------------
-  { id: 'rain', where: ['any'], kind: 'weather', text: 'The weather turns: cold rain sweeps in, soaking everything and turning paths to mud.', weight: 3, atRest: true },
-  { id: 'fog', where: ['any'], kind: 'weather', text: 'A thick fog rolls in, swallowing sound and sight beyond a few paces.', weight: 2 },
+  { id: 'rain', where: ['any'], kind: 'weather', text: 'The weather turns: cold rain sweeps in, soaking everything and turning paths to mud.', weight: 3, atRest: true, weather: 'rain' },
+  { id: 'fog', where: ['any'], kind: 'weather', text: 'A thick fog rolls in, swallowing sound and sight beyond a few paces.', weight: 2, weather: 'fog' },
   { id: 'omen_crows', where: ['any'], kind: 'omen', text: 'An omen: a flock of crows wheels overhead three times and settles, watching the character in silence.', weight: 1 },
   { id: 'omen_dream', where: ['any'], kind: 'omen', text: "A vivid dream or a sudden vision troubles the character: something from the story, twisted and strange. Make it hint at a real danger ahead.", weight: 1, atRest: true, time: 'night' },
-  { id: 'storm', where: ['road', 'wild', 'water'], kind: 'weather', text: 'A storm breaks: thunder, driving rain, and wind strong enough to bring down branches. Shelter would be wise.', weight: 2, atRest: true },
+  { id: 'storm', where: ['road', 'wild', 'water'], kind: 'weather', text: 'A storm breaks: thunder, driving rain, and wind strong enough to bring down branches. Shelter would be wise.', weight: 2, atRest: true, weather: 'storm' },
 
   // ---- towns and villages --------------------------------------------------------------
   { id: 'pickpocket', where: ['settlement'], kind: 'complication', text: 'A pickpocket makes a try for the character\'s purse in the crowd. Ask for a hidden perception roll with [[ROLL: perception | moderate | a hand at your belt]].', weight: 2, time: 'day' },
