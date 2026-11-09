@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ageLabel, dateLabel, practiced, project, SKILL_IDS, SKILLS, skillLevelFromXp, SKIP_SPANS, skipEvents, skipText, spanLabel, type SkillId, type SkipPlan } from '@shared/rules'
+import { ageLabel, dateLabel, practiced, project, SKILL_IDS, SKILLS, skillLevelFromXp, SKIP_SPANS, skipEvents, skipText, spanLabel, weeklyPay, type SkillId, type SkipPlan } from '@shared/rules'
+import { coinText } from './Life'
 import type { CampaignView } from '@shared/view'
 import { Button } from '../../components/Button'
 import { Icon } from '../../components/Icon'
@@ -15,8 +16,14 @@ export function SkipDialog({ view, open, onClose, onSkip }: { view: CampaignView
   const [days, setDays] = useState<number>(SKIP_SPANS[3].days)
   const [doing, setDoing] = useState('')
   const [practise, setPractise] = useState<[SkillId | '', SkillId | '']>(['', ''])
+  const job = view.state.job ?? null
+  const [working, setWorking] = useState(true)
   const close = useRef(onClose)
   close.current = onClose
+  // With work, the time goes on it by default, and so does the practice.
+  useEffect(() => {
+    if (open && job) setPractise((p) => (p[0] || p[1] ? p : [job.skill, '']))
+  }, [open, job])
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close.current()
@@ -26,11 +33,12 @@ export function SkipDialog({ view, open, onClose, onSkip }: { view: CampaignView
 
   const chosen = [...new Set(practise.filter(Boolean))] as SkillId[]
   const key = chosen.join(',')
+  const atWork = Boolean(job && working)
   const preview = useMemo(() => {
-    const plan = { days, doing: '', practise: key ? (key.split(',') as SkillId[]) : [] }
+    const plan = { days, doing: '', practise: key ? (key.split(',') as SkillId[]) : [], working: atWork }
     const after = project(view.state, skipEvents(view.state, view.settings, plan), view.settings)
-    return { after, grown: practiced(view.state, after, plan.practise) }
-  }, [view.state, view.settings, days, key])
+    return { after, grown: practiced(view.state, after, plan.practise), money: after.character.coins - view.state.character.coins }
+  }, [view.state, view.settings, days, key, atWork])
   const skills = useMemo(
     () =>
       SKILL_IDS.map((s) => ({ id: s, label: SKILLS[s].label, level: skillLevelFromXp(view.state.character.skillXp[s] ?? 0) })).sort((a, b) => b.level - a.level || a.label.localeCompare(b.label)),
@@ -39,7 +47,7 @@ export function SkipDialog({ view, open, onClose, onSkip }: { view: CampaignView
   const name = view.build.name
   const span = spanLabel(days)
   const submit = () => {
-    const plan: SkipPlan = { days, doing: doing.trim(), practise: chosen }
+    const plan: SkipPlan = { days, doing: doing.trim() || (atWork && job ? `I work as ${job.title} in ${job.place}.` : ''), practise: chosen, working: atWork }
     onSkip(skipText(plan), plan)
     onClose()
     setDoing('')
@@ -94,6 +102,12 @@ export function SkipDialog({ view, open, onClose, onSkip }: { view: CampaignView
                   className="input resize-y py-2 text-sm"
                 />
               </label>
+              {job && (
+                <label className="flex items-center gap-2 text-sm text-parchment-300">
+                  <input type="checkbox" checked={working} onChange={(e) => setWorking(e.target.checked)} className="accent-[var(--color-gold-400)]" />
+                  At work as {job.title} (about {coinText(weeklyPay(view.state, job))} a week)
+                </label>
+              )}
               <div>
                 <div className="mb-2 text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">Practise (up to two skills)</div>
                 <div className="flex flex-wrap gap-2">
@@ -121,6 +135,11 @@ export function SkipDialog({ view, open, onClose, onSkip }: { view: CampaignView
                 <div>
                   {name} will be {ageLabel(preview.after)} · {dateLabel(preview.after.time.day)}
                 </div>
+                {atWork && (
+                  <div className={`mt-1 ${preview.money >= 0 ? 'text-gold-200' : 'text-blood-400'}`}>
+                    {preview.money > 0 ? `${coinText(preview.money)} put by` : preview.money < 0 ? `${coinText(-preview.money)} less: the pay doesn't cover living` : 'The pay just covers living'}
+                  </div>
+                )}
                 {preview.grown.length > 0 && (
                   <div className="mt-1 text-gold-200">
                     {preview.grown.map((g) => `${SKILLS[g.skill].label} ${g.from} → ${g.to}`).join(' · ')}

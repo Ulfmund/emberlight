@@ -9,6 +9,7 @@ import {
   SEASON_INFO,
   seasonNumber,
   seasonOf,
+  HOMES,
   spanLabel,
   spellById,
   yearOf,
@@ -46,6 +47,17 @@ export class TimelineLog {
     if (isMemoryEvent(ev)) return this.seeMemory(ev, after)
     if (ev.type !== 'time_skip') this.seeTime(before, after)
     switch (ev.type) {
+      case 'home': {
+        const now = ev.home
+        const was = before.home
+        if (now) this.add(after, now.kind === 'room' ? `Took a room in ${now.place}` : `Bought ${HOMES[now.kind].label.toLowerCase()} in ${now.place}`, 'candle', 'good')
+        else if (was) this.add(after, was.kind === 'room' ? `Gave up the room in ${was.place}` : `Sold ${HOMES[was.kind].label.toLowerCase().replace(/^an? /, 'the ')} in ${was.place}`, 'candle')
+        break
+      }
+      case 'job':
+        if (ev.job) this.add(after, `Took work as ${ev.job.title} in ${ev.job.place}`, 'hammer', 'good')
+        else if (before.job) this.add(after, `Left work as ${before.job.title}`, 'hammer')
+        break
       case 'time_skip': {
         const span = spanLabel(ev.days)
         this.add(after, `${span.charAt(0).toUpperCase()}${span.slice(1)} went by: ${dateLabel(after.time.day).toLowerCase()}`, 'hourglass')

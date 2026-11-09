@@ -3,6 +3,7 @@ import type { FoeSpec } from './combat'
 import { SETTLED, type CampaignSettings, type EventFrequency, type GameState, type PlaceKind, type Weather } from './state'
 import { seasonOf, type Season } from './calendar'
 import { findPersona } from '../personas'
+import { atHome } from './life'
 
 /**
  * Random events (docs/spec/06-ai-dm.md#5-random-events): the world doesn't wait for the player.
@@ -114,6 +115,8 @@ export function rollWorldEvent(state: GameState, settings: CampaignSettings, ctx
   const hour = Math.floor(state.time.minute / 60)
   const night = hour < 6 || hour >= 20
   const resting = ctx.intent === 'rest'
+  // Nothing comes knocking while they sleep in their own home.
+  if (resting && atHome(state)) return null
   // The storyteller's leanings (personas.ts): more or fewer events, and which kinds.
   const lean = findPersona(settings.persona)?.leanings
   let chance = EVENT_CHANCE[settings.events] * (lean?.chance ?? 1)

@@ -474,7 +474,7 @@ export class TurnEngine {
       this.campaigns.db.addEvents(id, msg.id, newId('grp'), 'engine', evs)
       const after = project(state, evs, settings)
       const notes = engineNotes(state, after, settings, [], undefined, skipNote(state, after, skip))
-      const meta = { ...msg.meta, notes, skip: { days: skip.days, practise: skip.practise } }
+      const meta = { ...msg.meta, notes, skip: { days: skip.days, practise: skip.practise, working: skip.working } }
       this.campaigns.db.updateMessage(msg.id, { meta })
       yield { type: 'checks', checks: [] }
       return yield* this.narrate(id, { ...msg, meta }, signal, notes, ctx)

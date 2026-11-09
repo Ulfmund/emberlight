@@ -2,6 +2,7 @@ import { skillCaps, skillLevelFromXp, skillXpForLevel, xpMultiplier } from './ch
 import { buildNow, DAYS_PER_YEAR, SKIP_MAX_DAYS } from './calendar'
 import { applyEvent, type CampaignSettings, type GameEvent, type GameState } from './state'
 import { SKILL_IDS, type SkillId } from './tables'
+import { jobLevel, livelihood } from './life'
 
 /**
  * Long time-skips (docs/spec/04-rules-system.md#time-skips): "five years pass". The player says
@@ -16,6 +17,8 @@ export type SkipPlan = {
   doing: string
   /** Up to two skills they practise. */
   practise: SkillId[]
+  /** They spend it at their job (life.ts): pay comes in, and living costs go out. */
+  working?: boolean
 }
 
 export const SKIP_SPANS = [
@@ -103,7 +106,6 @@ export function skipEvents(state: GameState, settings: CampaignSettings, plan: S
   const skip: GameEvent = { type: 'time_skip', days, ...(doing ? { doing } : {}) }
   const events: GameEvent[] = [skip]
   const skills = [...new Set(plan.practise)].filter((s) => SKILL_IDS.includes(s)).slice(0, PRACTICE_MAX)
-  if (!skills.length) return events
   // Practice counts at the age they've reached, and stops at what they can ever learn.
   const after = applyEvent(state, skip, settings)
   const now = buildNow(after)
@@ -113,6 +115,15 @@ export function skipEvents(state: GameState, settings: CampaignSettings, plan: S
     const have = after.character.skillXp[s] ?? 0
     const amount = Math.round(Math.min(each, Math.max(0, skillXpForLevel(caps[s]) - have)))
     if (amount > 0) events.push({ type: 'skill_xp', skill: s, amount, practice: true })
+  }
+  // At work: the pay (at the skill they have midway), less the cost of living. Without a job they
+  // get by on odd work, and the purse neither grows nor shrinks.
+  if (plan.working && state.job) {
+    const trained = events.reduce((n, e) => (e.type === 'skill_xp' && e.skill === state.job!.skill ? n + e.amount : n), 0)
+    const end = jobLevel({ character: { ...state.character, skillXp: { ...state.character.skillXp, [state.job.skill]: (state.character.skillXp[state.job.skill] ?? 0) + trained } } }, state.job)
+    const money = livelihood(state, days, end)
+    const delta = Math.max(money.net, -state.character.coins)
+    if (delta) events.push({ type: 'coins', delta })
   }
   return events
 }

@@ -22,7 +22,7 @@ import { applyRename, previewRename } from '../core/rename'
 import { MAX_COMPANIONS, type CastMember } from '@shared/cards'
 import { MAX_FACTS, type MemoryEvent } from '@shared/memory'
 import { findWorld } from '@shared/worlds'
-import { AGES, ageYears, BACKGROUNDS, PRACTICE_MAX, RACES, SEXES, SKIP_MAX_DAYS } from '@shared/rules'
+import { AGES, ageYears, BACKGROUNDS, HOME_KINDS, PRACTICE_MAX, RACES, SEXES, SKIP_MAX_DAYS } from '@shared/rules'
 import { attachment } from './cards'
 import { campaignFileName, exportCampaign, importCampaign, MAX_CAMPAIGN_FILE, PortableError } from '../core/portable'
 import { fileName, isPng, v2Data, writeCardPng } from '../cards/export'
@@ -61,6 +61,14 @@ const SettingsSchema = z.object({
   limits: z.string().max(1000),
   persona: z.string().max(80),
   cultures: z.boolean()
+})
+
+/** A time-skip from the dialog or the Sheet's work buttons (skips.ts). */
+export const SkipSchema = z.object({
+  days: z.number().int().min(1).max(SKIP_MAX_DAYS),
+  doing: z.string().max(300).default(''),
+  practise: z.array(z.enum(tuple(SKILL_IDS))).max(PRACTICE_MAX).default([]),
+  working: z.boolean().optional()
 })
 
 const short = (n: number) => z.string().max(n)
@@ -279,7 +287,7 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
         work: WorkSchema.optional(),
         spell: z.string().max(40).optional(),
         image: z.string().max(80).optional(),
-        skip: z.object({ days: z.number().int().min(1).max(SKIP_MAX_DAYS), doing: z.string().max(300).default(''), practise: z.array(z.enum(tuple(SKILL_IDS))).max(PRACTICE_MAX).default([]) }).optional()
+        skip: SkipSchema.optional()
       })
     )
     const id = c.req.param('id')
@@ -427,6 +435,24 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
     if (!b) return c.json({ error: 'That change could not be read.' }, 400)
     const r = guard(() => {
       campaigns.party(c.req.param('id'), b)
+      return campaigns.view(c.req.param('id'))
+    })
+    return r.ok ? c.json(r.value) : c.json({ error: r.error }, 400)
+  })
+
+  app.post('/api/campaigns/:id/life', async (c) => {
+    const b = await body(
+      c,
+      z.union([
+        z.object({ home: z.enum(tuple(HOME_KINDS)) }),
+        z.object({ leaveHome: z.literal(true) }),
+        z.object({ job: z.object({ title: z.string().min(1).max(60), skill: z.enum(tuple(SKILL_IDS)), board: z.boolean() }) }),
+        z.object({ quitJob: z.literal(true) })
+      ])
+    )
+    if (!b) return c.json({ error: 'That change could not be read.' }, 400)
+    const r = guard(() => {
+      campaigns.life(c.req.param('id'), b)
       return campaigns.view(c.req.param('id'))
     })
     return r.ok ? c.json(r.value) : c.json({ error: r.error }, 400)

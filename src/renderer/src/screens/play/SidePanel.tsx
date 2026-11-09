@@ -17,6 +17,7 @@ import {
 import type { CampaignView } from '@shared/view'
 import { findTemplate, itemTemplate, knownSpells, SLOT_LABEL, SLOTS } from '@shared/rules'
 import { formatCoins } from './CharacterPanel'
+import { LifeSection } from './Life'
 import { LimitsField, PersonaPicker } from '../DmStyle'
 import { useGame } from '../../store'
 import { Icon } from '../../components/Icon'
@@ -79,6 +80,7 @@ function SheetTab({ view }: { view: CampaignView }) {
   return (
     <div className="space-y-5">
       <PartySection view={view} />
+      <LifeSection view={view} />
       <section>
         <h3 className="mb-2 flex items-center justify-between text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">
           Attributes

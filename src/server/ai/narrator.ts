@@ -41,6 +41,10 @@ import {
   practiced,
   spanSentence,
   type SkipPlan,
+  atHome,
+  HOMES,
+  jobLevel,
+  weeklyPay,
   dateLabel,
   SEASON_INFO,
   seasonOf,
@@ -236,7 +240,7 @@ ${gear}
 ${carrying}${body}${magic}
 ${c.status === 'downed' ? 'STATUS: DOWNED: unconscious and dying.\n' : c.status === 'dead' ? 'STATUS: DEAD.\n' : ''}
 ${loreAt(lore, 'after_char')}WHERE AND WHEN
-Day ${state.time.day} (${dateLabel(state.time.day).toLowerCase()}), ${timeOfDay}${state.location ? `, at ${state.location}` : ''}.${skyLine(state)} ${SEASON_INFO[seasonOf(state.time.day)].dm}${memoryBlock(memory)}${fallenBlock(state, third)}${companionBlock(state, cast, memory?.companions)}${loreBlock(lore)}${persona?.habit?.trim() ? `\n\nYOUR VOICE IN EVERY REPLY\n${persona.habit.trim()}` : ''}`
+Day ${state.time.day} (${dateLabel(state.time.day).toLowerCase()}), ${timeOfDay}${state.location ? `, at ${state.location}` : ''}.${skyLine(state)} ${SEASON_INFO[seasonOf(state.time.day)].dm}${lifeBlock(state)}${memoryBlock(memory)}${fallenBlock(state, third)}${companionBlock(state, cast, memory?.companions)}${loreBlock(lore)}${persona?.habit?.trim() ? `\n\nYOUR VOICE IN EVERY REPLY\n${persona.habit.trim()}` : ''}`
 }
 
 const SKY: Record<Weather, string> = { clear: '', rain: 'It is raining', storm: 'A storm is raging', fog: 'Thick fog lies over everything', snow: 'Snow is falling' }
@@ -312,6 +316,17 @@ export function engineNotes(
   return lines.join('\n')
 }
 
+/** Where the character lives and what they do for a living (life.ts), when they have either. */
+function lifeBlock(state: GameState): string {
+  const { home, job } = state
+  if (!home && !job) return ''
+  const lines: string[] = []
+  if (home) lines.push(`Home: ${HOMES[home.kind].label.toLowerCase()} in ${home.place}${home.kind === 'room' ? '' : ', their own'} (since day ${home.since}).${atHome(state) ? ' They are at home now.' : ''}`)
+  else lines.push('No home of their own: they live at inns and on the road.')
+  if (job) lines.push(`Work: ${job.title} in ${job.place} (${SKILLS[job.skill].label} ${jobLevel(state, job)}), paid about ${formatCoins(weeklyPay(state, job))} a week${job.board ? ', with room and board' : ''} (since day ${job.since}).`)
+  return `\n\nHOME AND WORK\n${lines.join('\n')}`
+}
+
 /** The DM's orders for a time-skip (skips.ts): a montage, not scenes, ending back in the present. */
 export function skipNote(before: GameState, after: GameState, plan: SkipPlan): string[] {
   const name = after.character.build.name
@@ -323,10 +338,16 @@ export function skipNote(before: GameState, after: GameState, plan: SkipPlan): s
   ]
   const grown = practiced(before, after, plan.practise).filter((p) => p.to > p.from)
   if (grown.length) lines.push(`Practice over that time: ${grown.map((p) => `${SKILLS[p.skill].label} ${p.from} → ${p.to}`).join(', ')}.`)
+  if (plan.working && before.job) {
+    const money = after.character.coins - before.character.coins
+    lines.push(`They spend it at work, as ${before.job.title} in ${before.job.place}: ${money > 0 ? `they put by ${formatCoins(money)} after the cost of living` : money < 0 ? `the pay didn't cover the cost of living; their savings fell by ${formatCoins(-money)}` : 'the pay just covered the cost of living'}.`)
+  }
   if (after.party.length) lines.push(`Travelling with them when it began: ${after.party.map((a) => a.name).join(', ')}. Say whether they stayed through it, and how they fared.`)
   lines.push(
-    `${name} is rested, fed and healed.`,
-    "Write it as a montage, not as scenes: a few short paragraphs that move through the time (the seasons turning, how they live and what they do, what became of the people they know: news, a wedding or a death, a newcomer, and how the places around them changed). Keep to what the story has set up: no great wars or deaths of major characters unless the story has led there. Then end in the present, on a morning after the time has passed, with something new for the player to act on."
+    plan.days >= 7 ? `${name} is rested, fed and healed.` : `${name} has slept and eaten.`,
+    plan.days >= 28
+      ? "Write it as a montage, not as scenes: a few short paragraphs that move through the time (the seasons turning, how they live and what they do, what became of the people they know: news, a wedding or a death, a newcomer, and how the places around them changed). Keep to what the story has set up: no great wars or deaths of major characters unless the story has led there. Then end in the present, on a morning after the time has passed, with something new for the player to act on."
+      : 'Tell these days briefly, in a paragraph or two (the work, a small moment or two, a face they see each day), and end in the present, on the morning after, with something for the player to act on.'
   )
   return lines
 }

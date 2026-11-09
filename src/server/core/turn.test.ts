@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULT_SETTINGS, type CharacterBuild } from '@shared/rules'
+import { DEFAULT_SETTINGS, skipText, type CharacterBuild } from '@shared/rules'
 import type { StreamEvent } from '@shared/types'
 import type { TurnEvent } from '@shared/view'
 import { GameDb } from '../store/db'
@@ -957,5 +957,36 @@ describe('turn engine', () => {
     expect(campaigns.view(id).state.combat).toBeTruthy()
     const out = await run(engine.act(id, '((a year passes))', signal))
     expect(out.find((e) => e.type === 'error')).toMatchObject({ message: expect.stringMatching(/Not in the middle of a fight/) })
+  })
+
+  it('rents a room, takes up work, and spends a week at it; the DM is told where they live and what they do', async () => {
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    fake.referee = { intent: 'other', checks: [] }
+    fake.scribe = { ...blankScribe(), location: 'Millbrook', placeKind: 'village' }
+    await run(engine.act(id, 'I walk into Millbrook.', signal))
+    fake.scribe = blankScribe()
+    expect(() => campaigns.life(id, { home: 'hall' })).toThrow(/A hall costs 300 gold/)
+    campaigns.life(id, { home: 'room' })
+    campaigns.life(id, { job: { title: "smith's hand", skill: 'smithing', board: false } })
+    let v = campaigns.view(id)
+    expect(v.state.home).toMatchObject({ kind: 'room', place: 'Millbrook' })
+    expect(v.state.job).toMatchObject({ title: "smith's hand", place: 'Millbrook', skill: 'smithing' })
+    const coins = v.state.character.coins
+    const plan = { days: 7, doing: "I work as smith's hand in Millbrook.", practise: ['smithing' as const], working: true }
+    await run(engine.act(id, skipText(plan), signal, { skip: plan }))
+    expect(lastNotes()).toMatch(/They spend it at work, as smith's hand in Millbrook: they put by/)
+    expect(lastNotes()).toMatch(/Tell these days briefly/)
+    expect(fake.lastSystem).toContain('HOME AND WORK')
+    expect(fake.lastSystem).toMatch(/Home: a rented room in Millbrook \(since day \d+\)\. They are at home now\./)
+    expect(fake.lastSystem).toMatch(/Work: smith's hand in Millbrook \(Smithing \d+\), paid about/)
+    v = campaigns.view(id)
+    expect(v.state.character.coins).toBeGreaterThan(coins)
+    expect(v.timeline.map((e) => e.text)).toEqual(expect.arrayContaining(['Took a room in Millbrook', "Took work as smith's hand in Millbrook", 'A week went by: spring, year 1']))
+    // Leaving: the room is given up, and the work too.
+    campaigns.life(id, { leaveHome: true })
+    campaigns.life(id, { quitJob: true })
+    expect(campaigns.view(id).state).toMatchObject({ home: null, job: null })
+    expect(() => campaigns.life(id, { quitJob: true })).toThrow(/no work to leave/)
   })
 })

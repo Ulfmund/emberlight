@@ -252,12 +252,40 @@ Code: `src/shared/rules/calendar.ts`.
 - **How long:** a week, a month, a season, a year, five years or ten in the dialog. Out of character, any number of days, weeks, months, seasons, years or decades, up to twenty years at once.
 - **What they do with it**, in the player's words (or left to the DM).
 - **Practice:** up to two skills, sharing the time. A day of practice is worth 4.8 skill XP (with the character's XP bonuses), so a year spent on one skill takes a beginner to about 13. The XP curve makes later years count for less, and practice stops at the skill's cap. Practice counts a third as much towards the character's level as skill XP earned in the story: years of quiet work make someone skilled, not a hero (five years at two skills bring about three levels).
-- **The engine** moves the calendar to the morning after the time has passed, so the character grows older (and may reach a new stage of life). They come out of it rested, fed and healed, with every condition gone except being a prisoner (the DM tells whether they got free). The weather is forgotten, and companions stay unless the story says otherwise. No Referee, no dice and no random events.
+- **The engine** moves the calendar to the morning after the time has passed, so the character grows older (and may reach a new stage of life). A week or more mends everything: they come out of it rested, fed and healed, with every condition gone except being a prisoner (the DM tells whether they got free). A shorter stretch heals like a night's sleep each day. The weather is forgotten, and companions stay unless the story says otherwise. No Referee, no dice and no random events.
 - **The DM** is told how long passed, between which dates, how old the character is now, what they did, what they practised and who was with them. It writes **a montage, not scenes**: a few paragraphs moving through the time (how they lived, what became of the people they know, how the places changed), keeping to what the story has set up. It ends back in the present, on a morning, with something new to act on. The Scribe records the people, places and deeds the montage tells of, but not its time, rest or meals (the engine has already moved those).
 - **The timeline** marks it ("Five years went by: spring, year 6"), and a rewind takes it back like any other turn.
 - Not during a fight, and not while downed or dead.
 
 Code: `src/shared/rules/skips.ts`.
+
+### Homes and work
+
+*Built (0.28.0).* Somewhere to live, and a living, chosen on the Sheet (*Home and work*) so the story never misreads them. Both go in front of the DM ("HOME AND WORK"), and the timeline marks each change.
+
+**Homes**, found in a town or a village, where the character is now:
+
+| | Price | Living costs a day |
+|---|---|---|
+| A rented room | none (rent) | 6 copper (rent and food) |
+| A cottage | 20 gold | 4 copper |
+| A house | 60 gold | 6 copper |
+| A hall | 300 gold | 15 copper (servants) |
+| No home: inns and the road | | 12 copper |
+
+- **A night's sleep at home mends fully** (instead of half), and no random event comes while resting there.
+- One home at a time: buying another sells the old one for half its price. Selling or giving up a room is a button too.
+- A child who takes up the tale keeps the family home; a stranger doesn't.
+
+**Work:** what it is ("smith's hand", "caravan guard"), the skill it uses, and whether room and board come with it (half the pay, no living costs). It's taken up where the character is.
+
+- **Pay:** 6 copper a day + the skill's level (a beginner 7, a skilled hand at 13 earns 19, a master over 50), six days a week, half with board. A beginner breaks even in a rented room; a skilled hand saves a cottage's price in under a year.
+- **Working:** *A day*, *A week* or *A season* on the Sheet is a short time-skip at work: pay comes in, living costs go out, and the job's skill is practised. A day heals like a night's sleep; the DM tells a day or a week in a paragraph or two and a season as a montage. In *Let time pass*, the time goes on the work by default.
+- **Without work**, a time-skip neither earns nor costs: the character gets by on odd jobs.
+- Savings never fall below an empty purse; the DM is told when the pay didn't cover living.
+- Nobody keeps the dead's work: an heir starts without a job.
+
+Code: `src/shared/rules/life.ts`.
 
 ---
 

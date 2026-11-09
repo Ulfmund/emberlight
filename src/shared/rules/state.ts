@@ -27,12 +27,13 @@ import {
   type SkillId
 } from './tables'
 import type { CheckResult } from './checks'
-import { isMemoryEvent, sameName, type MemoryEvent } from '../memory'
+import { isMemoryEvent, sameName, samePlace, type MemoryEvent } from '../memory'
 import { COMPANION_ROLES, companionStats, PARTY_MAX, type Companion, type CompanionRole } from './party'
 import { findTemplate, itemTemplate, type ItemTemplate, type Slot } from './items'
 import type { Combat, CombatOutcome, FoeStatus } from './combat'
 import { startingSpells } from './spellbook'
 import { buildNow, SKIP_MAX_DAYS, startingAge } from './calendar'
+import type { Home, Job } from './life'
 
 export type CombatMode = 'narrative' | 'turn' | 'mixed'
 export type EventFrequency = 'calm' | 'normal' | 'eventful' | 'chaos'
@@ -200,6 +201,9 @@ export type GameState = {
   fallen: Fallen[]
   /** Who travels with the character (party.ts). */
   party: Companion[]
+  /** Where they live, and what they do for a living (life.ts). */
+  home?: Home | null
+  job?: Job | null
 }
 
 /** One recorded change. Every event belongs to the message that caused it. */
@@ -217,6 +221,10 @@ export type GameEvent =
   | { type: 'time'; minutes: number }
   /** A long time-skip (skips.ts): the days go by, and the character is rested, fed and mended. */
   | { type: 'time_skip'; days: number; doing?: string }
+  /** Somewhere to live, or none (life.ts). */
+  | { type: 'home'; home: Home | null }
+  /** A living, or none (life.ts). */
+  | { type: 'job'; job: Job | null }
   | { type: 'renown'; amount: number; deed?: string }
   | { type: 'coins'; delta: number }
   | { type: 'item'; name: string; delta: number; icon?: string; spent?: boolean }
@@ -453,7 +461,9 @@ export function applyEvent(prev: GameState, ev: GameEvent, settings: CampaignSet
         c.mana = dd.maxMana
         // A starving body doesn't mend in its sleep.
         const starving = settings.survival && c.hungerMins >= 30 * 60
-        if (!starving) c.hp = Math.min(dd.maxHp, Math.max(c.hp, 0) + Math.ceil(dd.maxHp / 2))
+        // A night in their own bed mends them fully.
+        const home = Boolean(s.home && s.location && samePlace(s.home.place, s.location))
+        if (!starving) c.hp = home ? dd.maxHp : Math.min(dd.maxHp, Math.max(c.hp, 0) + Math.ceil(dd.maxHp / 2))
         c.conditions = c.conditions.filter((x) => x !== 'exhausted' && x !== 'well_fed')
         c.awakeMins = 0
       }
@@ -485,18 +495,25 @@ export function applyEvent(prev: GameState, ev: GameEvent, settings: CampaignSet
       // Whatever the sky was doing then has long since passed.
       s.weather = null
       s.weatherAt = undefined
-      // Rested, fed and mended: there's been time. Only a captor's chains outlast it (the DM tells whether).
+      // Rested and fed. A week or more mends everything but a captor's chains (the DM tells
+      // whether they got free); a shorter stretch heals like a night's sleep each day.
       c.status = 'alive'
       c.deathRolls = { success: 0, fail: 0 }
-      c.conditions = c.conditions.filter((x) => x === 'captured')
+      c.conditions = days >= 7 ? c.conditions.filter((x) => x === 'captured') : c.conditions.filter((x) => x !== 'exhausted')
       c.hungerMins = 0
       c.awakeMins = 0
       const dd = d()
-      c.hp = dd.maxHp
+      c.hp = days >= 7 ? dd.maxHp : Math.min(dd.maxHp, Math.max(c.hp, 0) + Math.ceil(dd.maxHp / 2) * days)
       c.stamina = dd.maxStamina
       c.mana = dd.maxMana
       break
     }
+    case 'home':
+      s.home = ev.home
+      break
+    case 'job':
+      s.job = ev.job
+      break
     case 'renown':
       c.renown = clamp(c.renown + ev.amount, 0, RENOWN_MAX)
       if (ev.deed) c.deeds.push({ text: ev.deed, day: s.time.day })
@@ -665,8 +682,11 @@ export function applyEvent(prev: GameState, ev: GameEvent, settings: CampaignSet
       s.combat = null
       // Their own years begin when they take up the tale.
       fresh.startDay = s.time.day + Math.max(0, ev.days)
-      // A new hero sets out alone; old friends may be met again in the story.
+      // A new hero sets out alone; old friends may be met again in the story. A child keeps the
+      // family home; nobody keeps the dead's work.
       s.party = []
+      if (!ev.inherit) s.home = null
+      s.job = null
       s.time = { day: s.time.day + Math.max(0, ev.days), minute: 8 * 60 }
       break
     }

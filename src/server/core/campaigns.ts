@@ -37,11 +37,16 @@ import {
   type CharacterBuild,
   type CheckResult,
   type GameEvent,
-  type GameState
+  type GameState,
+  HOMES,
+  SELL_SHARE,
+  SETTLED,
+  type HomeKind,
+  type SkillId
 } from '@shared/rules'
 import type { CampaignSummary, CampaignView, ChangeLine, MessageView } from '@shared/view'
 import type { CastMember } from '@shared/cards'
-import { projectMemory, sameName, type MemoryEvent } from '@shared/memory'
+import { projectMemory, sameName, samePlace, type MemoryEvent } from '@shared/memory'
 import { JourneyLog } from '@shared/journey'
 import { TimelineLog } from '@shared/timeline'
 import { normalizeEntry, type LoreEntry } from '@shared/lore'
@@ -396,6 +401,45 @@ export class Campaigns {
     }
     const anchor = [...path].reverse().find((m) => m.role === 'user') ?? path[path.length - 1]
     this.db.addEvents(id, anchor.id, newId('grp'), 'player', [ev])
+  }
+
+  /**
+   * A home and a living (life.ts), chosen from the Sheet: rent or buy where they are (buying a
+   * new home sells the old one for half), move out, take up work there, or leave it.
+   */
+  life(id: string, act: { home: HomeKind } | { leaveHome: true } | { job: { title: string; skill: SkillId; board: boolean } } | { quitJob: true }) {
+    const c = this.get(id)
+    if (!c.head_id) throw new Error('This story has no messages yet.')
+    const path = this.path(c)
+    const st = this.state(c, { path })
+    if (st.combat) throw new Error('Not in the middle of a fight.')
+    if (st.character.status !== 'alive') throw new Error(`${st.character.build.name} is in no state for that.`)
+    const place = st.location?.trim()
+    const evs: GameEvent[] = []
+    const resale = st.home && st.home.kind !== 'room' ? Math.round(HOMES[st.home.kind].price * SELL_SHARE) : 0
+    if ('home' in act) {
+      if (!place) throw new Error('Where? The story has no place yet.')
+      if (st.placeKind && !SETTLED.includes(st.placeKind)) throw new Error('A home is found in a town or a village.')
+      const h = HOMES[act.home]
+      if (st.home?.kind === act.home && samePlace(st.home.place, place)) throw new Error(`You already have ${h.label.toLowerCase()} here.`)
+      if (st.character.coins + resale < h.price) throw new Error(`${h.label} costs ${formatCoins(h.price)}, and you have ${formatCoins(st.character.coins)}${resale ? ` (and ${formatCoins(resale)} from selling the old one)` : ''}.`)
+      if (resale - h.price) evs.push({ type: 'coins', delta: resale - h.price })
+      evs.push({ type: 'home', home: { kind: act.home, place, since: st.time.day } })
+    } else if ('leaveHome' in act) {
+      if (!st.home) throw new Error('You have no home to leave.')
+      if (resale) evs.push({ type: 'coins', delta: resale })
+      evs.push({ type: 'home', home: null })
+    } else if ('job' in act) {
+      if (!place) throw new Error('Where? The story has no place yet.')
+      const title = act.job.title.trim().replace(/\s+/g, ' ').slice(0, 60)
+      if (!title) throw new Error('What work is it?')
+      evs.push({ type: 'job', job: { title, place, skill: act.job.skill, board: act.job.board, since: st.time.day } })
+    } else {
+      if (!st.job) throw new Error('You have no work to leave.')
+      evs.push({ type: 'job', job: null })
+    }
+    const anchor = [...path].reverse().find((m) => m.role === 'user') ?? path[path.length - 1]
+    this.db.addEvents(id, anchor.id, newId('grp'), 'player', evs)
   }
 
   /** New words for the character's appearance (the DM uses them from now on). */
