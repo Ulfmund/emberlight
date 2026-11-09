@@ -1,5 +1,6 @@
 import type { CampaignSettings, CharacterBuild, CheckResult, GameState, Hunger, SkillId, Weapon } from './rules'
 import type { Journey } from './journey'
+import type { TimelineEntry } from './timeline'
 import type { Memory } from './memory'
 
 /** What the interface gets for one campaign. Built by the server from the save file. */
@@ -55,6 +56,8 @@ export type CampaignView = {
   memory: Memory
   /** Where the character has been, and the ways between (the Journal's map). */
   journey: Journey
+  /** The story's milestones, day by day (the Journal's timeline), oldest first. */
+  timeline: TimelineEntry[]
   /** Library lorebooks attached to this story. */
   lorebooks: { id: string; name: string; entries: number }[]
   messages: MessageView[]

@@ -37,7 +37,7 @@ import { normalizeEntry, selectLoreDetailed } from '@shared/lore'
 import { DEFAULT_PERSONA, findPersona, personaCardId } from '@shared/personas'
 import { fillMacros, storyName } from '@shared/cards'
 import { estimateTokens, promptBlocks, type PromptReport } from '@shared/inspect'
-import { entityLine, projectMemory, relevantEntities, sameName, storySoFar, type Summary } from '@shared/memory'
+import { entityLine, projectMemory, questBrief, relevantEntities, sameName, storySoFar, type Summary } from '@shared/memory'
 import { factionBrief, factionStanding, withReputation } from '@shared/factions'
 import type { LoreEntry } from '@shared/lore'
 import type { Memory } from '@shared/memory'
@@ -593,7 +593,8 @@ export class TurnEngine {
     const pinned = memory.notes.map((n) => `- ${n.text}`).join('\n')
     const persona = this.personaFor(c.settings.persona)
     const factions = factionStanding(memory)
-    const build = (story: string) => narratorSystem(after, c.settings, names, c.cast, lore, { story, people, notes: pinned, companions, factions }, persona)
+    const quests = questBrief(memory)
+    const build = (story: string) => narratorSystem(after, c.settings, names, c.cast, lore, { story, people, notes: pinned, companions, factions, quests }, persona)
     const storyBudget = Math.round(ctx.contextChars * tier.storyShare)
     const keep = new Set(recalled.summaries)
     let system = build(storySoFar(memory, storyBudget, () => false, keep))

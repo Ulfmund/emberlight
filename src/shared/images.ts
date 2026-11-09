@@ -74,4 +74,10 @@ export function emblemPrompt(style: string, group: { what: string; details: stri
   return parts.join(', ').replace(/\s+/g, ' ').slice(0, 1500)
 }
 
+/** A notable thing, painted on its own: an heirloom, a relic, a letter. */
+export function stillLifePrompt(style: string, thing: { what: string; details: string[] }): string {
+  const parts = [styleBeyondFaces(style), `still life painting of ${thing.what}`, ...thing.details.map((d) => d.trim().replace(/\.$/, '')), 'on a plain cloth, finely detailed'].filter(Boolean)
+  return parts.join(', ').replace(/\s+/g, ' ').slice(0, 1500)
+}
+
 export const mediaUrl = (id: string) => `/api/media/${encodeURIComponent(id)}`

@@ -77,8 +77,7 @@ function blankScribe() {
     healing: 0,
     conditionsOn: [],
     conditionsOff: [],
-    people: [] as unknown[],
-    places: [] as unknown[],
+    records: [] as unknown[],
     placeKind: 'unknown',
     ate: 'none',
     itemsUsed: [] as unknown[],
@@ -297,11 +296,10 @@ describe('turn engine', () => {
     fake.scribe = {
       ...blankScribe(),
       location: 'Millbrook Crossing',
-      people: [{ name: 'Old Tam', otherNames: ['the ferryman'], who: 'ferryman at Millbrook', newFacts: ['lost two fingers to the river'], status: 'alive', attitude: 'unfriendly', relation: 'none' }],
-      places: []
+      records: [{ kind: 'person', name: 'Old Tam', otherNames: ['the ferryman'], what: 'ferryman at Millbrook', newFacts: ['lost two fingers to the river'], status: 'alive', attitude: 'unfriendly', relation: 'none' }]
     }
     await run(engine.act(id, 'I ask the ferryman about the river.', signal))
-    fake.scribe = { ...blankScribe(), people: [{ name: 'Tam', otherNames: [], who: '', newFacts: ['owes Brenna a favour'], status: 'alive', attitude: 'friendly', relation: 'none' }], places: [] }
+    fake.scribe = { ...blankScribe(), records: [{ kind: 'person', name: 'Tam', newFacts: ['owes Brenna a favour'], status: 'alive', attitude: 'friendly' }] }
     await run(engine.act(id, 'I help Tam haul the rope.', signal))
     fake.scribe = blankScribe()
     await run(engine.act(id, 'I wave goodbye to Tam.', signal))
@@ -608,8 +606,8 @@ describe('turn engine', () => {
   async function toDeath() {
     const id = campaigns.create(build, DEFAULT_SETTINGS)
     await run(engine.narrateHead(id, signal))
-    const person = (name: string, who: string, relation: string) => ({ name, otherNames: [], who, newFacts: [], status: 'alive', attitude: 'devoted', relation })
-    fake.scribe = { ...blankScribe(), people: [person('Wenna', "Brenna's daughter, waiting at home", 'child'), person('Old Tam', 'The ferryman', 'friend')] }
+    const person = (name: string, what: string, relation: string) => ({ kind: 'person', name, what, status: 'alive', attitude: 'devoted', relation })
+    fake.scribe = { ...blankScribe(), records: [person('Wenna', "Brenna's daughter, waiting at home", 'child'), person('Old Tam', 'The ferryman', 'friend')] }
     await run(engine.act(id, 'I think of home, and of Wenna.', signal))
     fake.scribe = blankScribe()
     await run(engine.act(id, 'I climb the Gallows Cliff path.', signal))
@@ -788,8 +786,8 @@ describe('turn engine', () => {
     const id = campaigns.create(build, DEFAULT_SETTINGS)
     await run(engine.narrateHead(id, signal))
     fake.referee = { intent: 'other', checks: [] }
-    const mira = { name: 'Mira', otherNames: [], who: 'a priestess of the dawn', newFacts: [], status: 'alive', attitude: 'friendly', relation: 'companion' }
-    fake.scribe = { ...blankScribe(), companionsJoined: ['Mira'], people: [mira] }
+    const mira = { kind: 'person', name: 'Mira', what: 'a priestess of the dawn', status: 'alive', attitude: 'friendly', relation: 'companion' }
+    fake.scribe = { ...blankScribe(), companionsJoined: ['Mira'], records: [mira] }
     await run(engine.act(id, 'Will you come with me, Mira?', signal))
     expect(campaigns.view(id).state.party.map((a) => [a.name, a.role])).toEqual([['Mira', 'healer']])
     fake.scribe = blankScribe()
@@ -818,8 +816,8 @@ describe('turn engine', () => {
     const id = campaigns.create(build, DEFAULT_SETTINGS)
     await run(engine.narrateHead(id, signal))
     fake.referee = { intent: 'other', checks: [] }
-    const pell = { name: 'Sergeant Pell', otherNames: [], who: 'a gruff watchman', newFacts: [], status: 'alive', attitude: 'neutral', relation: 'none', faction: 'the Town Watch' }
-    fake.scribe = { ...blankScribe(), factions: [{ name: 'the Town Watch', what: 'keepers of the peace', standingChange: 2, why: 'caught the cutpurse for them' }], people: [pell] }
+    const pell = { kind: 'person', name: 'Sergeant Pell', what: 'a gruff watchman', status: 'alive', attitude: 'neutral', partOf: 'the Town Watch' }
+    fake.scribe = { ...blankScribe(), records: [{ kind: 'faction', name: 'the Town Watch', what: 'keepers of the peace', standingChange: 2, why: 'caught the cutpurse for them' }, pell] }
     await run(engine.act(id, 'I hand the cutpurse over to the watch.', signal))
     expect(campaigns.view(id).memory.entities.find((e) => e.kind === 'faction')).toMatchObject({ name: 'the Town Watch', standing: 2 })
 
@@ -876,6 +874,24 @@ describe('turn engine', () => {
     const last = campaigns.view(id).messages.at(-1)!
     expect(last.error).toBeUndefined()
     expect(last.content).toMatch(/rain keeps falling/)
+  })
+
+  it('keeps the quests the character takes on in front of the DM, until they are done', async () => {
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    fake.referee = { intent: 'other', checks: [] }
+    fake.scribe = { ...blankScribe(), records: [{ kind: 'quest', name: 'Find the missing ferry', what: 'learn where the ferry went', partOf: 'Old Tam' }] }
+    await run(engine.act(id, "I'll find your ferry, Tam.", signal))
+    fake.scribe = blankScribe()
+    await run(engine.act(id, 'I walk down to the river.', signal))
+    expect(fake.lastSystem).toContain('QUESTS THE CHARACTER HAS TAKEN ON')
+    expect(fake.lastSystem).toContain('- Find the missing ferry (asked by Old Tam): learn where the ferry went.')
+    fake.scribe = { ...blankScribe(), records: [{ kind: 'quest', name: 'Find the missing ferry', status: 'done' }] }
+    await run(engine.act(id, 'I drag the ferry back to the landing.', signal))
+    fake.scribe = blankScribe()
+    await run(engine.act(id, 'I rest.', signal))
+    expect(fake.lastSystem).not.toContain('QUESTS THE CHARACTER HAS TAKEN ON')
+    expect(campaigns.view(id).memory.entities.find((e) => e.kind === 'quest')!.status).toBe('done')
   })
 
   it('the player can ask someone along, say what they do in a fight, and part ways', async () => {

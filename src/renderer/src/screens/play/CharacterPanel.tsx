@@ -29,7 +29,7 @@ export function timeLabel(minute: number) {
 
 function journalLine(v: CampaignView) {
   const people = v.memory.entities.filter((e) => e.kind === 'person').length
-  const places = v.memory.entities.length - people
+  const places = v.memory.entities.filter((e) => e.kind === 'place').length
   if (!people && !places) return 'People and places you meet'
   return `${people} ${people === 1 ? 'person' : 'people'} · ${places} ${places === 1 ? 'place' : 'places'}`
 }

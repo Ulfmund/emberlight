@@ -71,10 +71,13 @@ const JournalEditSchema = z.discriminatedUnion('type', [
     aliases: z.array(short(80)).max(8).optional(),
     summary: short(400).optional(),
     facts: z.array(short(300)).max(MAX_FACTS).optional(),
-    status: z.enum(['alive', 'dead', 'missing', 'unknown']).optional(),
+    status: z.enum(['alive', 'dead', 'missing', 'unknown', 'active', 'done', 'failed']).optional(),
     attitude: z.enum(['hostile', 'unfriendly', 'neutral', 'friendly', 'devoted']).nullable().optional(),
     standing: z.number().int().min(-3).max(3).nullable().optional(),
-    faction: short(80).nullable().optional()
+    faction: short(80).nullable().optional(),
+    ties: z.array(z.object({ how: short(60), name: short(60) })).max(8).optional(),
+    giver: short(80).nullable().optional(),
+    holder: short(80).nullable().optional()
   }),
   z.object({ type: z.literal('entity_forget'), id: short(200) }),
   z.object({ type: z.literal('summary_edit'), level: z.enum(['scene', 'chapter']), to: short(80), title: short(120), text: short(4000) }),

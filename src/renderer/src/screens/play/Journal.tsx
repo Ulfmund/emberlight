@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { ATTITUDES, fmtStanding, MAX_FACTS, sameFaction, sameName, STANDINGS, standingLabel, type Attitude, type Entity, type EntityStatus, type MemoryEvent, type Summary } from '@shared/memory'
+import { ATTITUDES, fmtStanding, MAX_FACTS, parseTie, QUEST_STATUSES, sameFaction, sameName, STANDINGS, standingLabel, type Attitude, type Entity, type EntityStatus, type MemoryEvent, type Summary, type Tie } from '@shared/memory'
 import { cardImageUrl } from '@shared/cards'
 import { BACKGROUNDS, RACES } from '@shared/rules'
 import type { CampaignView } from '@shared/view'
@@ -13,6 +13,8 @@ import { RenameDialog } from './RenameDialog'
 import { PortraitDialog } from './PortraitDialog'
 import { TravelButton } from './Party'
 import { JourneyMap } from './JourneyMap'
+import { timeLabel } from './CharacterPanel'
+import type { TimelineEntry } from '@shared/timeline'
 import { mediaUrl } from '@shared/images'
 
 /**
@@ -21,7 +23,7 @@ import { mediaUrl } from '@shared/images'
  * correction to what the DM knows.
  */
 
-type Section = 'people' | 'places' | 'map' | 'factions' | 'story' | 'notes' | 'lore' | 'fallen'
+type Section = 'people' | 'places' | 'map' | 'factions' | 'quests' | 'items' | 'story' | 'timeline' | 'notes' | 'lore' | 'fallen'
 
 const ATTITUDE_INFO: Record<Attitude, { label: string; color: string }> = {
   hostile: { label: 'Hostile', color: '#d9574c' },
@@ -34,7 +36,10 @@ const STATUS_INFO: Record<EntityStatus, { label: string; tone: string }> = {
   alive: { label: 'Alive', tone: 'text-parchment-400' },
   dead: { label: 'Dead', tone: 'text-blood-400' },
   missing: { label: 'Missing', tone: 'text-ember-400' },
-  unknown: { label: 'Unknown', tone: 'text-parchment-500' }
+  unknown: { label: 'Unknown', tone: 'text-parchment-500' },
+  active: { label: 'Under way', tone: 'text-gold-300' },
+  done: { label: 'Done', tone: 'text-moss-400' },
+  failed: { label: 'Failed', tone: 'text-blood-400' }
 }
 
 export function Journal({ view, open, onClose }: { view: CampaignView; open: boolean; onClose: () => void }) {
@@ -43,6 +48,9 @@ export function Journal({ view, open, onClose }: { view: CampaignView; open: boo
   const people = useMemo(() => m.entities.filter((e) => e.kind === 'person').sort(bySeen), [m.entities])
   const places = useMemo(() => m.entities.filter((e) => e.kind === 'place').sort(bySeen), [m.entities])
   const factions = useMemo(() => m.entities.filter((e) => e.kind === 'faction').sort(bySeen), [m.entities])
+  // Quests under way first.
+  const quests = useMemo(() => m.entities.filter((e) => e.kind === 'quest').sort((a, b) => Number(a.status !== 'active') - Number(b.status !== 'active') || bySeen(a, b)), [m.entities])
+  const items = useMemo(() => m.entities.filter((e) => e.kind === 'item').sort(bySeen), [m.entities])
 
   useEffect(() => {
     if (!open) return
@@ -56,7 +64,10 @@ export function Journal({ view, open, onClose }: { view: CampaignView; open: boo
     { id: 'places', label: 'Places', icon: 'map', count: places.length },
     ...(view.journey?.stops.length ? [{ id: 'map' as const, label: 'Map', icon: 'signpost' }] : []),
     ...(factions.length ? [{ id: 'factions' as const, label: 'Factions', icon: 'party', count: factions.length }] : []),
+    ...(quests.length ? [{ id: 'quests' as const, label: 'Quests', icon: 'star', count: quests.filter((q) => q.status === 'active').length || undefined }] : []),
+    ...(items.length ? [{ id: 'items' as const, label: 'Things', icon: 'amulet', count: items.length }] : []),
     { id: 'story', label: 'Story', icon: 'scroll', count: m.scenes.length + m.chapters.length || undefined },
+    ...(view.timeline?.length ? [{ id: 'timeline' as const, label: 'Timeline', icon: 'hourglass' }] : []),
     { id: 'notes', label: 'Pinned', icon: 'pin', count: m.notes.length || undefined },
     { id: 'lore', label: 'Lore', icon: 'book', count: view.lorebooks.length || undefined },
     ...(view.state.fallen?.length ? [{ id: 'fallen' as const, label: 'Fallen', icon: 'skull', count: view.state.fallen.length }] : [])
@@ -115,6 +126,8 @@ export function Journal({ view, open, onClose }: { view: CampaignView; open: boo
                 {section === 'people' && <EntityList view={view} items={people} kind="person" />}
                 {section === 'places' && <EntityList view={view} items={places} kind="place" />}
                 {section === 'factions' && <EntityList view={view} items={factions} kind="faction" />}
+                {section === 'quests' && <EntityList view={view} items={quests} kind="quest" />}
+                {section === 'items' && <EntityList view={view} items={items} kind="item" />}
                 {section === 'map' && (
                   <>
                     <Heading title="Map" text="Everywhere you have been, and the ways between. Tap a place to see what you know of it." />
@@ -122,6 +135,7 @@ export function Journal({ view, open, onClose }: { view: CampaignView; open: boo
                   </>
                 )}
                 {section === 'story' && <StorySection view={view} />}
+                {section === 'timeline' && <TimelineSection entries={view.timeline ?? []} />}
                 {section === 'notes' && <NotesSection view={view} />}
                 {section === 'lore' && <LoreSection view={view} />}
                 {section === 'fallen' && <FallenSection view={view} />}
@@ -197,7 +211,9 @@ function useSave() {
 const LIST_TEXT: Record<Entity['kind'], { title: string; text: string; empty: string }> = {
   person: { title: 'People', text: 'Everyone you have met or heard of, and how they feel about you.', empty: 'Nobody yet. The people you meet will be written here.' },
   place: { title: 'Places', text: 'Where you have been, and what you learned there.', empty: 'Nowhere yet. The places you visit will be written here.' },
-  faction: { title: 'Factions', text: 'The groups you have dealt with, and what they think of you. It counts when you talk with their people.', empty: 'No groups yet.' }
+  faction: { title: 'Factions', text: 'The groups you have dealt with, and what they think of you. It counts when you talk with their people.', empty: 'No groups yet.' },
+  quest: { title: 'Quests', text: 'What you have taken on, who asked it of you, and how it went.', empty: 'No quests yet. When you take something on, it is written here.' },
+  item: { title: 'Things', text: 'Notable things in the story (heirlooms, relics, letters, keys) and who has them now.', empty: 'Nothing notable yet.' }
 }
 
 function EntityList({ view, items, kind }: { view: CampaignView; items: Entity[]; kind: Entity['kind'] }) {
@@ -227,6 +243,7 @@ function EntityCard({ entity: e, view }: { entity: Entity; view: CampaignView })
   const companion = view.cast.find((m) => m.role === 'companion' && m.hasImage && sameName(m.name, e.name))
   const color = speakerColor(e.name)
   const dead = e.status === 'dead'
+  const struck = dead || e.status === 'failed'
   const members = e.kind === 'faction' ? view.memory.entities.filter((x) => x.kind === 'person' && x.faction && sameFaction(x.faction, e.name)) : []
   return (
     <motion.div
@@ -247,8 +264,9 @@ function EntityCard({ entity: e, view }: { entity: Entity; view: CampaignView })
         <div className="flex gap-4">
           <button
             type="button"
-            onClick={() => setPicturing(true)}
-            title={`A picture of ${e.name}`}
+            onClick={() => e.kind !== 'quest' && setPicturing(true)}
+            disabled={e.kind === 'quest'}
+            title={e.kind === 'quest' ? undefined : `A picture of ${e.name}`}
             className="no-drag grid h-12 w-12 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-full border-2 font-display text-base font-bold text-ink-950 disabled:cursor-default"
             style={{
               borderColor: color,
@@ -264,20 +282,28 @@ function EntityCard({ entity: e, view }: { entity: Entity; view: CampaignView })
               <Icon name="map" size={22} style={{ color }} />
             ) : e.kind === 'faction' ? (
               <Icon name="party" size={22} style={{ color }} />
+            ) : e.kind === 'quest' ? (
+              <Icon name="star" size={22} style={{ color: e.status === 'done' ? 'var(--color-moss-400)' : e.status === 'failed' ? 'var(--color-blood-400)' : color }} />
+            ) : e.kind === 'item' ? (
+              <Icon name="amulet" size={22} style={{ color }} />
             ) : (
               initials(e.name)
             )}
           </button>
-          <PortraitDialog open={picturing} onClose={() => setPicturing(false)} entity={{ id: e.id, name: e.name }} />
+          {e.kind !== 'quest' && <PortraitDialog open={picturing} onClose={() => setPicturing(false)} entity={{ id: e.id, name: e.name }} />}
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 pr-16">
-              <span className={`font-display text-lg tracking-wide ${dead ? 'text-parchment-400 line-through decoration-blood-400/60' : 'text-parchment-50'}`}>{e.name}</span>
+              <span className={`font-display text-lg tracking-wide ${struck ? 'text-parchment-400 line-through decoration-blood-400/60' : 'text-parchment-50'}`}>{e.name}</span>
               {e.kind === 'person' && e.status !== 'alive' && <span className={`text-xs font-semibold uppercase ${STATUS_INFO[e.status].tone}`}>{STATUS_INFO[e.status].label}</span>}
               {e.aliases.length > 0 && <span className="text-xs text-parchment-500">also {e.aliases.join(', ')}</span>}
               {e.kind === 'person' && e.faction && <span className="text-xs text-gold-300/80">of {e.faction}</span>}
+              {e.kind === 'quest' && <span className={`text-xs font-semibold uppercase ${STATUS_INFO[e.status].tone}`}>{STATUS_INFO[e.status].label}</span>}
             </div>
             {e.kind === 'person' && <AttitudeMeter value={e.attitude} />}
             {e.kind === 'faction' && <StandingMeter value={e.standing ?? 0} />}
+            {e.kind === 'person' && e.ties && e.ties.length > 0 && <p className="mt-1 text-[0.8rem] text-parchment-400">{e.ties.map((t) => `${t.how.charAt(0).toUpperCase()}${t.how.slice(1)} ${t.name}`).join(' · ')}</p>}
+            {e.kind === 'quest' && e.giver && <p className="mt-1 text-[0.8rem] text-parchment-400">Asked by {e.giver}</p>}
+            {e.kind === 'item' && e.holder && <p className="mt-1 text-[0.8rem] text-parchment-400">{e.holder === 'you' ? 'You have it' : `${e.holder} has it`}</p>}
             <p className="mt-1.5 text-[0.92rem] leading-snug text-parchment-200">{e.summary || <span className="text-parchment-500 italic">No description yet.</span>}</p>
             {e.facts.length > 0 && (
               <ul className="mt-2 space-y-1">
@@ -391,9 +417,14 @@ function EntityEditor({ entity: e, onDone }: { entity: Entity; onDone: () => voi
   const [attitude, setAttitude] = useState<Attitude | 'unknown'>(e.attitude ?? 'unknown')
   const [standing, setStanding] = useState(String(e.standing ?? 0))
   const [faction, setFaction] = useState(e.faction ?? '')
+  const [ties, setTies] = useState((e.ties ?? []).map((t) => `${t.how}: ${t.name}`).join('\n'))
+  const [giver, setGiver] = useState(e.giver ?? '')
+  const [holder, setHolder] = useState(e.holder ?? '')
   const [confirmForget, setConfirmForget] = useState(false)
   const person = e.kind === 'person'
   const group = e.kind === 'faction'
+  const quest = e.kind === 'quest'
+  const item = e.kind === 'item'
 
   const submit = async () => {
     const ok = await save({
@@ -406,7 +437,10 @@ function EntityEditor({ entity: e, onDone }: { entity: Entity; onDone: () => voi
       status,
       attitude: person ? (attitude === 'unknown' ? null : attitude) : undefined,
       standing: group ? Number(standing) : undefined,
-      faction: person ? faction.trim() || null : undefined
+      faction: person ? faction.trim() || null : undefined,
+      ties: person ? ties.split('\n').map(parseTie).filter((t): t is Tie => t !== null) : undefined,
+      giver: quest ? giver.trim() || null : undefined,
+      holder: item ? holder.trim() || null : undefined
     })
     if (ok) onDone()
   }
@@ -434,13 +468,37 @@ function EntityEditor({ entity: e, onDone }: { entity: Entity; onDone: () => voi
         </label>
       </div>
       <label className="block">
-        <Label>{person ? 'Who they are' : group ? 'What they are' : 'What it is'}</Label>
+        <Label>{person ? 'Who they are' : group ? 'What they are' : quest ? 'What has to be done' : 'What it is'}</Label>
         <input value={summary} onChange={(x) => setSummary(x.target.value)} maxLength={400} className="input py-2 text-sm" />
       </label>
       <label className="block">
-        <Label>What you know (one per line)</Label>
+        <Label>{quest ? 'How it has gone (one per line)' : 'What you know (one per line)'}</Label>
         <textarea value={facts} onChange={(x) => setFacts(x.target.value)} rows={Math.min(8, Math.max(3, e.facts.length + 1))} className="input resize-y py-2 text-sm leading-relaxed" />
       </label>
+      {quest && (
+        <div className="grid gap-3 md:grid-cols-2">
+          <div>
+            <Label>How it stands</Label>
+            <Choice value={status} onChange={setStatus} options={QUEST_STATUSES.map((s) => ({ id: s, label: STATUS_INFO[s].label }))} />
+          </div>
+          <label className="block">
+            <Label>Asked by</Label>
+            <input value={giver} onChange={(x) => setGiver(x.target.value)} maxLength={80} placeholder="Someone, or nobody (your own aim)" className="input py-2 text-sm" />
+          </label>
+        </div>
+      )}
+      {item && (
+        <label className="block">
+          <Label>Who has it</Label>
+          <input value={holder} onChange={(x) => setHolder(x.target.value)} maxLength={80} placeholder={'"you", or who has it now'} className="input py-2 text-sm" />
+        </label>
+      )}
+      {person && (
+        <label className="block">
+          <Label>Ties to others (one per line, like "granddaughter of: Old Tam")</Label>
+          <textarea value={ties} onChange={(x) => setTies(x.target.value)} rows={Math.min(5, Math.max(2, (e.ties?.length ?? 0) + 1))} className="input resize-y py-2 text-sm leading-relaxed" />
+        </label>
+      )}
       {person && (
         <label className="block">
           <Label>Belongs to</Label>
@@ -487,6 +545,47 @@ function EntityEditor({ entity: e, onDone }: { entity: Entity; onDone: () => voi
         </button>
       </div>
     </div>
+  )
+}
+
+// ---- Timeline ---------------------------------------------------------------------------------
+
+const TONE: Record<TimelineEntry['tone'], string> = { good: 'text-moss-400', bad: 'text-blood-400', neutral: 'text-gold-400' }
+
+/** The story's milestones, day by day, the latest first. */
+function TimelineSection({ entries }: { entries: TimelineEntry[] }) {
+  const days = useMemo(() => {
+    const out: { day: number; items: TimelineEntry[] }[] = []
+    for (const e of entries) {
+      const last = out.at(-1)
+      if (last && last.day === e.day) last.items.push(e)
+      else out.push({ day: e.day, items: [e] })
+    }
+    return out.reverse().map((d) => ({ ...d, items: [...d.items].reverse() }))
+  }, [entries])
+  return (
+    <>
+      <Heading title="Timeline" text="What has happened, day by day: places reached, deeds, fights, quests, the people who came and went." />
+      {!entries.length && <Empty>Nothing yet. The story's milestones will be written here.</Empty>}
+      <div className="space-y-5">
+        {days.map((d) => (
+          <section key={d.day}>
+            <h4 className="mb-2 font-display text-sm tracking-[0.18em] text-gold-300 uppercase">Day {d.day}</h4>
+            <ol className="relative space-y-2 border-l border-gold-500/20 pl-4">
+              {d.items.map((e, i) => (
+                <li key={i} className="relative">
+                  <span className="absolute top-1 -left-[1.4rem] grid h-5 w-5 place-items-center rounded-full border border-gold-500/25 bg-ink-900">
+                    <Icon name={e.icon} size={11} className={TONE[e.tone]} />
+                  </span>
+                  <span className="text-[0.92rem] leading-snug text-parchment-100">{e.text}</span>
+                  <span className="ml-2 text-[0.7rem] text-parchment-500">{timeLabel(e.minute).part.toLowerCase()}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ))}
+      </div>
+    </>
   )
 }
 

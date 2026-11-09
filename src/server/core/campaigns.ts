@@ -41,7 +41,8 @@ import {
 import type { CampaignSummary, CampaignView, ChangeLine, MessageView } from '@shared/view'
 import type { CastMember } from '@shared/cards'
 import { projectMemory, sameName, type MemoryEvent } from '@shared/memory'
-import { journeyOf } from '@shared/journey'
+import { JourneyLog } from '@shared/journey'
+import { TimelineLog } from '@shared/timeline'
 import { normalizeEntry, type LoreEntry } from '@shared/lore'
 import type { World } from '@shared/worlds'
 import { GameDb, newId, type CampaignRow, type EventRow, type LorebookRow, type MessageRow } from '../store/db'
@@ -177,8 +178,17 @@ export class Campaigns {
     const all = this.db.messagesFor(id)
     const path = this.path(c, all)
     const events = this.activeEvents(c, path)
-    // One pass: the state, and the journey that led to it.
-    const { state, journey } = journeyOf(this.start(c), events.map((e) => e.event), (st, ev) => applyEvent(st, ev, c.settings))
+    // One pass: the state, the journey that led to it, the story's milestones and its memory.
+    const journeyLog = new JourneyLog()
+    const timeline = new TimelineLog()
+    let state = this.start(c)
+    for (const { event } of events) {
+      const before = state
+      state = applyEvent(state, event, c.settings)
+      journeyLog.see(event, state)
+      timeline.see(event, before, state)
+    }
+    const journey = journeyLog.done()
 
     const children = new Map<string, MessageRow[]>()
     for (const m of all) {
@@ -244,8 +254,9 @@ export class Campaigns {
         needs: needs(state, c.settings.survival)
       },
       cast: c.cast.map((m) => ({ cardId: m.cardId, role: m.role, name: m.name, hasImage: m.hasImage })),
-      memory: projectMemory(events.map((e) => e.event)),
+      memory: timeline.memory,
       journey,
+      timeline: timeline.done(),
       lorebooks: c.lorebooks.map((lid) => this.db.getLorebook(lid)).filter((b) => b !== null).map((b) => ({ id: b.id, name: b.name, entries: b.entries.length })),
       messages,
       awaitingNarration: last?.role === 'user',

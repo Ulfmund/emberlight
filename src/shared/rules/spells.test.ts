@@ -99,12 +99,11 @@ describe('spells', () => {
     const st = initialState(witch, S)
     const out = {
       minutesPassed: 30, rest: 'none' as const, location: '', deed: '', deedRenown: 0, itemsGained: [], itemsLost: [], coinsChange: 0, milestoneXp: 0, healing: 0,
-      conditionsOn: [], conditionsOff: [], people: [], places: [], placeKind: 'unknown', ate: 'none' as const, itemsUsed: [], itemsEquipped: [],
+      conditionsOn: [], conditionsOff: [], records: [], placeKind: 'unknown', ate: 'none' as const, itemsUsed: [], itemsEquipped: [],
       spellsLearned: ['Firebolt', 'Mend', 'Fireball of Doom'],
       weather: 'unchanged' as const,
     companionsJoined: [],
-    companionsLeft: [],
-    factions: []
+    companionsLeft: []
     }
     const evs = scribeToEvents(out as Parameters<typeof scribeToEvents>[0], st)
     expect(evs.filter((e) => e.type === 'learn_spell')).toEqual([{ type: 'learn_spell', id: 'firebolt', name: 'Firebolt' }])

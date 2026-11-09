@@ -1,6 +1,6 @@
 import type { Hono } from 'hono'
 import { z } from 'zod'
-import { ImageSettingsSchema, emblemPrompt, portraitPrompt, scenePrompt } from '@shared/images'
+import { ImageSettingsSchema, emblemPrompt, portraitPrompt, scenePrompt, stillLifePrompt } from '@shared/images'
 import { AGES, BACKGROUNDS, RACES, SEXES } from '@shared/rules'
 import { projectMemory } from '@shared/memory'
 import type { Campaigns } from '../core/campaigns'
@@ -156,6 +156,7 @@ function portraitFor(campaigns: Campaigns, settings: SettingsStore, id: string, 
     const what = e.summary ? `${e.name}, ${e.summary.replace(/\.$/, '')}` : e.name
     if (e.kind === 'place') return scenePrompt(style, { what, details: e.facts.slice(-2) })
     if (e.kind === 'faction') return emblemPrompt(style, { what, details: e.facts.filter((f) => !/\([+−-]\d\)$/.test(f)).slice(-1) })
+    if (e.kind === 'item') return stillLifePrompt(style, { what, details: e.facts.slice(-2) })
     return portraitPrompt(style, { kind: e.summary ? e.summary.replace(/\.$/, '') : e.name, details: e.facts.slice(-2) })
   }
   const b = view.state.character.build

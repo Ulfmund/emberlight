@@ -1,14 +1,30 @@
 /**
- * Long-term memory (docs/spec/07-memory-and-lore.md): the people, places and factions met in
- * play, and the story condensed into layered summaries (scenes → chapters → the story so far).
+ * Long-term memory (docs/spec/07-memory-and-lore.md): the people, places, factions, quests and
+ * notable items of the story, and the story condensed into layered summaries (scenes →
+ * chapters → the story so far).
  *
  * Memory is built from events, like the rest of the game state, so it follows the branch
  * being played: rewind past the moment you met someone and the record of them is gone too.
  */
 
-export type EntityKind = 'person' | 'place' | 'faction'
+export type EntityKind = 'person' | 'place' | 'faction' | 'quest' | 'item'
 export type Attitude = 'hostile' | 'unfriendly' | 'neutral' | 'friendly' | 'devoted'
-export type EntityStatus = 'alive' | 'dead' | 'missing' | 'unknown'
+/** People (and things): alive, dead, missing, unknown. Quests: active, done, failed. */
+export type EntityStatus = 'alive' | 'dead' | 'missing' | 'unknown' | 'active' | 'done' | 'failed'
+export const QUEST_STATUSES: EntityStatus[] = ['active', 'done', 'failed']
+const OTHER_STATUSES: EntityStatus[] = ['alive', 'dead', 'missing', 'unknown']
+
+/** How one character is tied to another ("granddaughter of" Old Tam). */
+export type Tie = { how: string; name: string }
+
+/** "granddaughter of: Old Tam" → a tie (null if it isn't one). */
+export function parseTie(s: string): Tie | null {
+  const at = s.indexOf(':')
+  if (at < 1) return null
+  const how = s.slice(0, at).replace(/\s+/g, ' ').trim().slice(0, 60)
+  const name = s.slice(at + 1).replace(/\s+/g, ' ').trim().slice(0, 60)
+  return how && name ? { how, name } : null
+}
 
 export const ATTITUDES: Attitude[] = ['hostile', 'unfriendly', 'neutral', 'friendly', 'devoted']
 
@@ -58,6 +74,12 @@ export type Entity = {
   faction?: string
   /** Factions only: what they think of the player character (−3 to +3). */
   standing?: number
+  /** People only: how they're tied to other characters. */
+  ties?: Tie[]
+  /** Quests only: who asked it of the character. */
+  giver?: string
+  /** Items only: who has it now ("you": the player character). */
+  holder?: string
   /** A picture of them (a media id). */
   image?: string
   firstSeenDay: number
@@ -106,6 +128,11 @@ export type MemoryEvent =
       faction?: string
       /** Factions: how much the player's deeds just moved them (added up, kept to −3…+3). */
       standingChange?: number
+      /** People: ties to other characters (added to those known). */
+      ties?: Tie[]
+      /** Quests: who asked it. Items: who has it now. */
+      giver?: string
+      holder?: string
       day: number
     }
   | { type: 'summary'; summary: Summary }
@@ -130,6 +157,11 @@ export type JournalEdit =
       standing?: number | null
       /** People: the faction they belong to (null: none). */
       faction?: string | null
+      /** People: their ties to others, all of them (replaces what was recorded). */
+      ties?: Tie[]
+      /** Quests: who asked it; items: who has it (null: nobody known). */
+      giver?: string | null
+      holder?: string | null
     }
   | { type: 'entity_forget'; id: string }
   | { type: 'summary_edit'; level: Summary['level']; to: string; title: string; text: string }
@@ -212,7 +244,8 @@ export function sameFaction(a: string, b: string): boolean {
 
 export function findEntity(m: Memory, kind: EntityKind, name: string, aliases: string[] = []): Entity | undefined {
   const names = [name, ...aliases]
-  const same = kind === 'place' ? samePlace : kind === 'faction' ? sameFaction : sameName
+  // Groups, quests and things go by shorter names too ("the ferry" for "Find the missing ferry").
+  const same = kind === 'place' ? samePlace : kind === 'person' ? sameName : sameFaction
   return m.entities.find((e) => e.kind === kind && [e.name, ...e.aliases].some((x) => names.some((n) => same(x, n))))
 }
 
@@ -247,7 +280,7 @@ export function applyMemoryEvent(m: Memory, ev: MemoryEvent, counter: { n: numbe
           lastSeen: counter.n,
           mentions: 0
         }
-        if (ev.kind !== 'person') e.status = 'unknown'
+        if (ev.kind !== 'person') e.status = ev.kind === 'quest' ? 'active' : 'unknown'
         if (ev.kind === 'faction') e.standing = 0
         m.entities.push(e)
       } else {
@@ -270,12 +303,19 @@ export function applyMemoryEvent(m: Memory, ev: MemoryEvent, counter: { n: numbe
         if (t && !e.facts.some((x) => similar(x, t))) e.facts.push(t)
       }
       if (e.facts.length > MAX_FACTS) e.facts = e.facts.slice(-MAX_FACTS)
-      if (ev.status) e.status = ev.status
+      if (ev.status && (e.kind === 'quest' ? QUEST_STATUSES : OTHER_STATUSES).includes(ev.status)) e.status = ev.status
       if (ev.attitude && e.kind === 'person') e.attitude = ev.attitude
       // "none" from the Scribe doesn't undo a tie it recorded before; the Journal can.
       if (ev.relation && ev.relation !== 'none' && e.kind === 'person') e.relation = ev.relation
       if (ev.faction?.trim() && e.kind === 'person') e.faction = ev.faction.trim()
       if (ev.standingChange && e.kind === 'faction') e.standing = clampStanding((e.standing ?? 0) + ev.standingChange)
+      if (ev.ties?.length && e.kind === 'person') {
+        const ties = [...(e.ties ?? [])]
+        for (const t of ev.ties) if (t.how.trim() && t.name.trim() && !ties.some((x) => sameName(x.name, t.name) && x.how.toLowerCase() === t.how.toLowerCase())) ties.push({ how: t.how.trim(), name: t.name.trim() })
+        e.ties = ties.slice(-8)
+      }
+      if (ev.giver?.trim() && e.kind === 'quest') e.giver = ev.giver.trim()
+      if (ev.holder?.trim() && e.kind === 'item') e.holder = ev.holder.trim()
       e.lastSeenDay = ev.day
       e.lastSeen = counter.n
       e.mentions++
@@ -300,7 +340,10 @@ export function applyMemoryEvent(m: Memory, ev: MemoryEvent, counter: { n: numbe
       e.aliases = e.aliases.filter((a) => normName(a) !== normName(e.name)).slice(-6)
       if (ev.summary !== undefined) e.summary = ev.summary.trim()
       if (ev.facts) e.facts = ev.facts.map((f) => f.trim()).filter(Boolean).slice(-MAX_FACTS)
-      if (ev.status) e.status = ev.status
+      if (ev.status && (e.kind === 'quest' ? QUEST_STATUSES : OTHER_STATUSES).includes(ev.status)) e.status = ev.status
+      if (ev.ties && e.kind === 'person') e.ties = ev.ties.filter((t) => t.how.trim() && t.name.trim()).slice(0, 8)
+      if (ev.giver !== undefined && e.kind === 'quest') e.giver = ev.giver?.trim() || undefined
+      if (ev.holder !== undefined && e.kind === 'item') e.holder = ev.holder?.trim() || undefined
       if (ev.attitude !== undefined && e.kind === 'person') e.attitude = ev.attitude ?? undefined
       if (ev.relation !== undefined && e.kind === 'person') e.relation = ev.relation && ev.relation !== 'none' ? ev.relation : undefined
       if (ev.image !== undefined) e.image = ev.image ?? undefined
@@ -364,7 +407,8 @@ export function mentions(text: string, e: Entity): boolean {
  */
 export function relevantEntities(m: Memory, recent: string, location: string | null, max: number, exclude: string[] = [], recalled: string[] = []): Entity[] {
   const skip = (e: Entity) => exclude.some((x) => sameName(x, e.name))
-  const live = m.entities.filter((e) => !skip(e))
+  // Quests have their own block; everything else competes for the DM's attention here.
+  const live = m.entities.filter((e) => !skip(e) && e.kind !== 'quest')
   const picked: Entity[] = []
   const add = (e: Entity) => {
     if (picked.length < max && !picked.includes(e)) picked.push(e)
@@ -392,6 +436,9 @@ export function entityLine(e: Entity, facts: number): string {
     e.kind === 'faction' ? `faction; the player is ${standingLabel(e.standing).toLowerCase()} by them (${fmtStanding(e.standing ?? 0)})` : null,
     e.aliases.length ? `also called ${e.aliases.slice(0, 3).join(', ')}` : null,
     e.kind === 'person' && e.faction ? `of ${e.faction}` : null,
+    e.kind === 'person' && e.ties?.length ? e.ties.slice(0, 3).map((t) => `${t.how} ${t.name}`).join(', ') : null,
+    e.kind === 'item' ? `a notable thing${e.holder ? `, held by ${e.holder === 'you' ? 'the player' : e.holder}` : ''}` : null,
+    e.kind === 'quest' ? `quest, ${e.status}${e.giver ? `, asked by ${e.giver}` : ''}` : null,
     e.kind === 'person' && e.relation ? RELATION_LABEL[e.relation].replace('your', "the player's") : null,
     e.kind === 'person' && e.attitude ? `${e.attitude} toward the player` : null,
     e.status === 'dead' ? 'DEAD' : e.status === 'missing' ? 'missing' : null,
@@ -399,6 +446,17 @@ export function entityLine(e: Entity, facts: number): string {
   ].filter(Boolean)
   const f = facts > 0 && e.facts.length ? ` Known: ${e.facts.slice(-facts).join('; ')}.` : ''
   return `- ${e.name} (${tags.join(', ')}): ${e.summary || 'no description yet'}.${f}`.replace(/\.\./g, '.')
+}
+
+/** The quests still open, newest first. */
+export const activeQuests = (m: Memory) => m.entities.filter((e) => e.kind === 'quest' && e.status === 'active').sort((a, b) => b.lastSeen - a.lastSeen)
+
+/** For the DM: what the character has taken on, who asked, and how far it's got. */
+export function questBrief(m: Memory, max = 6): string {
+  return activeQuests(m)
+    .slice(0, max)
+    .map((q) => `- ${q.name}${q.giver ? ` (asked by ${q.giver})` : ''}: ${q.summary || 'no details yet'}.${q.facts.length ? ` So far: ${q.facts.slice(-2).join('; ')}.` : ''}`.replace(/\.\./g, '.'))
+    .join('\n')
 }
 
 const dayRange = (s: Summary) => (s.fromDay === s.toDay ? `day ${s.fromDay}` : `days ${s.fromDay}–${s.toDay}`)

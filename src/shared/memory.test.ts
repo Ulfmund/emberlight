@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { entityLine, mentions, projectMemory, relevantEntities, sameName, storySoFar, type MemoryEvent, type Summary } from './memory'
-import { scribeToEvents, type ScribeOutput } from '../server/ai/jobs/scribe'
+import { entityLine, mentions, parseTie, projectMemory, questBrief, relevantEntities, sameName, storySoFar, type MemoryEvent, type Summary } from './memory'
+import { scribeToEvents, type ScribeInput } from '../server/ai/jobs/scribe'
 import { DEFAULT_SETTINGS, initialState, project, storyMinute, type CharacterBuild } from './rules'
 
 const person = (name: string, extra: Partial<Extract<MemoryEvent, { type: 'entity' }>> = {}): MemoryEvent => ({ type: 'entity', kind: 'person', name, day: 1, ...extra })
@@ -144,7 +144,7 @@ describe('Scribe memory output', () => {
     appearance: '',
     personality: ''
   }
-  const blank: ScribeOutput = {
+  const blank: ScribeInput = {
     minutesPassed: 10,
     rest: 'none',
     location: '',
@@ -157,8 +157,7 @@ describe('Scribe memory output', () => {
     healing: 0,
     conditionsOn: [],
     conditionsOff: [],
-    people: [],
-    places: [],
+    records: [],
     placeKind: 'unknown',
     ate: 'none',
     itemsUsed: [],
@@ -166,8 +165,7 @@ describe('Scribe memory output', () => {
     spellsLearned: [],
     weather: 'unchanged' as const,
     companionsJoined: [],
-    companionsLeft: [],
-    factions: []
+    companionsLeft: []
   }
 
   it('records people and places, but never the player character or nameless extras', () => {
@@ -176,12 +174,12 @@ describe('Scribe memory output', () => {
       {
         ...blank,
         location: 'The Wicker Goose',
-        people: [
-          { name: 'Old Tam', otherNames: ['the ferryman'], who: 'ferryman at Millbrook', newFacts: ['owes Brenna a favour'], status: 'alive', attitude: 'friendly', relation: 'none', faction: '' },
-          { name: 'Brenna', otherNames: [], who: 'the hunter', newFacts: [], status: 'alive', attitude: 'unknown', relation: 'none', faction: '' },
-          { name: 'the tall guard', otherNames: [], who: 'a guard', newFacts: [], status: 'alive', attitude: 'neutral', relation: 'none', faction: '' }
-        ],
-        places: [{ name: 'Millbrook Crossing', what: 'a ferry landing', newFacts: [] }]
+        records: [
+          { kind: 'person', name: 'Old Tam', otherNames: ['the ferryman'], what: 'ferryman at Millbrook', newFacts: ['owes Brenna a favour'], status: 'alive', attitude: 'friendly' },
+          { kind: 'person', name: 'Brenna', what: 'the hunter', status: 'alive' },
+          { kind: 'person', name: 'the tall guard', what: 'a guard', status: 'alive', attitude: 'neutral' },
+          { kind: 'place', name: 'Millbrook Crossing', what: 'a ferry landing' }
+        ]
       },
       state
     )
@@ -201,18 +199,80 @@ describe('Scribe memory output', () => {
     expect(scribeToEvents({ ...blank, weather: 'clear' }, { ...state, weather: 'rain' })).toContainEqual({ type: 'weather', weather: 'clear' })
   })
 
+  it('records quests, notable things, and ties between people', () => {
+    const state = initialState(build, DEFAULT_SETTINGS)
+    const evs = scribeToEvents(
+      {
+        ...blank,
+        records: [
+          { kind: 'quest', name: 'Find the missing ferry', what: 'learn where the Millbrook ferry went', partOf: 'Old Tam' },
+          { kind: 'item', name: 'the silver amulet', what: 'a serpent-shaped amulet', partOf: 'the player' },
+          { kind: 'item', name: 'the ferry key', partOf: 'Old Tam' },
+          { kind: 'person', name: 'Wenna', what: "Tam's granddaughter", status: 'alive', ties: ['granddaughter of: Old Tam', 'nonsense', 'friend of: Brenna', 'ferry key: family heirloom, passed from his father', 'owes money to: the Lantern Guild'] }
+        ]
+      },
+      state
+    )
+    // A quest starts under way, with who asked; a thing says who has it ("you" for the player).
+    expect(evs).toContainEqual({ type: 'entity', kind: 'quest', name: 'Find the missing ferry', aliases: [], summary: 'learn where the Millbrook ferry went', facts: [], status: 'active', giver: 'Old Tam', day: 1 })
+    expect(evs).toContainEqual(expect.objectContaining({ kind: 'item', name: 'the silver amulet', holder: 'you' }))
+    expect(evs).toContainEqual(expect.objectContaining({ kind: 'item', name: 'the ferry key', holder: 'Old Tam' }))
+    // Ties are kept only when they're ties, and never to the player character (that's relation).
+    expect(evs.find((e) => e.type === 'entity' && e.name === 'Wenna')).toMatchObject({ ties: [{ how: 'granddaughter of', name: 'Old Tam' }, { how: 'owes money to', name: 'the Lantern Guild' }] })
+
+    const m = projectMemory(evs)
+    expect(questBrief(m)).toBe('- Find the missing ferry (asked by Old Tam): learn where the Millbrook ferry went.')
+    expect(entityLine(m.entities.find((e) => e.name === 'Wenna')!, 2)).toContain('granddaughter of Old Tam, owes money to the Lantern Guild')
+    expect(entityLine(m.entities.find((e) => e.name === 'the silver amulet')!, 2)).toContain('a notable thing, held by the player')
+    // Quests have their own block, so they never crowd people out of the DM's memory list.
+    expect(relevantEntities(m, 'the missing ferry', null, 10).some((e) => e.kind === 'quest')).toBe(false)
+
+    // Done, under a shorter name: the same quest, not a new one.
+    const done = scribeToEvents({ ...blank, records: [{ kind: 'quest', name: 'the missing ferry', status: 'done', newFacts: ['found it sunk below the weir'] }] }, state, m)
+    const m2 = projectMemory([...evs, ...done])
+    expect(m2.entities.filter((e) => e.kind === 'quest')).toHaveLength(1)
+    expect(m2.entities.find((e) => e.kind === 'quest')).toMatchObject({ name: 'Find the missing ferry', status: 'done', facts: ['found it sunk below the weir'] })
+    expect(questBrief(m2)).toBe('')
+    // A person can't be "done", and a quest can't be "dead".
+    const odd = projectMemory([...evs, { type: 'entity', kind: 'person', name: 'Wenna', status: 'done', day: 2 }, { type: 'entity', kind: 'quest', name: 'Find the missing ferry', status: 'dead', day: 2 }])
+    expect(odd.entities.find((e) => e.name === 'Wenna')!.status).toBe('alive')
+    expect(odd.entities.find((e) => e.kind === 'quest')!.status).toBe('active')
+  })
+
+  it('lets the player correct quests, things and ties in the Journal', () => {
+    const base: MemoryEvent[] = [
+      { type: 'entity', kind: 'quest', name: 'Find the missing ferry', giver: 'Old Tam', day: 1 },
+      { type: 'entity', kind: 'item', name: 'the silver amulet', holder: 'you', day: 1 },
+      { type: 'entity', kind: 'person', name: 'Wenna', ties: [{ how: 'granddaughter of', name: 'Old Tam' }], day: 1 },
+      { type: 'entity', kind: 'person', name: 'Wenna', ties: [{ how: 'Granddaughter of', name: 'old tam' }, { how: 'friend of', name: 'Pell' }], day: 2 }
+    ]
+    expect(projectMemory(base).entities.find((e) => e.name === 'Wenna')!.ties).toEqual([
+      { how: 'granddaughter of', name: 'Old Tam' },
+      { how: 'friend of', name: 'Pell' }
+    ])
+    const m = projectMemory([
+      ...base,
+      { type: 'entity_edit', id: 'quest:find the missing ferry', status: 'failed', giver: null },
+      { type: 'entity_edit', id: 'item:the silver amulet', holder: 'Sergeant Pell' },
+      { type: 'entity_edit', id: 'person:wenna', ties: [{ how: 'sister of', name: 'Colly' }] }
+    ])
+    expect(m.entities.find((e) => e.kind === 'quest')).toMatchObject({ status: 'failed', giver: undefined })
+    expect(m.entities.find((e) => e.kind === 'item')!.holder).toBe('Sergeant Pell')
+    expect(m.entities.find((e) => e.name === 'Wenna')!.ties).toEqual([{ how: 'sister of', name: 'Colly' }])
+    expect(parseTie('owes money to: the Lantern Guild')).toEqual({ how: 'owes money to', name: 'the Lantern Guild' })
+    expect(parseTie(': nobody')).toBeNull()
+  })
+
   it("records groups, and what the character's deeds did to their standing", () => {
     const state = initialState(build, DEFAULT_SETTINGS)
     const evs = scribeToEvents(
       {
         ...blank,
-        factions: [
-          { name: 'the Town Watch', what: 'keepers of the peace in Millbrook', standingChange: 5, why: 'caught the cutpurse for them' },
-          { name: 'x', what: '', standingChange: 0, why: '' }
-        ],
-        people: [
-          { name: 'Sergeant Pell', otherNames: [], who: 'a gruff watchman', newFacts: [], status: 'alive', attitude: 'neutral', relation: 'none', faction: 'the Watch' },
-          { name: 'Ysolde', otherNames: [], who: 'a guild clerk', newFacts: [], status: 'alive', attitude: 'neutral', relation: 'none', faction: 'the Merchant Guild' }
+        records: [
+          { kind: 'faction', name: 'the Town Watch', what: 'keepers of the peace in Millbrook', standingChange: 5, why: 'caught the cutpurse for them' },
+          { kind: 'faction', name: 'x' },
+          { kind: 'person', name: 'Sergeant Pell', what: 'a gruff watchman', status: 'alive', attitude: 'neutral', partOf: 'the Watch' },
+          { kind: 'person', name: 'Ysolde', what: 'a guild clerk', status: 'alive', attitude: 'neutral', partOf: 'the Merchant Guild' }
         ]
       },
       state
@@ -226,15 +286,15 @@ describe('Scribe memory output', () => {
 
   it('companions come along when the story says so, and leave or die the same way', () => {
     const state = initialState(build, DEFAULT_SETTINGS)
-    const mira = { name: 'Mira', otherNames: [], who: 'a priestess of the dawn', newFacts: [], status: 'alive' as const, attitude: 'friendly' as const, relation: 'companion' as const, faction: '' }
-    const evs = scribeToEvents({ ...blank, companionsJoined: ['Mira', 'Brenna'], people: [mira] }, state)
+    const mira = { kind: 'person' as const, name: 'Mira', what: 'a priestess of the dawn', status: 'alive' as const, attitude: 'friendly' as const, relation: 'companion' as const }
+    const evs = scribeToEvents({ ...blank, companionsJoined: ['Mira', 'Brenna'], records: [mira] }, state)
     expect(evs.filter((e) => e.type === 'party_join')).toEqual([{ type: 'party_join', companion: { id: 'ally_mira', name: 'Mira', role: 'healer' } }])
     const withMira = project(state, evs, DEFAULT_SETTINGS)
     expect(withMira.party.map((a) => a.name)).toEqual(['Mira'])
     expect(scribeToEvents({ ...blank, companionsJoined: ['Mira'] }, withMira).some((e) => e.type === 'party_join')).toBe(false)
     expect(scribeToEvents({ ...blank, companionsLeft: ['mira'] }, withMira)).toContainEqual({ type: 'party_leave', id: 'ally_mira', name: 'Mira', why: 'left' })
-    expect(scribeToEvents({ ...blank, people: [{ ...mira, status: 'dead' }] }, withMira)).toContainEqual({ type: 'party_leave', id: 'ally_mira', name: 'Mira', why: 'dead' })
+    expect(scribeToEvents({ ...blank, records: [{ ...mira, status: 'dead' }] }, withMira)).toContainEqual({ type: 'party_leave', id: 'ally_mira', name: 'Mira', why: 'dead' })
     // Nobody joins who the story says is dead.
-    expect(scribeToEvents({ ...blank, companionsJoined: ['Mira'], people: [{ ...mira, status: 'dead' }] }, state).some((e) => e.type === 'party_join')).toBe(false)
+    expect(scribeToEvents({ ...blank, companionsJoined: ['Mira'], records: [{ ...mira, status: 'dead' }] }, state).some((e) => e.type === 'party_join')).toBe(false)
   })
 })
