@@ -1,7 +1,7 @@
 {
   "name": "rp-frontend",
   "productName": "Emberlight",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "A roleplaying frontend with an AI Dungeon Master.",
   "author": "Ulfmund",
   "main": "./out/main/index.js",

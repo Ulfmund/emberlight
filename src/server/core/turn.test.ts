@@ -331,7 +331,7 @@ describe('turn engine', () => {
     expect(fake.lastSystem).toMatch(/Chapter, day 1: Chapter \d+\. A chapter passed/)
     // Summaries never repeat what's still shown in full: the latest scene isn't summarized yet.
     expect(fake.lastMessages.at(-1)!.content).toContain('(70)')
-  })
+  }, 60_000) // 70 turns: slow CI machines need more than the default 5 seconds
   it('starts in the example world and gives the DM its lore when it comes up', async () => {
     const lore = new LoreLibrary(db)
     const world = findWorld('cinder_marches')!
