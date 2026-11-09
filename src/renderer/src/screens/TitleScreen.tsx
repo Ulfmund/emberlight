@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { motion } from 'motion/react'
 import { findPreset } from '@shared/presets'
 import titleArt from '../assets/title.jpg'
@@ -7,6 +8,7 @@ import { UpdateNotice } from '../components/UpdateNotice'
 import { Button } from '../components/Button'
 import { Icon } from '../components/Icon'
 import { useGame } from '../store'
+import { PhoneDialog } from './PhoneDialog'
 
 const rise = {
   hidden: { opacity: 0, y: 18, filter: 'blur(6px)' },
@@ -26,6 +28,7 @@ export function TitleScreen() {
   const hasStory = Boolean(latest)
 
   const begin = () => go(connected ? 'creator' : 'connect')
+  const [phone, setPhone] = useState(false)
 
   return (
     <div className="relative flex-1 overflow-hidden">
@@ -89,6 +92,11 @@ export function TitleScreen() {
             <Button variant="secondary" size="lg" icon="plug" onClick={() => go('connect')} className="min-w-72">
               Connect a Model
             </Button>
+            {settings && !settings.remote && (
+              <Button variant="ghost" icon="phone" onClick={() => setPhone(true)} className="mt-1">
+                Play on Phone
+              </Button>
+            )}
           </motion.div>
         </motion.div>
 
@@ -114,6 +122,7 @@ export function TitleScreen() {
         <div className="absolute right-[5vw] bottom-8">
           <UpdateNotice />
         </div>
+        <PhoneDialog open={phone} onClose={() => setPhone(false)} />
       </div>
     </div>
   )

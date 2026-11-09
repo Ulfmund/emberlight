@@ -1,12 +1,13 @@
-import { createServer as createHttpServer } from 'node:http'
+import { createServer as createHttpServer, type Server } from 'node:http'
 import { readFile } from 'node:fs/promises'
 import { extname, join, normalize, sep } from 'node:path'
 import { Hono } from 'hono'
 import { getRequestListener } from '@hono/node-server'
 import { z } from 'zod'
-import { Connection, type SettingsView, type TestResult, type UpdateStatus } from '@shared/types'
+import { Connection, type RemoteView, type SettingsView, type TestResult, type UpdateStatus } from '@shared/types'
 import { findPreset } from '@shared/presets'
-import { SettingsStore } from './store/settings'
+import { newRemoteKey, SettingsStore } from './store/settings'
+import { accessGate, isRemote, lanAddresses, LINK_PORT, WIFI_PORT } from './remote'
 import { SecretStore, type Cipher } from './store/secrets'
 import { GameDb } from './store/db'
 import { createProvider } from './ai/providers'
@@ -41,6 +42,8 @@ export type ServerOptions = {
  * HTTP API, so there is exactly one code path for everything the UI does.
  */
 export async function startServer(opts: ServerOptions): Promise<{ port: number; close: () => void }> {
+  /** Listeners for other devices (Wi-Fi, tunnel link), started and stopped from the settings. */
+  const extra: { wifi: { server: Server; port: number } | null; link: { server: Server; port: number } | null } = { wifi: null, link: null }
   const settings = new SettingsStore(opts.dataDir)
   const secrets = new SecretStore(opts.dataDir, opts.cipher)
   const host = opts.host ?? '127.0.0.1'
@@ -48,35 +51,38 @@ export async function startServer(opts: ServerOptions): Promise<{ port: number; 
 
   const app = new Hono()
 
-  // ---- Safety: only our own pages may use the API --------------------------------------
-  // Blocks other websites open in a browser from calling this server (it can spend API credit),
-  // and blocks DNS-rebinding tricks by checking the Host header too.
-  app.use('/api/*', async (c, next) => {
-    const allowedHosts = [`127.0.0.1:${port}`, `localhost:${port}`]
-    const allowedOrigins = [...allowedHosts.map((h) => `http://${h}`), ...(opts.devOrigins ?? [])]
-    const hostHeader = c.req.header('host') ?? ''
-    const origin = c.req.header('origin')
-    const devHost = (opts.devOrigins ?? []).some((o) => o.endsWith(`//${hostHeader}`))
-    if (!allowedHosts.includes(hostHeader) && !devHost) return c.json({ error: 'Forbidden host' }, 403)
-    if (origin && !allowedOrigins.includes(origin)) return c.json({ error: 'Forbidden origin' }, 403)
-    await next()
-  })
+  // ---- Safety: who may use the server ------------------------------------------------------
+  // This computer's own app window, or another device holding the secret key (see remote.ts).
+  const ports = { main: () => port, wifi: () => extra.wifi?.port ?? null, link: () => extra.link?.port ?? null }
+  app.use('*', accessGate({ ports, remote: () => settings.remote, devOrigins: opts.devOrigins }))
+
+  /**
+   * Another device may pick a different model, but never send the saved API key somewhere new:
+   * only a preset's own addresses (or the one already saved) are allowed from there.
+   */
+  const remoteMayUse = (c: Parameters<typeof isRemote>[0], conn: Connection) => {
+    if (!isRemote(c, ports)) return true
+    const preset = findPreset(conn.presetId)
+    const allowed = [preset?.baseUrl, ...(preset?.probeUrls ?? []), settings.connection?.presetId === conn.presetId ? settings.connection?.baseUrl : undefined]
+    return allowed.includes(conn.baseUrl)
+  }
 
   // ---- Settings & keys -----------------------------------------------------------------
-  const settingsView = async (): Promise<SettingsView> => {
+  const settingsView = async (c?: Parameters<typeof isRemote>[0]): Promise<SettingsView> => {
     const savedKeys: Record<string, boolean> = {}
     for (const id of ['openrouter', 'claude', 'custom', 'lmstudio', 'strata', 'koboldcpp']) savedKeys[id] = await secrets.has(id)
-    return { connection: settings.connection, savedKeys, secureStorage: secrets.secure }
+    return { connection: settings.connection, savedKeys, secureStorage: secrets.secure, remote: c ? isRemote(c, ports) : false }
   }
 
   app.get('/api/health', (c) => c.json({ ok: true }))
-  app.get('/api/settings', async (c) => c.json(await settingsView()))
+  app.get('/api/settings', async (c) => c.json(await settingsView(c)))
 
   app.put('/api/settings/connection', async (c) => {
     const parsed = Connection.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return c.json({ error: 'Invalid connection settings' }, 400)
+    if (!remoteMayUse(c, parsed.data)) return c.json({ error: 'A new server address can only be set on the computer running Emberlight.' }, 403)
     settings.setConnection(parsed.data)
-    return c.json(await settingsView())
+    return c.json(await settingsView(c))
   })
 
   app.put('/api/keys/:presetId', async (c) => {
@@ -123,7 +129,9 @@ export async function startServer(opts: ServerOptions): Promise<{ port: number; 
     if (!body.success) return c.json<TestResult>({ ok: false, message: 'Invalid request.' }, 400)
     const conn = body.data.connection
     const preset = findPreset(conn.presetId)
-    const key = body.data.key?.trim() || (await secrets.get(conn.presetId))
+    if (!remoteMayUse(c, conn)) return c.json<TestResult>({ ok: false, message: 'A new server address can only be set on the computer running Emberlight.' }, 403)
+    const remote = isRemote(c, ports)
+    const key = (remote ? '' : body.data.key?.trim()) || (await secrets.get(conn.presetId))
     if (preset?.needsKey && !key) {
       return c.json<TestResult>({ ok: false, message: `${preset.label} needs an API key.` })
     }
@@ -162,6 +170,50 @@ export async function startServer(opts: ServerOptions): Promise<{ port: number; 
     return c.json<TestResult>({ ok: false, message: lastError || 'Could not connect.' })
   })
 
+  // ---- Playing from other devices (this computer only: the gate refuses these remotely) ----
+  const remoteView = (): RemoteView => {
+    const r = settings.remote
+    const q = `?key=${encodeURIComponent(r.key)}`
+    return {
+      wifi: { on: r.wifi, running: Boolean(extra.wifi), urls: extra.wifi ? lanAddresses().map((ip) => `http://${ip}:${extra.wifi!.port}/${q}`) : [] },
+      link: { on: r.link, running: Boolean(extra.link), port: extra.link?.port ?? null, path: `/${q}` },
+      error: remoteError
+    }
+  }
+  let remoteError: string | undefined
+  const applyRemote = async () => {
+    remoteError = undefined
+    const r = settings.remote
+    for (const way of ['wifi', 'link'] as const) {
+      if (r[way] && !extra[way]) {
+        try {
+          extra[way] = await listen(way === 'wifi' ? '0.0.0.0' : '127.0.0.1', way === 'wifi' ? WIFI_PORT : LINK_PORT, 10)
+        } catch (err) {
+          remoteError = `Couldn't open the ${way === 'wifi' ? 'Wi-Fi' : 'link'} connection: ${(err as Error).message}`
+        }
+      } else if (!r[way] && extra[way]) {
+        extra[way]!.server.close()
+        // Drop paired devices' open streams too.
+        extra[way]!.server.closeAllConnections?.()
+        extra[way] = null
+      }
+    }
+  }
+  app.get('/api/remote', (c) => c.json(remoteView()))
+  app.put('/api/remote', async (c) => {
+    const b = z.object({ wifi: z.boolean().optional(), link: z.boolean().optional() }).safeParse(await c.req.json().catch(() => null))
+    if (!b.success) return c.json({ error: 'Invalid settings' }, 400)
+    settings.setRemote(b.data)
+    await applyRemote()
+    return c.json(remoteView())
+  })
+  app.post('/api/remote/new-key', async (c) => {
+    // A new key unpairs every device: they must scan the new code.
+    settings.setRemote({ key: newRemoteKey() })
+    for (const way of ['wifi', 'link'] as const) extra[way]?.server.closeAllConnections?.()
+    return c.json(remoteView())
+  })
+
   // ---- The game (campaigns, turns, saves) -----------------------------------------------
   const db = new GameDb(opts.dataDir)
   const campaigns = new Campaigns(db)
@@ -192,24 +244,40 @@ export async function startServer(opts: ServerOptions): Promise<{ port: number; 
 
   // ---- Listen ----------------------------------------------------------------------------
   const listener = getRequestListener(app.fetch)
-  const server = createHttpServer(listener)
-  const tries = opts.portFallback ? 20 : 1
-  for (let i = 0; i < tries; i++) {
-    try {
-      await new Promise<void>((resolve, reject) => {
-        server.once('error', reject)
-        server.listen(port, host, () => {
-          server.off('error', reject)
-          resolve()
+  /** Opens a listener on the first free port from `from`. */
+  async function listen(on: string, from: number, tries: number): Promise<{ server: Server; port: number }> {
+    const srv = createHttpServer(listener)
+    for (let i = 0, p = from; i < tries; i++, p++) {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          srv.once('error', reject)
+          srv.listen(p, on, () => {
+            srv.off('error', reject)
+            resolve()
+          })
         })
-      })
-      return { port, close: () => { server.close(); db.close() } }
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'EADDRINUSE' || i === tries - 1) throw err
-      port++
+        return { server: srv, port: p }
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== 'EADDRINUSE' || i === tries - 1) throw err
+      }
+    }
+    throw new Error('No free port.')
+  }
+
+  const main = await listen(host, port, opts.portFallback ? 20 : 1).catch((err) => {
+    throw err instanceof Error && err.message === 'No free port.' ? new Error('Could not start the local server.') : err
+  })
+  port = main.port
+  await applyRemote()
+  return {
+    port,
+    close: () => {
+      main.server.close()
+      extra.wifi?.server.close()
+      extra.link?.server.close()
+      db.close()
     }
   }
-  throw new Error('Could not start the local server.')
 }
 
 /** Production pages may only load code and data from this server. */

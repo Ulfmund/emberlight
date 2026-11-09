@@ -342,6 +342,12 @@ const paths: Record<string, React.ReactNode> = {
       <circle cx="12" cy="12" r="2.8" />
     </>
   ),
+  phone: (
+    <>
+      <rect x="6.5" y="2.5" width="11" height="19" rx="2.2" />
+      <path d="M10.5 18.5h3" />
+    </>
+  ),
   book: (
     <>
       <path d="M12 6.5c-2-1.6-4.8-2-8-1.5v13c3.2-.5 6 0 8 1.5 2-1.5 4.8-2 8-1.5V5c-3.2-.5-6-.1-8 1.5z" />

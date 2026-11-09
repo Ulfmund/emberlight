@@ -1,4 +1,4 @@
-import type { Connection, SettingsView, TestResult, UpdateStatus } from '@shared/types'
+import type { Connection, RemoteView, SettingsView, TestResult, UpdateStatus } from '@shared/types'
 import type { CampaignSettings, CharacterBuild, Attr } from '@shared/rules'
 import type { CampaignSummary, CampaignView, TurnEvent } from '@shared/view'
 import type { CardDetail, CardSummary } from '@shared/cards'
@@ -26,6 +26,11 @@ export const api = {
     fetch(`/api/keys/${encodeURIComponent(presetId)}`, { method: 'DELETE' }).then((r) => json<SettingsView>(r)),
   testConnection: (connection: Connection, key?: string) =>
     post('/api/connection/test', { connection, key }).then((r) => json<TestResult>(r)),
+
+  // ---- play on phone (this computer only)
+  remote: () => fetch('/api/remote').then((r) => json<RemoteView>(r)),
+  setRemote: (patch: { wifi?: boolean; link?: boolean }) => put('/api/remote', patch).then((r) => json<RemoteView>(r)),
+  newRemoteKey: () => post('/api/remote/new-key').then((r) => json<RemoteView>(r)),
 
   // ---- updates
   updateStatus: () => fetch('/api/update').then((r) => json<UpdateStatus>(r)),

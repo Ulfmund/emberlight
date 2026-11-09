@@ -71,6 +71,16 @@ export type SettingsView = {
   savedKeys: Record<string, boolean>
   /** True when keys are encrypted by the operating system. */
   secureStorage: boolean
+  /** True when this screen is another device (a phone), not the computer running Emberlight. */
+  remote?: boolean
+}
+
+/** Play on Phone: where other devices can connect (only ever shown on the computer itself). */
+export type RemoteView = {
+  wifi: { on: boolean; running: boolean; urls: string[] }
+  /** For a tunnel (e.g. Cloudflare) to point at: http://127.0.0.1:<port>, then open <tunnel>/<path>. */
+  link: { on: boolean; running: boolean; port: number | null; path: string }
+  error?: string
 }
 
 /** Where the app's self-update is at. "disabled" = development build or phone. */

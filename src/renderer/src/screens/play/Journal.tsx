@@ -54,7 +54,7 @@ export function Journal({ view, open, onClose }: { view: CampaignView; open: boo
     <AnimatePresence>
       {open && (
         <motion.div
-          className="absolute inset-0 z-40 grid place-items-center bg-ink-950/75 p-6 backdrop-blur-sm"
+          className="absolute inset-0 z-40 grid place-items-center bg-ink-950/75 backdrop-blur-sm md:p-6"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -67,10 +67,10 @@ export function Journal({ view, open, onClose }: { view: CampaignView; open: boo
             animate={{ y: 0, scale: 1, opacity: 1 }}
             exit={{ y: 12, scale: 0.98, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 320, damping: 30 }}
-            className="panel flex h-[min(86vh,52rem)] w-full max-w-4xl overflow-hidden rounded-2xl"
+            className="panel relative flex h-full w-full max-w-4xl flex-col overflow-hidden md:h-[min(86vh,52rem)] md:flex-row md:rounded-2xl"
           >
-            <nav className="flex w-48 shrink-0 flex-col gap-1 border-r border-gold-500/15 bg-ink-950/50 p-4">
-              <div className="mb-4 flex items-center gap-2.5 px-1">
+            <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-gold-500/15 bg-ink-950/50 p-2 pr-12 md:w-48 md:flex-col md:overflow-visible md:border-r md:border-b-0 md:p-4">
+              <div className="mb-4 hidden items-center gap-2.5 px-1 md:flex">
                 <Icon name="book" size={24} className="text-gold-300" />
                 <h2 className="font-display text-xl tracking-wider text-gold-300">Journal</h2>
               </div>
@@ -78,7 +78,7 @@ export function Journal({ view, open, onClose }: { view: CampaignView; open: boo
                 <button
                   key={s.id}
                   onClick={() => setSection(s.id)}
-                  className={`no-drag relative flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                  className={`no-drag relative flex shrink-0 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors md:gap-2.5 ${
                     section === s.id ? 'text-gold-200' : 'text-parchment-400 hover:bg-white/5 hover:text-parchment-100'
                   }`}
                 >
@@ -88,18 +88,18 @@ export function Journal({ view, open, onClose }: { view: CampaignView; open: boo
                   {s.count ? <span className="relative text-xs text-parchment-500 tabular-nums">{s.count}</span> : null}
                 </button>
               ))}
-              <p className="mt-auto px-1 text-[0.72rem] leading-snug text-parchment-500">
+              <p className="mt-auto hidden px-1 text-[0.72rem] leading-snug text-parchment-500 md:block">
                 This is what the Dungeon Master remembers. Fix anything that's wrong and the DM will know.
               </p>
             </nav>
 
-            <div className="flex min-w-0 flex-1 flex-col">
-              <div className="flex justify-end px-3 pt-3">
-                <button onClick={onClose} className="no-drag focus-ring cursor-pointer rounded-lg p-2 text-parchment-400 hover:bg-white/5 hover:text-gold-200" aria-label="Close">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <div className="absolute top-2 right-2 flex justify-end md:static md:px-3 md:pt-3">
+                <button onClick={onClose} className="no-drag focus-ring cursor-pointer rounded-lg bg-ink-950/60 p-2 text-parchment-400 hover:bg-white/5 hover:text-gold-200" aria-label="Close">
                   <Icon name="x" size={20} />
                 </button>
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto px-7 pb-8">
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-8 md:px-7 md:pt-0">
                 {section === 'people' && <EntityList view={view} items={people} kind="person" />}
                 {section === 'places' && <EntityList view={view} items={places} kind="place" />}
                 {section === 'story' && <StorySection view={view} />}
@@ -228,7 +228,7 @@ function EntityCard({ entity: e, view }: { entity: Entity; view: CampaignView })
           </div>
           <button
             onClick={() => setEditing(true)}
-            className="no-drag absolute top-3 right-3 flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-xs text-parchment-400 opacity-0 transition group-hover:opacity-100 hover:bg-white/5 hover:text-gold-200 focus:opacity-100"
+            className="no-drag absolute top-3 right-3 flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-xs text-parchment-400 opacity-0 touch:opacity-100 transition group-hover:opacity-100 hover:bg-white/5 hover:text-gold-200 focus:opacity-100"
           >
             <Icon name="quill" size={14} /> Edit
           </button>
@@ -482,7 +482,7 @@ function SummaryCard({ summary: s, eyebrow, bare = false, small = false }: { sum
           <p className={`mt-1 font-story leading-relaxed text-parchment-200 ${small ? 'text-[0.95rem]' : 'text-[1.02rem]'}`}>{s.text}</p>
           <button
             onClick={() => setEditing(true)}
-            className="no-drag absolute top-3 right-3 flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-xs text-parchment-400 opacity-0 transition group-hover:opacity-100 hover:bg-white/5 hover:text-gold-200 focus:opacity-100"
+            className="no-drag absolute top-3 right-3 flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-xs text-parchment-400 opacity-0 touch:opacity-100 transition group-hover:opacity-100 hover:bg-white/5 hover:text-gold-200 focus:opacity-100"
           >
             <Icon name="quill" size={14} /> Edit
           </button>
@@ -520,7 +520,7 @@ function ArcCard({ text: initial }: { text: string }) {
               setText(initial)
               setEditing(true)
             }}
-            className="no-drag absolute top-3 right-3 flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-xs text-parchment-400 opacity-0 transition group-hover:opacity-100 hover:bg-white/5 hover:text-gold-200 focus:opacity-100"
+            className="no-drag absolute top-3 right-3 flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-xs text-parchment-400 opacity-0 touch:opacity-100 transition group-hover:opacity-100 hover:bg-white/5 hover:text-gold-200 focus:opacity-100"
           >
             <Icon name="quill" size={14} /> Edit
           </button>
@@ -589,7 +589,7 @@ function NotesSection({ view }: { view: CampaignView }) {
                   {n.text}
                 </button>
               )}
-              <button onClick={() => void save({ type: 'note_remove', id: n.id })} className="no-drag cursor-pointer rounded p-1 text-parchment-500 opacity-0 transition group-hover:opacity-100 hover:text-blood-400" title="Unpin">
+              <button onClick={() => void save({ type: 'note_remove', id: n.id })} className="no-drag cursor-pointer rounded p-1 text-parchment-500 opacity-0 touch:opacity-100 transition group-hover:opacity-100 hover:text-blood-400" title="Unpin">
                 <Icon name="x" size={15} />
               </button>
             </motion.li>

@@ -42,6 +42,15 @@ const pollNow = () => void tick()
  * `compact` is the title-bar pill; the full version is the card on the title screen.
  */
 export function UpdateNotice({ compact = false }: { compact?: boolean }) {
+  // Updates are installed on the computer running Emberlight, never from a phone.
+  if (!IN_APP) return null
+  return <UpdateNoticeInner compact={compact} />
+}
+
+/** True inside the desktop app window (false in a phone's browser). */
+export const IN_APP = typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron')
+
+function UpdateNoticeInner({ compact }: { compact: boolean }) {
   const status = useUpdates((s) => s.status)
   const [restarting, setRestarting] = useState(false)
 

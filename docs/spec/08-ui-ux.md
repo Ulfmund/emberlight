@@ -68,6 +68,12 @@ The goal is that it **looks and feels like a game**: clear panels, icons for eve
 - Long-press = tooltip. Shake = throw dice (optional, uses device motion).
 - Connecting: **Play on Phone** on the PC shows a QR code. Scan it, then tap "Add to Home Screen" (see [01](01-architecture.md#platform-decision)).
 
+**Built (0.5.0):**
+- Below 768px wide: a slim status strip (portrait, name, level, health / stamina / mana) with Journal and Character buttons; Character opens a full-screen drawer with the character panel and the Sheet / Bag / Log / Saves tabs (instead of the bottom tab bar). The creator's steps become an icon strip with the cards and random-roll buttons; the Journal and the character library go full screen. Controls that appear on hover are always shown on touch screens (`touch:` variant). Quick actions, long-press tooltips, shake to roll and a PWA manifest are still to do.
+- **Play on Phone** (title screen, computer only): "Allow phones on this Wi-Fi" opens a second listener on all network interfaces (port 41740) and shows a QR code with the pairing link. Windows asks once whether Emberlight may use the network.
+- **Link for a tunnel** (Advanced): a loopback-only listener (port 41750) for a tunnel the player runs (Cloudflare Tunnel, Tailscale Serve).
+- **Security** (`src/server/remote.ts`): anything arriving on those listeners, or carrying proxy headers on the main port, is remote. It needs the 192-bit key: `?key=…` once, then an HttpOnly, SameSite=Lax cookie (Secure over HTTPS). Remote requests must be same-origin, can never use `/api/keys`, `/api/update/*` or `/api/remote`, and may only point a preset at its own addresses, so the saved API key can't be sent anywhere new. "Disconnect all phones" makes a new key.
+
 ## Feel and animation ("juice")
 
 Every effect has a toggle, and there's a master **Effects** setting: Off / Subtle / Full. The OS "reduce motion" setting is respected. Effects only animate cheap properties (position, scale, opacity) or draw on a separate canvas layer, so they never slow down typing or scrolling.

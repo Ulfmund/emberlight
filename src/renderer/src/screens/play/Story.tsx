@@ -45,7 +45,7 @@ export function Story({ view }: { view: CampaignView }) {
 
   return (
     <div ref={scroller} onScroll={onScroll} className="relative z-10 min-h-0 flex-1 overflow-y-auto">
-      <div className="mx-auto max-w-3xl px-6 pt-10 pb-10">
+      <div className="mx-auto max-w-3xl px-4 pt-5 pb-8 md:px-6 md:pt-10 md:pb-10">
         <div className="mb-8 flex items-center gap-4">
           <div className="gilt-rule flex-1" />
           <span className="font-display text-xs tracking-[0.3em] text-gold-500">{view.name.toUpperCase()}</span>
@@ -153,7 +153,7 @@ function PlayerTurn({ m, onUndo }: { m: MessageView; onUndo?: () => void }) {
       <div className="relative max-w-[85%] rounded-2xl rounded-tr-sm border border-gold-500/30 bg-gradient-to-b from-ink-700/80 to-ink-800/80 px-5 py-3 shadow-[0_10px_30px_-12px_rgb(0_0_0/0.8)]">
         <div className="mb-1 flex items-center justify-end gap-2">
           {onUndo && (
-            <button onClick={onUndo} className="no-drag cursor-pointer text-[0.68rem] text-parchment-500 opacity-0 transition-opacity group-hover:opacity-100 hover:text-gold-300" title="Take this turn back">
+            <button onClick={onUndo} className="no-drag cursor-pointer text-[0.68rem] text-parchment-500 opacity-0 touch:opacity-100 transition-opacity group-hover:opacity-100 hover:text-gold-300" title="Take this turn back">
               <Icon name="rewind" size={12} className="mr-1 inline -translate-y-px" />
               undo
             </button>

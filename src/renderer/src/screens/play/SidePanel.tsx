@@ -28,9 +28,19 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'saves', label: 'Saves', icon: 'save' }
 ]
 
-export function SidePanel({ view, tab, setTab }: { view: CampaignView; tab: Tab; setTab: (t: Tab) => void }) {
+export function SidePanel({
+  view,
+  tab,
+  setTab,
+  className = 'w-[22rem] border-l border-gold-500/15 bg-ink-950/70 backdrop-blur'
+}: {
+  view: CampaignView
+  tab: Tab
+  setTab: (t: Tab) => void
+  className?: string
+}) {
   return (
-    <aside className="relative z-10 flex w-[22rem] shrink-0 flex-col border-l border-gold-500/15 bg-ink-950/70 backdrop-blur">
+    <aside className={`relative z-10 flex shrink-0 flex-col ${className}`}>
       <div className="flex gap-1 border-b border-gold-500/15 p-2">
         {TABS.map((t) => (
           <button

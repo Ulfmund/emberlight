@@ -62,6 +62,16 @@ Handy buttons:
 - **Return here** (on older DM messages) or **undo** (on your own turns): go back in the story. The other branch is kept.
 - **Sheet / Bag / Log / Saves** on the right: your skills and caps, your items, everything that's changed, and save slots plus campaign settings.
 
+## Playing on your phone
+
+Your phone can play the same adventures as this computer, as long as Emberlight is open here.
+
+1. On the title screen, click **Play on Phone** and switch on **Allow phones on this Wi-Fi**.
+2. If Windows asks whether Emberlight may use the network, choose **Allow**.
+3. Point the phone's camera at the code and tap the link. Emberlight opens in the phone's browser. (Optional: **Add to Home Screen** for an app icon.)
+
+The phone must be on the same Wi-Fi. API keys can only be entered on the computer. **Disconnect all phones** in the same window locks every phone out again (they can scan the new code).
+
 ## Updating
 
 Emberlight checks for new versions by itself. When one is out, a glowing **Update** button appears in the top bar (and on the title screen):

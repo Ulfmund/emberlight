@@ -3,6 +3,9 @@
 /* ------------------------------------------------------------------------------------------
    Theme tokens. Everything visual reads from these, so a new theme = new values here.
    ------------------------------------------------------------------------------------------ */
+/* Touch screens (no hover): controls that appear on hover are always shown there. */
+@custom-variant touch (@media (hover: none));
+
 @theme {
   --font-display: 'Cinzel', 'Times New Roman', serif;
   --font-story: 'Crimson Pro', Georgia, serif;

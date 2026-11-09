@@ -88,7 +88,7 @@ export function CardLibrary({
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 grid place-items-center bg-ink-950/80 p-6 backdrop-blur-sm"
+          className="fixed inset-0 z-50 grid place-items-center bg-ink-950/80 backdrop-blur-sm md:p-6"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -101,7 +101,7 @@ export function CardLibrary({
             animate={{ y: 0, scale: 1, opacity: 1 }}
             exit={{ y: 12, scale: 0.98, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 320, damping: 30 }}
-            className="panel flex max-h-[86vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl"
+            className="panel flex h-full w-full max-w-5xl flex-col overflow-hidden md:h-auto md:max-h-[86vh] md:rounded-2xl"
           >
             <div className="flex items-start gap-4 border-b border-gold-500/15 px-6 pt-5 pb-4">
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-gold-500/35 bg-ink-850 text-gold-300">
@@ -269,7 +269,7 @@ function CardTile({
         <button
           onClick={onDelete}
           className={`no-drag absolute top-2 right-2 flex cursor-pointer items-center gap-1 rounded-full px-2 py-1 text-xs transition ${
-            confirmingDelete ? 'bg-blood-500 text-parchment-50' : 'bg-ink-950/70 text-parchment-300 opacity-0 group-hover:opacity-100 hover:text-blood-400'
+            confirmingDelete ? 'bg-blood-500 text-parchment-50' : 'bg-ink-950/70 text-parchment-300 opacity-0 touch:opacity-100 group-hover:opacity-100 hover:text-blood-400'
           }`}
           title="Remove from library"
         >

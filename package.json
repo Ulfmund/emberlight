@@ -1,7 +1,7 @@
 {
   "name": "rp-frontend",
   "productName": "Emberlight",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "A roleplaying frontend with an AI Dungeon Master.",
   "author": "Ulfmund",
   "main": "./out/main/index.js",
@@ -21,6 +21,7 @@
     "dotenv": "^18.0.10",
     "electron-updater": "^6.8.11",
     "hono": "^4.13.17",
+    "qrcode": "^1.5.4",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -29,6 +30,7 @@
     "@fontsource/crimson-pro": "^5.3.0",
     "@tailwindcss/vite": "^4.3.5",
     "@types/node": "^26.6.6",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.2.1",

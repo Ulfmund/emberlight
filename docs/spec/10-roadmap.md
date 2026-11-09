@@ -45,7 +45,7 @@ Built in milestones. Each one ends with something playable, so the artist can te
 ## Milestone 4 — Polish and reach
 - Full "juice" pass (including the typing runes), effects settings
 - Suggestions + ghost text
-- Play on Phone (QR pairing, PWA, mobile layout, shake to roll)
+- Play on Phone (QR pairing, PWA, mobile layout, shake to roll) *(QR pairing on Wi-Fi, tunnel link and mobile layout ✅ 0.5.0; PWA and shake to roll to do)*
 - Image generation (SD WebUI/Forge, ComfyUI, OpenAI-compatible)
 - Image input (vision, or a captioning fallback)
 - Card, lorebook and campaign export; automatic backups

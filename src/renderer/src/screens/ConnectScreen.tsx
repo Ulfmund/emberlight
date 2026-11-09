@@ -94,19 +94,19 @@ export function ConnectScreen() {
   return (
     <div className="relative flex-1 overflow-y-auto">
       <EmberField density={0.35} className="opacity-60" />
-      <div className="relative z-10 mx-auto max-w-5xl px-8 pt-8 pb-16">
-        <div className="mb-8 flex items-center gap-4">
-          <Button variant="ghost" icon="back" size="sm" onClick={() => go('title')}>
-            Back
+      <div className="relative z-10 mx-auto max-w-5xl px-4 pt-5 pb-16 md:px-8 md:pt-8">
+        <div className="mb-6 flex items-center gap-3 md:mb-8 md:gap-4">
+          <Button variant="ghost" icon="back" size="sm" onClick={() => go('title')} aria-label="Back" className="shrink-0 px-2 md:px-3">
+            <span className="hidden md:inline">Back</span>
           </Button>
-          <div>
-            <h2 className="font-display text-3xl tracking-wider text-gold-300">Connect a Model</h2>
+          <div className="min-w-0">
+            <h2 className="font-display text-2xl tracking-wider text-gold-300 md:text-3xl">Connect a Model</h2>
             <p className="mt-1 text-parchment-400">Pick where your Dungeon Master's mind lives.</p>
           </div>
         </div>
 
         {/* Preset cards */}
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
           {PRESETS.map((p, i) => {
             const active = p.id === presetId
             return (
@@ -172,7 +172,11 @@ export function ConnectScreen() {
               />
             </Field>
 
-            {preset.needsKey || presetId === 'custom' ? (
+            {settings?.remote && (preset.needsKey || presetId === 'custom') ? (
+              <Field label="API key" hint={hasSavedKey ? 'A key is saved on the computer running Emberlight.' : 'Keys can only be entered on the computer running Emberlight.'}>
+                <input disabled value="" placeholder={hasSavedKey ? '•••••••••••• (saved)' : 'Enter it on the computer'} className="input" />
+              </Field>
+            ) : preset.needsKey || presetId === 'custom' ? (
               <Field
                 label="API key"
                 hint={

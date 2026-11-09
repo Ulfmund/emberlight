@@ -202,7 +202,7 @@ export function CreatorScreen() {
 
   return (
     <div
-      className="relative flex min-h-0 flex-1"
+      className="relative flex min-h-0 flex-1 flex-col md:flex-row"
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes('Files')) e.preventDefault()
       }}
@@ -224,15 +224,16 @@ export function CreatorScreen() {
       />
 
       {/* Steps */}
-      <nav className="relative z-10 flex w-56 shrink-0 flex-col gap-1 border-r border-gold-500/15 bg-ink-950/60 p-4">
-        <Button variant="ghost" size="sm" icon="back" onClick={() => go('title')} className="mb-3 self-start">
-          Back
+      <nav className="relative z-10 flex shrink-0 items-center gap-0.5 overflow-x-auto border-b border-gold-500/15 bg-ink-950/60 p-2 md:w-56 md:gap-1 md:flex-col md:items-stretch md:overflow-visible md:border-r md:border-b-0 md:p-4">
+        <Button variant="ghost" size="sm" icon="back" onClick={() => go('title')} className="shrink-0 px-2 md:mb-3 md:self-start md:px-3" aria-label="Back">
+          <span className="hidden md:inline">Back</span>
         </Button>
         {STEPS.map((s, i) => (
           <button
             key={s.id}
             onClick={() => setStep(i)}
-            className={`no-drag relative flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
+            aria-label={s.label}
+            className={`no-drag relative flex shrink-0 cursor-pointer items-center gap-3 rounded-lg p-1 text-left text-sm transition-colors md:px-3 md:py-2.5 ${
               i === step ? 'text-gold-200' : 'text-parchment-400 hover:bg-white/5 hover:text-parchment-100'
             }`}
           >
@@ -242,10 +243,19 @@ export function CreatorScreen() {
             <span className="relative grid h-7 w-7 place-items-center rounded-full border border-gold-500/30 bg-ink-850 text-xs">
               <Icon name={s.icon} size={15} />
             </span>
-            <span className="relative font-display tracking-wider">{s.label}</span>
+            <span className="relative hidden font-display tracking-wider md:inline">{s.label}</span>
           </button>
         ))}
-        <div className="mt-auto space-y-2">
+        {/* Phones: the same two as small icon buttons. */}
+        <div className="ml-auto flex shrink-0 gap-1 pl-1 md:hidden">
+          <button onClick={() => setLibrary({ open: true, dropped: [] })} className="no-drag grid h-9 w-9 cursor-pointer place-items-center rounded-lg border border-gold-500/25 text-gold-300" aria-label="Character cards">
+            <Icon name="cards" size={19} />
+          </button>
+          <motion.button whileTap={{ scale: 0.9, rotate: -20 }} onClick={rollAdventurer} className="no-drag grid h-9 w-9 cursor-pointer place-items-center rounded-lg border border-ember-500/50 bg-ember-500/15 text-ember-400" aria-label="Roll a new adventurer">
+            <Icon name="d20" size={20} />
+          </motion.button>
+        </div>
+        <div className="mt-auto hidden space-y-2 md:block">
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.97 }}
@@ -277,7 +287,7 @@ export function CreatorScreen() {
 
       {/* Step content */}
       <div className="relative z-10 min-w-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-4xl px-8 pt-8 pb-24">
+        <div className="mx-auto max-w-4xl px-4 pt-5 pb-24 md:px-8 md:pt-8">
           <AnimatePresence mode="wait">
             <motion.div key={step} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.22 }}>
               {step === 0 && <OriginStep build={build} update={update} settings={settings} setSettings={(s) => { setSettings(s); setBuild((b) => normalize(b, s.sexModifiers)) }} />}
@@ -565,13 +575,13 @@ function AttributesStep({ build, update, sexMode }: { build: CharacterBuild; upd
           const v = build.attributes[a]
           const cap = caps[a].cap
           return (
-            <div key={a} className="grid grid-cols-[10rem_1fr_auto_auto] items-center gap-4 rounded-lg px-3 py-2.5 hover:bg-white/[0.03]">
+            <div key={a} className="grid grid-cols-[1fr_auto_auto] items-center gap-x-4 gap-y-2 rounded-lg px-2 py-2.5 hover:bg-white/[0.03] md:grid-cols-[10rem_1fr_auto_auto] md:gap-4 md:px-3">
               <div>
                 <div className="font-display tracking-wide text-parchment-50">{ATTR_INFO[a].label}</div>
                 <div className="text-[0.72rem] leading-tight text-parchment-500">{ATTR_INFO[a].blurb}</div>
               </div>
-              <Tip content={<>Cap {cap}: {caps[a].sources.map((s) => `${s.label} ${s.value > 0 && s.label !== 'Base' ? '+' : ''}${s.value}`).join(', ')}</>}>
-                <div className="w-full min-w-48">
+              <Tip content={<>Cap {cap}: {caps[a].sources.map((s) => `${s.label} ${s.value > 0 && s.label !== 'Base' ? '+' : ''}${s.value}`).join(', ')}</>} className="order-last col-span-3 md:order-none md:col-span-1">
+                <div className="w-full md:min-w-48">
                   <CapBar value={v} cap={cap} />
                 </div>
               </Tip>

@@ -28,7 +28,17 @@ function journalLine(v: CampaignView) {
   return `${people} ${people === 1 ? 'person' : 'people'} · ${places} ${places === 1 ? 'place' : 'places'}`
 }
 
-export function CharacterPanel({ view, onOpenSheet, onOpenJournal }: { view: CampaignView; onOpenSheet: () => void; onOpenJournal: () => void }) {
+export function CharacterPanel({
+  view,
+  onOpenSheet,
+  onOpenJournal,
+  className = 'w-72 border-r border-gold-500/15 bg-ink-950/70 backdrop-blur'
+}: {
+  view: CampaignView
+  onOpenSheet: () => void
+  onOpenJournal: () => void
+  className?: string
+}) {
   const c = view.state.character
   const b = view.build
   const d = view.derived
@@ -36,7 +46,7 @@ export function CharacterPanel({ view, onOpenSheet, onOpenJournal }: { view: Cam
   const t = timeLabel(view.state.time.minute)
 
   return (
-    <aside className="relative z-10 flex w-72 shrink-0 flex-col gap-5 overflow-y-auto border-r border-gold-500/15 bg-ink-950/70 p-5 backdrop-blur">
+    <aside className={`relative z-10 flex shrink-0 flex-col gap-5 overflow-y-auto p-5 ${className}`}>
       <div className="flex flex-col items-center text-center">
         <Medallion name={b.name} race={b.race} size={92} dead={c.status === 'dead'} image={playerPortrait(view)} />
         <div className="mt-3 font-display text-lg tracking-wide text-gold-200">{b.name}</div>

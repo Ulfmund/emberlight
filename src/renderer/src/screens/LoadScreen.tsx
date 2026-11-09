@@ -31,17 +31,17 @@ export function LoadScreen() {
   return (
     <div className="relative flex-1 overflow-y-auto">
       <EmberField density={0.3} className="opacity-50" />
-      <div className="relative z-10 mx-auto max-w-4xl px-8 pt-8 pb-16">
-        <div className="mb-8 flex items-center gap-4">
-          <Button variant="ghost" icon="back" size="sm" onClick={() => go('title')}>
-            Back
+      <div className="relative z-10 mx-auto max-w-4xl px-4 pt-5 pb-16 md:px-8 md:pt-8">
+        <div className="mb-6 flex items-center gap-3 md:mb-8 md:gap-4">
+          <Button variant="ghost" icon="back" size="sm" onClick={() => go('title')} aria-label="Back" className="shrink-0 px-2 md:px-3">
+            <span className="hidden md:inline">Back</span>
           </Button>
-          <div>
-            <h2 className="font-display text-3xl tracking-wider text-gold-300">Your Adventures</h2>
-            <p className="mt-1 text-parchment-400">Every tale is saved as you play.</p>
+          <div className="min-w-0">
+            <h2 className="font-display text-2xl tracking-wider text-gold-300 md:text-3xl">Your Adventures</h2>
+            <p className="mt-1 hidden text-parchment-400 sm:block">Every tale is saved as you play.</p>
           </div>
-          <Button variant="primary" icon="d20" className="ml-auto" onClick={() => go('creator')}>
-            New adventure
+          <Button variant="primary" icon="d20" className="ml-auto shrink-0" onClick={() => go('creator')} aria-label="New adventure">
+            <span className="hidden sm:inline">New adventure</span>
           </Button>
         </div>
 
@@ -83,7 +83,7 @@ export function LoadScreen() {
                     </Button>
                   </div>
                 ) : (
-                  <button onClick={() => setConfirm(c.id)} className="no-drag cursor-pointer rounded-md p-2 text-parchment-500 opacity-0 transition group-hover:opacity-100 hover:text-blood-400" title="Delete this adventure">
+                  <button onClick={() => setConfirm(c.id)} className="no-drag cursor-pointer rounded-md p-2 text-parchment-500 opacity-0 touch:opacity-100 transition group-hover:opacity-100 hover:text-blood-400" title="Delete this adventure">
                     <Icon name="trash" size={16} />
                   </button>
                 )}
