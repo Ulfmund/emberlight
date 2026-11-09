@@ -1,5 +1,6 @@
 import {
   allyId,
+  buildNow,
   guessRole,
   partyFromCast,
   PARTY_MAX,
@@ -228,8 +229,9 @@ export class Campaigns {
     })
 
     const d = derived(state, c.settings)
-    // The character now playing: the one the story began with, or whoever took up the tale.
-    const build = state.character.build
+    // The character now playing (the one the story began with, or whoever took up the tale), at
+    // the age they've reached.
+    const build = buildNow(state)
     const sCaps = skillCaps(build, c.settings.sexModifiers)
     const level = state.character.level
     const last = path[path.length - 1]

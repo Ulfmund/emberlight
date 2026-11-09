@@ -1,4 +1,4 @@
-import { derived, weatherNow, type CampaignSettings, type GameState, type PlaceKind, type Weather } from './rules'
+import { derived, seasonOf, weatherNow, type CampaignSettings, type GameState, type PlaceKind, type Season, type Weather } from './rules'
 
 /**
  * How the scene sounds (docs/spec/09-audio.md#how-the-scene-decides-the-mix): the place, the
@@ -36,6 +36,7 @@ export type Scene = {
   foes?: number
   /** The character is below half health. */
   hurt?: boolean
+  season?: Season
 }
 
 export type Soundscape = {
@@ -59,7 +60,8 @@ export function sceneOf(state: GameState, settings: CampaignSettings): Scene {
     horror: settings.tone === 'horror',
     boss: fighting.some((f) => f.tier === 'boss'),
     foes: fighting.length,
-    hurt: state.character.hp * 2 < derived(state, settings).maxHp
+    hurt: state.character.hp * 2 < derived(state, settings).maxHp,
+    season: seasonOf(state.time.day)
   }
 }
 
@@ -94,6 +96,12 @@ export function soundscape(s: Scene): Soundscape {
   if ((s.weather === 'rain' || s.weather === 'storm') && !sheltered) {
     delete beds.birds
     delete beds.crickets
+  }
+  // Winter: no birdsong, no crickets, and more wind outside.
+  if (s.season === 'winter') {
+    delete beds.birds
+    delete beds.crickets
+    if (!sheltered) beds.wind = Math.min(0.8, (beds.wind ?? 0) + 0.15)
   }
   let music: Mood = s.night && (place.music === 'explore' || place.music === 'town') && s.place !== 'indoors' ? 'night' : place.music
   if (s.horror && (music === 'explore' || music === 'tension' || music === 'night')) music = 'eerie'

@@ -1,4 +1,5 @@
 import { mod, skillLevelFromXp, socialModifier, xpMultiplier, type Rng } from './character'
+import { buildNow } from './calendar'
 import { applyEvent, derived, type CampaignSettings, type GameEvent, type GameState } from './state'
 import { armor, encumbrance, hasTool, needs, TOOL_SKILLS } from './gear'
 import {
@@ -36,6 +37,8 @@ export type CheckRequest = {
   faction?: string
   /** What that faction thinks of the character, put on by the engine (shown in the breakdown). */
   reputation?: { faction: string; value: number }
+  /** Other bonuses the engine puts on, each with why ("Winter: little grows under the snow"). */
+  bonuses?: { label: string; value: number }[]
 }
 
 export type CheckResult = CheckRequest & {
@@ -81,6 +84,7 @@ export function checkBreakdown(state: GameState, settings: CampaignSettings, req
   ]
   if (req.modifier) parts.push({ label: 'Situation', value: req.modifier })
   if (req.reputation?.value) parts.push({ label: `Standing with ${req.reputation.faction}`, value: Math.max(-3, Math.min(3, req.reputation.value)) })
+  for (const b of req.bonuses ?? []) if (b.value) parts.push({ label: b.label, value: Math.max(-5, Math.min(5, b.value)) })
   if (SOCIAL_SKILLS.includes(req.skill) && req.withStrangers) {
     const sm = socialModifier(c.build.sex, settings.sexModifiers, c.renown)
     if (sm) parts.push({ label: sm < 0 ? 'Must prove yourself' : 'Standing & Renown', value: sm })
@@ -164,7 +168,7 @@ export function resolveCheck(
   if (inspired) events.push({ type: 'condition', id: 'inspired', on: false })
 
   // Training: every attempt teaches something; success teaches more.
-  const xp = Math.round(CHECK_XP[req.difficulty] * (success ? 1 : 0.5) * xpMultiplier(c.build))
+  const xp = Math.round(CHECK_XP[req.difficulty] * (success ? 1 : 0.5) * xpMultiplier(buildNow(state)))
   events.push({ type: 'skill_xp', skill: req.skill, amount: xp })
 
   // Physical effort costs stamina.

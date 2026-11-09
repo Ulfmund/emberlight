@@ -81,7 +81,7 @@ describe('the timeline', () => {
         inherit: { coins: 0, renown: 0, items: [] }
       }
     ])
-    expect(entries.map((e) => e.text)).toEqual(['Brenna Rook died: Bled out', "Ada Rook took up the tale, as Brenna Rook's child"])
-    expect(entries[1].day).toBeGreaterThan(3000)
+    expect(entries.map((e) => e.text)).toEqual(['Brenna Rook died: Bled out', '10 years went by: spring, year 11', "Ada Rook took up the tale, as Brenna Rook's child"])
+    expect(entries[2].day).toBeGreaterThan(3000)
   })
 })

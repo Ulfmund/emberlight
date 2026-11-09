@@ -1,4 +1,19 @@
-import { foeRoster, spellById, type GameEvent, type GameState } from './rules'
+import {
+  ageStage,
+  ageYears,
+  AGES,
+  dateLabel,
+  DAYS_PER_YEAR,
+  foeRoster,
+  SEASON_ICON,
+  SEASON_INFO,
+  seasonNumber,
+  seasonOf,
+  spellById,
+  yearOf,
+  type GameEvent,
+  type GameState
+} from './rules'
 import { applyMemoryEvent, emptyMemory, findEntity, isMemoryEvent, samePlace, type Memory, type MemoryEvent } from './memory'
 
 /**
@@ -28,6 +43,7 @@ export class TimelineLog {
 
   see(ev: GameEvent, before: GameState, after: GameState) {
     if (isMemoryEvent(ev)) return this.seeMemory(ev, after)
+    this.seeTime(before, after)
     switch (ev.type) {
       case 'location': {
         const name = ev.name.trim()
@@ -59,7 +75,21 @@ export class TimelineLog {
         this.add(after, `Learned ${spellById(ev.id)?.name ?? ev.name ?? 'a spell'}`, 'sparkle', 'good')
         break
     }
-    if (after.character.level > before.character.level && after.character.build.name === before.character.build.name) this.add(after, `Reached level ${after.character.level}`, 'star', 'good')
+    const same = after.character.build.name === before.character.build.name
+    if (after.character.level > before.character.level && same) this.add(after, `Reached level ${after.character.level}`, 'star', 'good')
+    if (same && ageStage(after) !== ageStage(before)) this.add(after, `${after.character.build.name} is ${AGES[ageStage(after)].label.toLowerCase()} now, at ${ageYears(after)}`, 'hourglass')
+  }
+
+  /** A season turning; or, in a jump (an heir's arrival, years skipped), the time that went by. */
+  private seeTime(before: GameState, after: GameState) {
+    const turned = seasonNumber(after.time.day) - seasonNumber(before.time.day)
+    if (turned <= 0) return
+    const day = after.time.day
+    const years = Math.floor((day - before.time.day) / DAYS_PER_YEAR)
+    if (years >= 1) return this.add(after, `${years === 1 ? 'A year' : `${years} years`} went by: ${dateLabel(day).toLowerCase()}`, 'hourglass')
+    if (turned > 1) return this.add(after, `Months went by: ${dateLabel(day).toLowerCase()}`, 'hourglass')
+    const s = seasonOf(day)
+    this.add(after, `${SEASON_INFO[s].label} came${s === 'spring' ? `: year ${yearOf(day)} began` : ''}`, SEASON_ICON[s])
   }
 
   private seeMemory(ev: MemoryEvent, at: GameState) {

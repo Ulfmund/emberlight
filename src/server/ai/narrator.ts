@@ -35,6 +35,11 @@ import {
   type Weather,
   weatherNow,
   weatherPassed,
+  ageYears,
+  buildNow,
+  dateLabel,
+  SEASON_INFO,
+  seasonOf,
   allyHealth,
   ROLE_INFO,
   type Companion
@@ -128,7 +133,8 @@ export function narratorSystem(
   persona?: PersonaText
 ): string {
   const c = state.character
-  const b = c.build
+  // The character as they are now: their age moves through the years (calendar.ts).
+  const b = buildNow(state)
   const d = derived(state, settings)
   const sex = SEXES[settings.sexModifiers][b.sex]
   const skills = SKILL_IDS.map((s) => [s, skillLevelFromXp(c.skillXp[s] ?? 0)] as const)
@@ -213,7 +219,7 @@ HOW TO RUN THE GAME
 - Avoid stock phrases ("a shiver ran down your spine", "a testament to", "barely above a whisper").${askRoll}${fight}
 
 ${loreAt(lore, 'before_char')}THE PLAYER CHARACTER
-${b.name}: ${RACES[b.race].label.toLowerCase()}, ${sex.label.toLowerCase()}, ${AGES[b.age].label.toLowerCase()} (${AGES[b.age].years}), ${BACKGROUNDS[b.background].label.toLowerCase()}.${b.appearance ? `\nAppearance: ${b.appearance}` : ''}${b.personality ? `\nPersonality: ${b.personality}` : ''}
+${b.name}: ${RACES[b.race].label.toLowerCase()}, ${sex.label.toLowerCase()}, ${ageYears(state)} years old (${AGES[b.age].label.toLowerCase()}), ${BACKGROUNDS[b.background].label.toLowerCase()}.${b.appearance ? `\nAppearance: ${b.appearance}` : ''}${b.personality ? `\nPersonality: ${b.personality}` : ''}
 Level ${c.level}. Health ${c.hp}/${d.maxHp}, stamina ${c.stamina}/${d.maxStamina}${d.maxMana ? `, mana ${c.mana}/${d.maxMana}` : ''}.${c.conditions.length ? `\nConditions: ${c.conditions.map((x) => CONDITIONS[x].label).join(', ')}.` : ''}
 Best skills: ${skills || 'none trained yet'}.
 Renown: ${tier}${deeds ? `, known for: ${deeds}` : ''}. ${renownGuide(tier, b.sex, settings)}
@@ -221,7 +227,7 @@ ${gear}
 ${carrying}${body}${magic}
 ${c.status === 'downed' ? 'STATUS: DOWNED: unconscious and dying.\n' : c.status === 'dead' ? 'STATUS: DEAD.\n' : ''}
 ${loreAt(lore, 'after_char')}WHERE AND WHEN
-Day ${state.time.day}, ${timeOfDay}${state.location ? `, at ${state.location}` : ''}.${skyLine(state)}${memoryBlock(memory)}${fallenBlock(state, third)}${companionBlock(state, cast, memory?.companions)}${loreBlock(lore)}`
+Day ${state.time.day} (${dateLabel(state.time.day).toLowerCase()}), ${timeOfDay}${state.location ? `, at ${state.location}` : ''}.${skyLine(state)} ${SEASON_INFO[seasonOf(state.time.day)].dm}${memoryBlock(memory)}${fallenBlock(state, third)}${companionBlock(state, cast, memory?.companions)}${loreBlock(lore)}`
 }
 
 const SKY: Record<Weather, string> = { clear: '', rain: 'It is raining', storm: 'A storm is raging', fog: 'Thick fog lies over everything', snow: 'Snow is falling' }

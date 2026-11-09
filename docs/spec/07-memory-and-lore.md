@@ -97,7 +97,7 @@ type Relationship = {
 
 ## Timeline
 
-- An **in-game clock and calendar**: day count, season, time of day. Time moves when the Referee or Scribe reports time passing, or on rest and travel.
+- An **in-game clock and calendar**: day count, season, time of day (seasons of 90 days and years of 360, see [04](04-rules-system.md#seasons-and-aging)). Time moves when the Referee or Scribe reports time passing, or on rest and travel.
 - **Event entries:** `{ gameTime, messageRange, summary, participants[], place, importance }`. They are always stored and shown **in order**, so the model is never asked to work out the sequence itself.
 - **Summaries in layers:**
   - **Scene:** a few sentences, written when the scene changes (new location, time skip, combat ends).
@@ -112,7 +112,7 @@ type Relationship = {
 - Each summary is an event on the last message it covers, so it survives rerolls and swipes of later messages and disappears with a rewind past it.
 - Summaries can be edited in the Journal (0.4.0).
 
-**Built (0.21.0):** the Journal's **Timeline**: the story's milestones, day by day and newest first (places first reached, deeds, fights and how they ended, people who came into the story, quests taken on and finished, things come by, groups thinking better or worse of the character, companions joining and leaving, spells learned, levels, deaths and heirs). It's built from the branch being played in the same pass as the game state and the map, and keeps the memory as it goes, so the view builds memory only once. A group's standing is a milestone only when it moves. Code: `src/shared/timeline.ts`.
+**Built (0.21.0):** the Journal's **Timeline**: the story's milestones, day by day and newest first (places first reached, deeds, fights and how they ended, people who came into the story, quests taken on and finished, things come by, groups thinking better or worse of the character, companions joining and leaving, spells learned, levels, deaths and heirs; since 0.24.0 also the turning seasons and years, the years that go by in a jump, and each new stage of life). It's built from the branch being played in the same pass as the game state and the map, and keeps the memory as it goes, so the view builds memory only once. A group's standing is a milestone only when it moves. Code: `src/shared/timeline.ts`.
 
 ---
 

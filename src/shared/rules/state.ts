@@ -31,6 +31,7 @@ import { COMPANION_ROLES, companionStats, PARTY_MAX, type Companion, type Compan
 import { findTemplate, itemTemplate, type ItemTemplate, type Slot } from './items'
 import type { Combat, CombatOutcome, FoeStatus } from './combat'
 import { startingSpells } from './spellbook'
+import { buildNow, startingAge } from './calendar'
 
 export type CombatMode = 'narrative' | 'turn' | 'mixed'
 export type EventFrequency = 'calm' | 'normal' | 'eventful' | 'chaos'
@@ -130,6 +131,9 @@ export type Status = 'alive' | 'downed' | 'dead'
 
 export type CharacterState = {
   build: CharacterBuild
+  /** Their age in years when their part of the story began, and the day it began (calendar.ts). */
+  ageAtStart?: number
+  startDay?: number
   attributes: Record<Attr, number>
   attrPoints: number
   skillXp: Record<SkillId, number>
@@ -276,7 +280,8 @@ export function derived(state: GameState, settings: CampaignSettings) {
     maxHp: maxHp(b.sex, settings.sexModifiers, c.attributes.END, c.level),
     maxStamina: maxStamina(c.attributes.END, c.attributes.AGI),
     maxMana: maxMana(c.attributes.ARC, c.level),
-    attrCaps: attrCaps(b, settings.sexModifiers)
+    // Limits follow the stage of life the character has reached, not the one they began at.
+    attrCaps: attrCaps(buildNow(state), settings.sexModifiers)
   }
 }
 
@@ -291,6 +296,8 @@ export function initialState(build: CharacterBuild, settings: CampaignSettings):
   const level = 1
   const character: CharacterState = {
     build,
+    ageAtStart: startingAge(build),
+    startDay: 1,
     attributes,
     attrPoints: 0,
     skillXp,
@@ -630,6 +637,8 @@ export function applyEvent(prev: GameState, ev: GameEvent, settings: CampaignSet
       s.fallen = [...(s.fallen ?? []), ev.fallen]
       s.character = fresh
       s.combat = null
+      // Their own years begin when they take up the tale.
+      fresh.startDay = s.time.day + Math.max(0, ev.days)
       // A new hero sets out alone; old friends may be met again in the story.
       s.party = []
       s.time = { day: s.time.day + Math.max(0, ev.days), minute: 8 * 60 }

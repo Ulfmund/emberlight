@@ -22,7 +22,7 @@ import { applyRename, previewRename } from '../core/rename'
 import { MAX_COMPANIONS, type CastMember } from '@shared/cards'
 import { MAX_FACTS, type MemoryEvent } from '@shared/memory'
 import { findWorld } from '@shared/worlds'
-import { AGES, BACKGROUNDS, RACES, SEXES } from '@shared/rules'
+import { AGES, ageYears, BACKGROUNDS, RACES, SEXES } from '@shared/rules'
 import { attachment } from './cards'
 import { campaignFileName, exportCampaign, importCampaign, MAX_CAMPAIGN_FILE, PortableError } from '../core/portable'
 import { fileName, isPng, v2Data, writeCardPng } from '../cards/export'
@@ -217,9 +217,10 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
   app.get('/api/campaigns/:id/character-card', (c) => {
     const r = guard(() => {
       const view = campaigns.view(c.req.param('id'))
-      const b = view.state.character.build
+      const b = view.build
       const sex = SEXES[view.settings.sexModifiers][b.sex].label.toLowerCase()
-      const who = `${b.name} is a ${AGES[b.age].label.toLowerCase()} ${sex} ${RACES[b.race].label.toLowerCase()}, a ${BACKGROUNDS[b.background].label.toLowerCase()} by trade.`
+      const age = AGES[b.age].label.toLowerCase()
+      const who = `${b.name} is ${/^[aeiou]/.test(age) ? 'an' : 'a'} ${age} ${sex} ${RACES[b.race].label.toLowerCase()} of ${ageYears(view.state)}, a ${BACKGROUNDS[b.background].label.toLowerCase()} by trade.`
       const data = v2Data({ name: b.name, description: [who, b.appearance.trim()].filter(Boolean).join('\n\n'), personality: b.personality, creator: 'Emberlight', tags: ['emberlight'] })
       // Their portrait, if it came from a card (and they're still the one it was for).
       const own = view.state.fallen.length ? undefined : view.cast.find((m) => m.role === 'player' && m.hasImage)

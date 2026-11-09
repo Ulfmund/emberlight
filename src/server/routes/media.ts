@@ -202,7 +202,7 @@ function portraitFor(campaigns: Campaigns, settings: SettingsStore, id: string, 
     if (!e) throw new Error('That is no longer in the Journal.')
     return recordPrompt(style, e)
   }
-  const b = view.state.character.build
+  const b = view.build
   const sex = SEXES[view.settings.sexModifiers][b.sex].label.toLowerCase()
   const kind = `${/^[aeiou]/i.test(AGES[b.age].label) ? 'an' : 'a'} ${AGES[b.age].label.toLowerCase()} ${RACES[b.race].label.toLowerCase()} ${sex === 'male' ? 'man' : sex === 'female' ? 'woman' : sex}`
   return portraitPrompt(style, { kind, details: [BACKGROUNDS[b.background].label.toLowerCase(), b.appearance.slice(0, 500)] })

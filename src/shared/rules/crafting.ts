@@ -4,6 +4,7 @@ import { hasTool, templateOf, TOOL_SKILLS } from './gear'
 import { findTemplate, itemTemplate } from './items'
 import { applyEvent, SETTLED, type CampaignSettings, type GameEvent, type GameState, type PlaceKind } from './state'
 import { SKILLS, TIER_INFO, type Difficulty, type SkillId, type Tier } from './tables'
+import { seasonGathering, seasonOf } from './calendar'
 
 /**
  * Gathering and crafting (docs/spec/04-rules-system.md#items-equipment-money). Gathering turns
@@ -258,8 +259,8 @@ export function resolveWork(
     working = applyEvent(working, ev, settings)
   }
   const done = () => ({ events, results, state: working, log })
-  const roll = (skill: SkillId, difficulty: Difficulty, reason: string) => {
-    const req: CheckRequest = { skill, difficulty, modifier: 0, advantage: 'none', reason, dramatic: false, withStrangers: false, risk: RISK[skill] ?? { severity: 'none', source: 'environment' } }
+  const roll = (skill: SkillId, difficulty: Difficulty, reason: string, bonuses?: CheckRequest['bonuses']) => {
+    const req: CheckRequest = { skill, difficulty, modifier: 0, advantage: 'none', reason, dramatic: false, withStrangers: false, risk: RISK[skill] ?? { severity: 'none', source: 'environment' }, ...(bonuses?.length ? { bonuses } : {}) }
     const res = resolveCheck(working, settings, req, rng)
     results.push(res.result)
     res.events.forEach(push)
@@ -274,7 +275,9 @@ export function resolveWork(
     }
     const main = nameOf(node.yields[0].item).toLowerCase()
     if (TOOL_SKILLS.includes(node.skill) && !hasTool(working.character, node.skill)) log.push(`(No proper tools for ${SKILLS[node.skill].label.toLowerCase()}: the roll is harder.)`)
-    const res = roll(node.skill, node.difficulty, `gathering ${main}`)
+    const season = seasonGathering(node.skill, seasonOf(working.time.day))
+    if (season) log.push(`(${season.why}: ${season.value > 0 ? 'easier' : 'harder'} this time of year.)`)
+    const res = roll(node.skill, node.difficulty, `gathering ${main}`, season ? [{ label: season.why, value: season.value }] : undefined)
     if (!TIER_INFO[res.tier].success) {
       log.push(`GATHERING: nothing gathered this time${res.damage ? '' : ' (the time is spent all the same)'}.`)
       return done()

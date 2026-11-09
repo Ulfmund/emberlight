@@ -54,7 +54,7 @@ The design goal is two very different playthroughs. Men hold the physical power 
 
 With the setting **Off**, both sexes use the male physical row with no social modifiers, base HP 8, and a 35% capture chance.
 
-**Age** (aging over time is a v2 feature; at character creation it's a one-time choice):
+**Age** (the stage of life picked at creation; characters grow older as the story goes on, and the stage they reach sets their caps from then on, see [Seasons and aging](#seasons-and-aging)):
 
 | Age | STR | AGI | END | INT | ARC | WIT | PRE | Other |
 |---|---|---|---|---|---|---|---|---|
@@ -217,6 +217,33 @@ A level-1 character with average END has about 21 HP. Most weapons deal 1d6–1d
 | **Long rest** | ~8 hours of sleep | Half max HP, full stamina and mana, −1 Exhausted |
 
 Resting in the wild rolls on the random encounter table (see [06](06-ai-dm.md#5-random-events)). The Scribe detects rests from the story ("you sleep until dawn") and the engine applies them automatically, with a small "Rested" toast.
+
+---
+
+## Seasons and aging
+
+*Built (0.24.0).* The story keeps a calendar: four seasons of 90 days and a year of 360, beginning on the first day of spring. The Sheet shows the date ("Day 300 · Winter, year 1"), and the DM is told the season and what it means.
+
+**Growing older.** A character's age is counted in years. It starts at a typical age for the stage picked at creation (in human years: young 18, adult 27, middle-aged 44, elder 62) and goes up by one every 360 days. Some peoples age much slower than others:
+
+| People | Ages | An adult starts at | Middle-aged from | Elder from |
+|---|---|---|---|---|
+| Human | with the calendar | 27 | 36 | 56 |
+| Halfling | 1.25× slower | 34 | 45 | 70 |
+| Orc | a little faster | 22 | 29 | 45 |
+| Dwarf | 2.5× slower | 68 | 90 | 140 |
+| Elf | 5× slower | 135 | 180 | 280 |
+
+The stage of life follows the years, and **the stage reached sets the character's limits from then on**: the caps in the [age table](#attribute-caps) move with it. A hunter who turns middle-aged loses a point of Strength and Agility cap and gains a point of Intellect, Arcane and Wits cap; a young character who grows up loses the +10% skill XP. The attributes themselves don't fall, only how far they can grow. Nobody goes back a stage: a character picked as middle-aged stays middle-aged even if their years are few. Each new stage is marked on the timeline. An heir's years begin when they take up the tale.
+
+**What the seasons do:**
+- **Gathering:** herbs are scarce in winter (−4) and plentiful in autumn (+2) and spring (+1); fishing is harder in winter (−2) and easier in summer (+1); hunting is harder in winter (−1) and easier in autumn (+1). The bonus shows in the roll's breakdown, with why.
+- **Weather:** snow falls in winter, in place of rain and storms; rain and storms come the rest of the year.
+- **Sound:** no birdsong or crickets in winter, and more wind outside.
+- **The DM** hears the season (thaw and mud in spring, dust on summer roads, harvest and cold mornings in autumn, short days and snow in winter) and plays to it: winter travel is slow, and a night in the open is dangerous.
+- **The timeline** marks each new season, each new year, and the years that go by in a jump.
+
+Code: `src/shared/rules/calendar.ts`.
 
 ---
 

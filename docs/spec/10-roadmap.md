@@ -60,12 +60,15 @@ Built in milestones. Each one ends with something playable, so the artist can te
 - Location art; a simple map of visited places ✅ 0.19.0 (wide pictures of places, emblems for factions, and the Journal's map of the way so far)
 - Companions travelling with the player (AI-controlled in combat) ✅ 0.17.0 (up to four, from cards or the story; five fighting roles; healers can save you)
 
-## v2 — Life sim (if the artist wants it)
-- **Aging:** characters age over in-game time, and caps shift with it (physical caps fall after middle age, Intellect/Arcane caps rise), using the age table in [04](04-rules-system.md#attribute-caps) as stages
+## 1.0 — The life sim, storytellers and peoples
+*Decided 2026-11-09: the life sim comes into 1.0 instead of a later v2, along with storyteller personalities and the peoples' cultures.*
+- **Aging** ✅ 0.24.0: characters grow older with the calendar (some peoples much slower), and the stage of life they reach sets their caps (physical caps fall after middle age, Intellect and Arcane caps rise) ([04](04-rules-system.md#seasons-and-aging))
+- **Seasons** with effects on gathering, weather and sound ✅ 0.24.0 (the DM plays winter roads as slow and a night in the open as dangerous)
+- The peoples' cultures: how humans, dwarves and elves live, their customs for men's and women's work, and what they think of each other
+- Storyteller personalities, RimWorld-style: Whalechan, the Veteran, the Romance Writer, the Old Soul and more
 - Long time-skips ("five years pass…") with summarized events
 - Homes, property, jobs, income from trade skills
-- Seasons with effects on gathering and travel
-- Family and legacy: heirs, inheritance, and playing the next generation after a death
+- Family and legacy: marriage, children growing up, heirs and inheritance *(playing the next generation after a death ✅ 0.10.0)*
 
 ## Not planned
 - Multiplayer

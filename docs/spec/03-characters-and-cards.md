@@ -37,7 +37,7 @@ A step-by-step screen with big illustrated choices. Every step shows how the cho
 
 1. **Race** — cards with art, a one-line flavor text, and a mini chart of stat caps.
 2. **Sex** — shows its cap modifiers.
-3. **Age** — young / adult / middle-aged / elder (affects caps; aging over time is a v2 feature).
+3. **Age** — young / adult / middle-aged / elder (affects caps; the character grows older as the story goes on, see [04](04-rules-system.md#seasons-and-aging)).
 4. **Background** — e.g. farmhand, apprentice smith, temple acolyte, street thief, hunter. Sets starting skills and gear.
 5. **Attributes** — point-buy. Each attribute is a bar showing its current value and a **cap marker** for this character. Hovering a cap shows why ("Dwarf +2, Male +1").
 6. **Skills** — spend starting skill points; caps shown the same way.

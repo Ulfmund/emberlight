@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { RenameDialog } from './RenameDialog'
 import { PortraitDialog } from './PortraitDialog'
-import { AGES, BACKGROUNDS, CONDITIONS, RACES, SEXES } from '@shared/rules'
+import { AGES, ageYears, BACKGROUNDS, CONDITIONS, dateLabel, RACES, SEXES } from '@shared/rules'
 import type { CampaignView } from '@shared/view'
 import { Medallion } from '../../components/Medallion'
 import { cardImageUrl } from '@shared/cards'
@@ -91,7 +91,7 @@ export function CharacterPanel({
         </div>
         <RenameDialog open={renaming} onClose={() => setRenaming(false)} from={b.name} target={{ kind: 'player' }} />
         <div className="text-xs text-parchment-400">
-          {RACES[b.race].label} · {SEXES[view.settings.sexModifiers][b.sex].label} · {AGES[b.age].label}
+          {RACES[b.race].label} · {SEXES[view.settings.sexModifiers][b.sex].label} · {AGES[b.age].label}, {ageYears(view.state)}
         </div>
         <div className="text-xs text-gold-300/80">{BACKGROUNDS[b.background].label}</div>
         <motion.div key={c.level} initial={{ scale: 1.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="mt-2 rounded-full border border-gold-400/50 bg-gold-500/15 px-3 py-0.5 font-display text-sm text-gold-200">
@@ -221,7 +221,7 @@ export function CharacterPanel({
         </div>
         <div className="flex items-center gap-2 text-parchment-300">
           <Icon name={t.icon} size={16} className="text-gold-400" />
-          Day {view.state.time.day} · {t.part}
+          Day {view.state.time.day} · {dateLabel(view.state.time.day)} · {t.part}
         </div>
         {view.state.location && (
           <div className="flex items-center gap-2 text-parchment-300">
