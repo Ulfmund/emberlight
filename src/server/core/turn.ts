@@ -10,6 +10,8 @@ import {
   resolveCheck,
   resolveRound,
   resolveWork,
+  castSpell,
+  spellById,
   rollWorldEvent,
   workFromChecks,
   shouldTrack,
@@ -136,7 +138,7 @@ export class TurnEngine {
   // ---- public actions ------------------------------------------------------------------
 
   /** The player acts (free text; or a move picked on the tracker, or "Make" in the Bag). */
-  async *act(id: string, text: string, signal: AbortSignal, picked: { combat?: CombatAction; work?: Work } = {}): AsyncGenerator<TurnEvent> {
+  async *act(id: string, text: string, signal: AbortSignal, picked: { combat?: CombatAction; work?: Work; spell?: string } = {}): AsyncGenerator<TurnEvent> {
     yield* this.playTurn(id, { text, kind: 'action', ...picked }, signal)
   }
 
@@ -311,8 +313,8 @@ export class TurnEngine {
           take(st.events, st.state)
           fightRolls.push(...st.results)
           log.push(`A FIGHT BEGINS against ${foeRoster(foes)}.`, ...st.log)
-          const spell = ref.checks.some((ch) => ch.skill === 'spellcasting')
-          const opening: CombatAction = ref.fight.playerAttacks ? { kind: spell ? 'cast' : 'attack', target: foes[0].id } : { kind: 'none' }
+          const spell = Boolean(ref.spell) || ref.checks.some((ch) => ch.skill === 'spellcasting')
+          const opening: CombatAction = ref.fight.playerAttacks ? (spell ? { kind: 'cast', target: foes[0].id, spell: ref.spell } : { kind: 'attack', target: foes[0].id }) : { kind: 'none' }
           const r = resolveRound(working, settings, opening, this.rng)
           take(r.events, r.state)
           fightRolls.push(...r.results)
@@ -323,7 +325,9 @@ export class TurnEngine {
         // Everything else, fights told in prose included: the checks, with their risks. Gathering
         // and crafting roll their own check (and move the items), so it isn't rolled twice.
         const work = ref.work ?? workFromChecks(ref.checks)
-        const r = this.resolve(working, settings, work ? ref.checks.filter((ch) => !WORK_SKILLS.has(ch.skill)) : ref.checks)
+        const spell = spellById(ref.spell)
+        // Work and spells roll their own check, so the Referee's for the same thing isn't rolled twice.
+        const r = this.resolve(working, settings, ref.checks.filter((ch) => !(work && WORK_SKILLS.has(ch.skill)) && !(spell && ch.skill === 'spellcasting')))
         take(r.events, r.after)
         checks.push(...r.results)
         if (work && alive()) {
@@ -331,6 +335,12 @@ export class TurnEngine {
           take(w.events, w.state)
           checks.push(...w.results)
           log.push(...w.log)
+        }
+        if (spell && alive()) {
+          const m = castSpell(working, settings, spell, this.rng)
+          take(m.events, m.state)
+          checks.push(...m.results)
+          log.push(...m.log)
         }
       }
     }
@@ -370,7 +380,7 @@ export class TurnEngine {
 
   private async *playTurn(
     id: string,
-    input: { text: string; kind: 'action' | 'roll_response'; hidden?: boolean; forced?: CheckRequest; answers?: string; combat?: CombatAction; work?: Work },
+    input: { text: string; kind: 'action' | 'roll_response'; hidden?: boolean; forced?: CheckRequest; answers?: string; combat?: CombatAction; work?: Work; spell?: string },
     signal: AbortSignal
   ): AsyncGenerator<TurnEvent> {
     let ctx: Ctx
@@ -417,6 +427,7 @@ export class TurnEngine {
     const plan: TurnPlan = {}
     if (input.forced) plan.ref = { checks: [input.forced], intent: 'other', fight: NO_FIGHT }
     else if (input.work && working.character.status === 'alive' && !working.combat) plan.ref = { checks: [], intent: input.work.kind, fight: NO_FIGHT, work: input.work }
+    else if (input.spell && working.character.status === 'alive' && !working.combat) plan.ref = { checks: [], intent: 'other', fight: NO_FIGHT, spell: input.spell }
     else if (working.character.status === 'alive' && working.combat) {
       plan.combat = input.combat
       if (!plan.combat) {
@@ -580,11 +591,10 @@ export class TurnEngine {
     if (clean && !error && !signal.aborted) {
       try {
         let scribed = await runScribe(ctx.provider, ctx.model, after, player.meta.hidden ? '(no action)' : player.content, notes ?? '', clean, memory)
-        // A fight is still on: seconds pass, not hours, and nobody sleeps or sits down to eat.
-        if (after.combat) scribed = scribed.filter((e) => e.type !== 'rest' && e.type !== 'eat').map((e) => (e.type === 'time' ? { ...e, minutes: Math.min(e.minutes, 1) } : e))
-        // In a fight the engine decides every wound: the story's blood is not a new condition.
+        // A turn of a fight (still on, or ended this turn): seconds pass, not hours, nobody sleeps or
+        // sits down to eat, and the engine decides every wound (the story's blood isn't a new condition).
         const fightTurn = after.combat || events.some((e) => e.message_id === player.id && e.event.type.startsWith('combat_'))
-        if (fightTurn) scribed = scribed.filter((e) => e.type !== 'condition')
+        if (fightTurn) scribed = scribed.filter((e) => e.type !== 'rest' && e.type !== 'eat' && e.type !== 'condition').map((e) => (e.type === 'time' ? { ...e, minutes: Math.min(e.minutes, after.combat ? 1 : 10) } : e))
         if (scribed.length) this.campaigns.db.addEvents(id, dm.id, newId('grp'), 'ai', scribed)
       } catch {
         // Bookkeeping failing must never break the story; the next turn tries again.

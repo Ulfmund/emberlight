@@ -29,6 +29,7 @@ import type { CheckResult } from './checks'
 import { isMemoryEvent, type MemoryEvent } from '../memory'
 import { findTemplate, itemTemplate, type ItemTemplate, type Slot } from './items'
 import type { Combat, CombatOutcome, FoeStatus } from './combat'
+import { startingSpells } from './spellbook'
 
 export type CombatMode = 'narrative' | 'turn' | 'mixed'
 export type EventFrequency = 'calm' | 'normal' | 'eventful' | 'chaos'
@@ -121,6 +122,8 @@ export type CharacterState = {
   awakeMins: number
   /** Words for the dead, written by the DM when they fall. */
   epitaph?: string
+  /** Spells known (ids from spells.ts). */
+  spells: string[]
 }
 
 /** A character who died, remembered in the Hall of the Fallen. */
@@ -202,6 +205,11 @@ export type GameEvent =
   | { type: 'new_character'; build: CharacterBuild; days: number; fallen: Fallen; inherit?: { coins: number; renown: number; items: { name: string; qty: number; icon?: string }[] } }
   /** The player renamed or redescribed a character who took over the tale. */
   | { type: 'build_edit'; name?: string; appearance?: string; personality?: string }
+  /** A spell learned (from a tome, a teacher, a revelation). */
+  | { type: 'learn_spell'; id: string; name?: string }
+  /** Magic in a fight: a ward for the rest of it, or a curse on a foe. */
+  | { type: 'combat_ward'; amount: number }
+  | { type: 'foe_weaken'; id: string; attack: number; name?: string }
   /** Long-term memory: people, places and summaries (see shared/memory.ts). */
   | MemoryEvent
 
@@ -247,7 +255,8 @@ export function initialState(build: CharacterBuild, settings: CampaignSettings):
     traitUsedDay: null,
     // Breakfast at six, up at six.
     hungerMins: 120,
-    awakeMins: 120
+    awakeMins: 120,
+    spells: startingSpells(build.background, build.race)
   }
   for (const k of bg.kit) addItem(character, k.name, 'qty' in k && k.qty ? k.qty : 1, k.icon)
   return { character, time: { day: 1, minute: 8 * 60 }, location: null, placeKind: null, combat: null, fallen: [] }
@@ -480,6 +489,17 @@ export function applyEvent(prev: GameState, ev: GameEvent, settings: CampaignSet
     case 'epitaph':
       c.epitaph = ev.text.trim().slice(0, 600)
       break
+    case 'learn_spell':
+      c.spells = [...new Set([...(c.spells ?? []), ev.id])]
+      break
+    case 'combat_ward':
+      if (s.combat) s.combat.ward = (s.combat.ward ?? 0) + ev.amount
+      break
+    case 'foe_weaken': {
+      const f = s.combat?.foes.find((x) => x.id === ev.id)
+      if (f) f.attack += ev.attack
+      break
+    }
     case 'build_edit':
       c.build = {
         ...c.build,

@@ -21,6 +21,7 @@ import {
   needs,
   templateOf,
   foeRoster,
+  spellById,
   validateBuild,
   type Fallen,
   type Slot,
@@ -496,13 +497,22 @@ export function describeEvents(events: GameEvent[]): ChangeLine[] {
         out.push({ text: `Hit ${ev.name ?? 'a foe'} for ${ev.amount}`, tone: 'good', icon: 'sword' })
         break
       case 'foe_status':
-        out.push({ text: `${ev.name ?? 'A foe'} ${ev.status === 'fled' ? 'fled' : ev.status === 'surrendered' ? 'yielded' : ev.status === 'down' ? 'is down' : 'fights on'}`, tone: 'good', icon: ev.status === 'fled' ? 'boot' : 'sword' })
+        out.push({ text: `${ev.name ?? 'A foe'} ${ev.status === 'fled' ? 'fled' : ev.status === 'surrendered' ? 'yielded' : ev.status === 'down' ? 'is down' : ev.status === 'asleep' ? 'fell asleep' : 'fights on'}`, tone: 'good', icon: ev.status === 'fled' ? 'boot' : ev.status === 'asleep' ? 'moon' : 'sword' })
         break
       case 'combat_end':
         out.push({ text: COMBAT_END_LINE[ev.outcome], tone: ev.outcome === 'defeat' ? 'bad' : 'good', icon: ev.outcome === 'defeat' ? 'skull' : ev.outcome === 'fled' ? 'boot' : 'laurel' })
         break
       case 'world_event':
         out.push({ text: 'Something happens', tone: 'neutral', icon: 'signpost' })
+        break
+      case 'learn_spell':
+        out.push({ text: `Learned ${spellById(ev.id)?.name ?? ev.name ?? 'a spell'}`, tone: 'good', icon: 'sparkle' })
+        break
+      case 'foe_weaken':
+        out.push({ text: `Cursed ${ev.name ?? 'a foe'}`, tone: 'good', icon: 'sparkle' })
+        break
+      case 'combat_ward':
+        out.push({ text: `Warded: +${ev.amount} Defense`, tone: 'good', icon: 'armor' })
         break
       case 'combat_round':
       case 'combat_dodge':

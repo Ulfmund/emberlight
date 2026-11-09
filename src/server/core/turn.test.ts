@@ -664,6 +664,29 @@ describe('turn engine', () => {
     expect(campaigns.get(id).build.name).toBe('Brenna Rook')
   })
 
+  it('casts spells from the Sheet without the Referee, and from words through it', async () => {
+    const id = campaigns.create({ ...build, background: 'hedgewitch' }, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    const mana = campaigns.view(id).state.character.mana
+    fake.calls = []
+    setRolls(0.75)
+    await run(engine.act(id, 'I cast Mend.', signal, { spell: 'mend' }))
+    expect(fake.calls).not.toContain('referee')
+    expect(lastNotes()).toMatch(/MAGIC: Mend works/)
+    expect(campaigns.view(id).state.character.mana).toBe(mana - 2)
+    expect(fake.lastSystem).toContain('Spells known: Mend (2 mana: Heal 1d8 + Arcane, and stop bleeding); Hex')
+
+    // In words: the Referee names the spell, and its own Spellcasting check isn't rolled on top.
+    fake.referee = {
+      intent: 'other',
+      checks: [{ skill: 'spellcasting', difficulty: 'moderate', modifier: 0, advantage: 'none', reason: 'a hex', dramatic: false, withStrangers: false, risk: 'none', riskSource: 'magic' }],
+      spell: 'a hex'
+    }
+    const out = await run(engine.act(id, 'I mutter a hex at the crow on the fence.', signal))
+    expect((out.find((e) => e.type === 'checks') as { checks: { reason: string }[] }).checks.map((c) => c.reason)).toEqual(['casting Hex'])
+    expect(lastNotes()).toMatch(/MAGIC: Hex works/)
+  })
+
   it('brings random events now and then, and not one after another', async () => {
     const id = campaigns.create(build, { ...DEFAULT_SETTINGS, events: 'chaos' })
     await run(engine.narrateHead(id, signal))

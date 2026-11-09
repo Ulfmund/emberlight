@@ -14,6 +14,8 @@ import {
   derived,
   ENEMY_TIERS,
   foeHealth,
+  knownSpells,
+  SPELLS,
   capacityKg,
   carriedKg,
   defenseValue,
@@ -124,6 +126,9 @@ export function narratorSystem(
   const gear = `Wielding: ${weapon.unarmed ? 'nothing (bare fists)' : weapon.name}. Wearing: ${worn.join(', ') || 'ordinary clothes'}. Defense ${defenseValue(c).total}.`
   const carrying = `Carrying: ${c.inventory.map((i) => `${i.name}${i.qty > 1 ? ` ×${i.qty}` : ''}`).join(', ') || 'nothing'}; ${formatCoins(c.coins)}.${load !== 'none' ? ` ${load === 'overloaded' ? 'OVERLOADED' : 'ENCUMBERED'}: carrying ${carriedKg(c)} kg of a comfortable ${capacityKg(c)} kg.` : ''}`
   const body = settings.survival ? `\nHunger: ${HUNGER_LABEL[need.hunger].toLowerCase()} (last proper meal ${need.hoursSinceMeal} hours ago). Tiredness: ${tiredness}.` : ''
+  // Magic (docs/spec/04-rules-system.md#spells-v1-simple): what they know, and what can be taught.
+  const known = knownSpells(state)
+  const magic = `\n${known.length ? `Spells known: ${known.map((sp) => `${sp.name} (${sp.cost} mana: ${sp.blurb.replace(/\.$/, '')})`).join('; ')}.` : 'Knows no spells.'} The spells that exist, if a teacher or a tome ever offers one: ${SPELLS.map((sp) => sp.name).join(', ')}. Name a spell plainly when the character learns it.`
 
   const voice = persona?.voice.trim()
     ? persona.fromCard
@@ -188,7 +193,7 @@ Level ${c.level}. Health ${c.hp}/${d.maxHp}, stamina ${c.stamina}/${d.maxStamina
 Best skills: ${skills || 'none trained yet'}.
 Renown: ${tier}${deeds ? `, known for: ${deeds}` : ''}. ${renownGuide(tier, b.sex, settings)}
 ${gear}
-${carrying}${body}
+${carrying}${body}${magic}
 ${c.status === 'downed' ? 'STATUS: DOWNED: unconscious and dying.\n' : c.status === 'dead' ? 'STATUS: DEAD.\n' : ''}
 WHERE AND WHEN
 Day ${state.time.day}, ${timeOfDay}${state.location ? `, at ${state.location}` : ''}.${memoryBlock(memory)}${fallenBlock(state, third)}${companionBlock(cast)}${loreBlock(lore)}`

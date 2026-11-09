@@ -15,7 +15,7 @@ import {
   type CampaignSettings
 } from '@shared/rules'
 import type { CampaignView } from '@shared/view'
-import { findTemplate, itemTemplate, SLOT_LABEL, SLOTS } from '@shared/rules'
+import { findTemplate, itemTemplate, knownSpells, SLOT_LABEL, SLOTS } from '@shared/rules'
 import { formatCoins } from './CharacterPanel'
 import { LimitsField, PersonaPicker } from '../DmStyle'
 import { useGame } from '../../store'
@@ -144,6 +144,7 @@ function SheetTab({ view }: { view: CampaignView }) {
           })}
         </section>
       ))}
+      <SpellList view={view} />
       <a
         href={api.characterCardUrl(view.id)}
         download
@@ -154,6 +155,48 @@ function SheetTab({ view }: { view: CampaignView }) {
         Save {view.build.name.split(' ')[0]} as a character card
       </a>
     </div>
+  )
+}
+
+/** Spells known, with Cast for the ones a character casts on themselves (docs/spec/04-rules-system.md#spells-v1-simple). */
+function SpellList({ view }: { view: CampaignView }) {
+  const { act, busy, live } = useGame()
+  const spells = knownSpells(view.state)
+  if (!spells.length) return null
+  const c = view.state.character
+  const fighting = Boolean(view.state.combat)
+  return (
+    <section>
+      <h3 className="mb-2 flex items-center justify-between text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">
+        Spells
+        <span className="font-normal tracking-normal text-arcane-400 normal-case tabular-nums">{c.mana} mana</span>
+      </h3>
+      <div className="space-y-1">
+        {spells.map((sp) => {
+          const own = sp.effect === 'heal' || sp.effect === 'buff' || sp.effect === 'utility'
+          const why = fighting ? 'In a fight, cast from the tracker.' : c.mana < sp.cost ? `Needs ${sp.cost} mana.` : `"I cast ${sp.name}."`
+          return (
+            <div key={sp.id} className="flex items-center gap-2.5 rounded-lg border border-arcane-400/15 bg-ink-850/60 px-2.5 py-2">
+              <Icon name="sparkle" size={16} className="shrink-0 text-arcane-400" />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm leading-tight text-parchment-100">
+                  {sp.name} <span className="text-[0.68rem] text-arcane-400 tabular-nums">{sp.cost} mana</span>
+                </div>
+                <div className="mt-0.5 text-[0.7rem] leading-snug text-parchment-400">{sp.blurb}</div>
+              </div>
+              {own && (
+                <Tip content={why} side="left">
+                  <Button size="sm" variant="secondary" disabled={fighting || c.mana < sp.cost || c.status !== 'alive' || busy || live.hold} onClick={() => void act(`I cast ${sp.name}.`, { spell: sp.id })}>
+                    Cast
+                  </Button>
+                </Tip>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <p className="mt-2 text-xs text-parchment-500">Harmful spells are cast at someone in the story, or from the fight tracker. Sleep brings the mana back.</p>
+    </section>
   )
 }
 

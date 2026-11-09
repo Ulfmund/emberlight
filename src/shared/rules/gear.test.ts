@@ -134,7 +134,8 @@ describe('hunger and tiredness', () => {
 describe('the Scribe and the pack', () => {
   const blank: ScribeOutput = {
     minutesPassed: 10, rest: 'none', location: '', deed: '', deedRenown: 0, itemsGained: [], itemsLost: [], coinsChange: 0, milestoneXp: 0, healing: 0,
-    conditionsOn: [], conditionsOff: [], people: [], places: [], placeKind: 'unknown', ate: 'none', itemsUsed: [], itemsEquipped: []
+    conditionsOn: [], conditionsOff: [], people: [], places: [], placeKind: 'unknown', ate: 'none', itemsUsed: [], itemsEquipped: [],
+    spellsLearned: []
   }
 
   it('turns eating, drinking and bandaging into the items doing their work', () => {

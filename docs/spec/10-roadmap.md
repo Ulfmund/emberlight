@@ -50,7 +50,7 @@ Built in milestones. Each one ends with something playable, so the artist can te
 - Image input (vision, or a captioning fallback)
 - Card, lorebook and campaign export; automatic backups ✅ 0.11.0 (backups since 0.1, lorebook export since 0.6.1)
 - Full lorebook feature set (recursion, groups, sticky/cooldown, etc.)
-- Spells
+- Spells ✅ 0.13.0 (17 spells; learned from callings, teachers and tomes)
 - UI sound effects ✅ 0.12.0
 
 ## v1.x

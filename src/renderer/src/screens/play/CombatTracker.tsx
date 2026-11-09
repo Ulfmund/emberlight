@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'motion/react'
-import { findTemplate, itemTemplate, SPELL_COST, type CombatAction, type Foe } from '@shared/rules'
+import { findTemplate, itemTemplate, knownSpells, SPELL_COST, type CombatAction, type Foe, type Spell } from '@shared/rules'
 import type { CampaignView } from '@shared/view'
 import { useGame } from '../../store'
 import { Icon } from '../../components/Icon'
@@ -15,6 +15,7 @@ export function CombatTracker({ view }: { view: CampaignView }) {
   const { act, busy, live } = useGame()
   const [target, setTarget] = useState<string | null>(null)
   const [confirmYield, setConfirmYield] = useState(false)
+  const [spellMenu, setSpellMenu] = useState(false)
   const cb = view.state.combat
   const c = view.state.character
   if (!cb || c.status !== 'alive') return null
@@ -30,6 +31,14 @@ export function CombatTracker({ view }: { view: CampaignView }) {
   }
 
   type Move = { id: string; label: string; icon: string; tip: string; go: () => void; disabled?: boolean; tone?: 'danger' }
+  // Spells the character knows that work in a fight.
+  const spells = knownSpells(view.state).filter((sp) => sp.combat)
+  const aimed = (sp: Spell) => sp.effect === 'damage' || sp.effect === 'debuff'
+  const castSpell = (sp: Spell) => {
+    setSpellMenu(false)
+    if (!chosen) return
+    send(aimed(sp) ? `I cast ${sp.name}${sp.area ? '' : ` at ${chosen.name}`}.` : `I cast ${sp.name}.`, { kind: 'cast', target: aimed(sp) ? chosen.id : undefined, spell: sp.id })
+  }
   const moves: Move[] = []
   if (chosen) {
     moves.push({
@@ -47,7 +56,12 @@ export function CombatTracker({ view }: { view: CampaignView }) {
       disabled: c.stamina < 2,
       go: () => send(`I throw everything into a heavy blow at ${chosen.name}.`, { kind: 'power', target: chosen.id })
     })
-    if (view.derived.maxMana > 0 && ((view.derived.skillLevels.spellcasting ?? 1) >= 2 || c.attributes.ARC >= 13))
+    if (spells.length === 1) {
+      const sp = spells[0]
+      moves.push({ id: 'cast', label: sp.name, icon: 'sparkle', tip: c.mana < sp.cost ? `Out of mana: ${sp.name} takes ${sp.cost}.` : `${sp.blurb} (${sp.cost} mana)`, disabled: c.mana < sp.cost, go: () => castSpell(sp) })
+    } else if (spells.length > 1) {
+      moves.push({ id: 'cast', label: 'Spells', icon: 'sparkle', tip: 'Choose a spell', disabled: spells.every((sp) => c.mana < sp.cost), go: () => setSpellMenu((x) => !x) })
+    } else if (view.derived.maxMana > 0 && ((view.derived.skillLevels.spellcasting ?? 1) >= 2 || c.attributes.ARC >= 13))
       moves.push({
         id: 'cast',
         label: 'Spell',
@@ -109,6 +123,23 @@ export function CombatTracker({ view }: { view: CampaignView }) {
             <FoeChip key={f.id} foe={f} selected={f.id === chosen?.id} onSelect={() => setTarget(f.id)} />
           ))}
         </div>
+        {spellMenu && spells.length > 1 && (
+          <div className="mt-1.5 grid gap-1 sm:grid-cols-2">
+            {spells.map((sp) => (
+              <button
+                key={sp.id}
+                type="button"
+                disabled={off || c.mana < sp.cost}
+                onClick={() => castSpell(sp)}
+                className="no-drag flex cursor-pointer items-baseline gap-2 rounded-lg border border-arcane-400/25 bg-ink-850/80 px-2.5 py-1.5 text-left hover:border-arcane-400/60 disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                <span className="text-sm text-parchment-100">{sp.name}</span>
+                <span className="ml-auto shrink-0 text-[0.68rem] text-arcane-400 tabular-nums">{sp.cost} mana</span>
+                <span className="hidden text-[0.68rem] text-parchment-500 sm:block" />
+              </button>
+            ))}
+          </div>
+        )}
         {/* Phones: one row of up to five moves, or two rows of four. */}
         <div className="mt-1.5 grid gap-1.5 sm:flex sm:flex-wrap" style={{ gridTemplateColumns: `repeat(${moves.length > 5 ? 4 : moves.length}, minmax(0, 1fr))` }}>
           {moves.map((m) => (
@@ -134,7 +165,7 @@ export function CombatTracker({ view }: { view: CampaignView }) {
   )
 }
 
-const OUT_LABEL: Record<Foe['status'], string> = { fighting: '', fled: 'Fled', down: 'Down', surrendered: 'Yielded' }
+const OUT_LABEL: Record<Foe['status'], string> = { fighting: '', fled: 'Fled', down: 'Down', surrendered: 'Yielded', asleep: 'Asleep' }
 
 function FoeChip({ foe, selected, onSelect }: { foe: Foe; selected: boolean; onSelect: () => void }) {
   const out = foe.status !== 'fighting'

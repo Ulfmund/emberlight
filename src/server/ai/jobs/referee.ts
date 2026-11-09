@@ -13,6 +13,8 @@ import {
   templateOf,
   type CheckRequest,
   type CombatAction,
+  findSpell,
+  knownSpells,
   type FoeSpec,
   type GameState,
   type RefereeCall,
@@ -64,7 +66,8 @@ export const RefereeSchema = z.object({
       kind: z.enum(['none', 'gather', 'craft']).describe('gather: mining, chopping wood, fishing, hunting game, picking herbs. craft: cooking, brewing, fletching, sewing, tanning, smithing'),
       what: z.string().describe('What they gather or make, in a few words ("iron ore", "fish", "healing draught", "arrows"); empty if none')
     })
-    .default({ kind: 'none', what: '' })
+    .default({ kind: 'none', what: '' }),
+  spell: z.string().default('').describe('If the character casts a spell, its name as they say it ("Mend", "a firebolt"); otherwise empty')
 })
 export type RefereeOutput = z.infer<typeof RefereeSchema>
 
@@ -84,6 +87,8 @@ Risk: "none" when failure just means it doesn't work. "light" for scrapes, bruis
 Fights: if the character attacks someone, or their action makes someone attack them right now, set fight.starts and list everyone who will fight them, as the story has them: what they are, how many, and how tough (tier). Only foes who are actually there. playerAttacks: whether the character's own action is the attack. sneakAttack: whether they strike unseen, from hiding. Also put the attack in checks as usual (melee, ranged or spellcasting, with its risk): it's used when the fight is told in prose instead of on the tracker.
 
 Gathering and crafting: if the character gathers resources (mining, chopping wood, fishing, hunting game, picking herbs) or makes something (cooking, brewing, fletching, sewing, tanning, smithing), set work to what they gather or make. The engine rolls that work itself, so don't also put it in checks. Only when they do the work this turn, not when they set off to do it later. Hunting an animal for meat or hide (tracking it and bringing it down) is gather work ("deer", "rabbits", "game"), not a fight and not a Survival check.
+
+Magic: if the character casts a spell, put its name in spell. The engine rolls Spellcasting for it, so don't also put that in checks. Casting a spell at someone to hurt or curse them is an attack: a fight starts, as above.
 
 Speech in "quotes" is what the character says; social checks only when they are trying to change someone's mind (persuade, lie, threaten, haggle). Social checks normally have risk "none": a failed persuasion means they aren't convinced. Only give a social check risk if failing means violence breaks out at that very moment, and then the harm comes from the people present (riskSource "sentient"), and then a fight starts too.`
 
@@ -141,11 +146,13 @@ export async function runReferee(
     .slice(0, 6)
     .map((f) => ({ kind: f.kind.trim().slice(0, 60), count: Math.max(1, Math.min(6, Math.round(f.count || 1))), tier: f.tier, name: f.name.trim().slice(0, 60) || undefined }))
   const work = out.work.kind !== 'none' && out.work.what.trim() ? { kind: out.work.kind, what: out.work.what.trim().slice(0, 80) } : undefined
+  const spell = out.spell.trim() ? findSpell(out.spell)?.id : undefined
   return {
     checks: out.checks.slice(0, 2).map(toRequest),
     intent: out.intent,
     fight: { starts: fight.starts && foes.length > 0, foes, playerAttacks: fight.playerAttacks, sneakAttack: fight.sneakAttack },
-    work
+    work,
+    spell
   }
 }
 
@@ -155,13 +162,14 @@ export const CombatRefereeSchema = z.object({
   action: z.enum(['attack', 'power_attack', 'cast', 'defend', 'flee', 'use_item', 'talk', 'surrender', 'other']),
   target: z.string().describe('For attacks: the id of the foe attacked (e.g. "f2"); otherwise empty'),
   item: z.string().describe('For use_item: the name of the item from the pack; otherwise empty'),
+  spell: z.string().default('').describe('For cast: the name of the spell, if they say which; otherwise empty'),
   checks: z.array(CheckSchema).describe('For talk or other only: at most one check (risk none: the foes are the danger). Empty otherwise')
 })
 
 const COMBAT_SYSTEM = `You are the Referee in the middle of a fight in a fantasy roleplaying game. You do not write story. A combat engine rolls every attack; you only decide what the character is doing this round, as ONE action:
 - attack: attacking a foe with their weapon (target: the foe's id). If they attack several, pick the main one.
 - power_attack: an all-out, heavy blow (costs stamina, hits harder).
-- cast: attacking with a spell or magic (if they have any).
+- cast: casting a spell: attacking with magic, healing themselves, a ward or a curse (spell: its name).
 - defend: guarding, parrying, dodging, taking cover, backing off.
 - flee: running away, breaking off, escaping.
 - use_item: drinking a potion, bandaging a wound, eating (item: its name from the pack).
@@ -177,7 +185,8 @@ export async function runCombatReferee(provider: Provider, model: string, state:
     const t = templateOf(i)
     return t && (t.food || t.heal || t.cures?.length)
   })
-  const prompt = `Recent story:\n${storyOf(recent)}\n\n${sheet(state)} Wielding ${weapon.unarmed ? 'nothing' : weapon.name}. Mana ${c.mana}. Usable items: ${usable.map((i) => i.name).join(', ') || 'none'}.\nFOES: ${combatSummary(state)}\n\nThe player now writes:\n"""${action}"""\n\nWhat is the character doing this round?`
+  const spells = knownSpells(state).filter((sp) => sp.combat)
+  const prompt = `Recent story:\n${storyOf(recent)}\n\n${sheet(state)} Wielding ${weapon.unarmed ? 'nothing' : weapon.name}. Mana ${c.mana}. Spells: ${spells.map((sp) => sp.name).join(', ') || 'none'}. Usable items: ${usable.map((i) => i.name).join(', ') || 'none'}.\nFOES: ${combatSummary(state)}\n\nThe player now writes:\n"""${action}"""\n\nWhat is the character doing this round?`
   const out = await provider.complete(model, {
     system: COMBAT_SYSTEM,
     messages: [{ role: 'user', content: prompt }],
@@ -191,7 +200,7 @@ export async function runCombatReferee(provider: Provider, model: string, state:
     case 'power_attack':
       return { kind: 'power', target: out.target.trim() }
     case 'cast':
-      return { kind: 'cast', target: out.target.trim() }
+      return { kind: 'cast', target: out.target.trim(), spell: findSpell(out.spell)?.id }
     case 'defend':
       return { kind: 'defend' }
     case 'flee':

@@ -337,6 +337,22 @@ Renown is how widely and how well the character is known. It changes how people 
 - Each spell: mana cost, effect template (damage / heal / buff / debuff / utility), DC or attack, and a scaling rule.
 - Casting = Spellcasting check. A critical failure is a **backfire** (rolled on a backfire table).
 
+*Built (0.13.0)* (`src/shared/rules/spells.ts`): 17 spells in 11 schools, each with a mana cost, a minimum Spellcasting level (below it, the roll is at a disadvantage), and an effect:
+
+| Kind | Spells |
+|---|---|
+| Harm | Spark (2 mana, 1d8), Thorn Lash (2, 1d6+1), Chill Touch (2, 1d6, heals half of it back), Frost Shard (3, 1d10), Firebolt (4, 2d6), Chain Lightning (6, 1d8 at every foe) |
+| Healing | Mend (2, 1d8, stops bleeding), Rejuvenate (5, 3d8, also poison) |
+| Protection | Stoneskin (3, +2 Defense for the fight), Moonveil (3: hidden, or +2 Defense in a fight), Courage (2: inspired, fear gone) |
+| Curses | Hex (2: a foe at −2 for the fight), Sleep (4: a weak or ordinary foe drops asleep; not leaders, legends or the dead), Dread (3: a foe who knows fear runs) |
+| Small magics | Light, Whisper (1), Ward Rune (3) |
+
+Damage and healing add the Arcane modifier and +1 every four Spellcasting levels; a critical doubles the dice. Harmful spells roll against the foe's Defense; the rest against a difficulty. A natural 1 backfires (d4): 1d6 damage to the caster, more mana lost, frightened, or a loud fizzle.
+
+- **Learning:** magical callings start with two (Hedge Witch: Mend, Hex; Loreward: Spark, Light; Moonsinger: Moonveil, Courage; Grove-Healer: Mend, Thorn Lash; Bone-Caller: Chill Touch, Dread; Runecarver: Light, Ward Rune; Temple Acolyte: Mend), and elves know Light. More come from the story: the narrator is told which spells exist and to name one plainly when a teacher or a tome passes it on, and the Scribe records it (`learn_spell`).
+- **Casting:** in a fight, from the tracker (a spell list when more than one is known; harmful ones at the chosen foe). Outside one, from the **Spells** list on the Sheet (healing, protection and small magics), or in words: the Referee names the spell and the engine rolls it. Casting a harmful spell at someone starts a fight like any attack, opening with that spell. Characters with no spells but some training can still throw raw magic (2 mana, 1d8) as before.
+- Sleep restores mana; casting spends it even when the spell fails.
+
 ## NPC relationships
 
 - Each NPC has a **disposition toward the player from −100 to +100**: Hostile, Unfriendly, Neutral, Friendly, Trusted, Devoted.

@@ -253,7 +253,7 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
   const CombatMoveSchema = z.union([
     z.object({ kind: z.literal('attack'), target }),
     z.object({ kind: z.literal('power'), target }),
-    z.object({ kind: z.literal('cast'), target }),
+    z.object({ kind: z.literal('cast'), target, spell: z.string().max(40).optional() }),
     z.object({ kind: z.literal('defend') }),
     z.object({ kind: z.literal('flee') }),
     z.object({ kind: z.literal('use_item'), item: z.string().min(1).max(80) }),
@@ -263,10 +263,10 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
   const WorkSchema = z.object({ kind: z.literal('craft'), what: z.string().min(1).max(60) })
 
   app.post('/api/campaigns/:id/act', async (c) => {
-    const b = await body(c, z.object({ text: z.string().min(1).max(4000), combat: CombatMoveSchema.optional(), work: WorkSchema.optional() }))
+    const b = await body(c, z.object({ text: z.string().min(1).max(4000), combat: CombatMoveSchema.optional(), work: WorkSchema.optional(), spell: z.string().max(40).optional() }))
     const id = c.req.param('id')
     return stream(c, (signal) =>
-      b ? turns.act(id, b.text, signal, { combat: b.combat, work: b.work }) : (async function* () { yield { type: 'error', message: 'Write something first.' } as TurnEvent })()
+      b ? turns.act(id, b.text, signal, { combat: b.combat, work: b.work, spell: b.spell }) : (async function* () { yield { type: 'error', message: 'Write something first.' } as TurnEvent })()
     )
   })
 

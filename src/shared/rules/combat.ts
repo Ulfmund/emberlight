@@ -3,6 +3,7 @@ import { d, defeatEvents, resolveCheck, type CheckRequest, type CheckResult } fr
 import { ENEMY_TIERS, enemyTemplate, findEnemy, HARM_FROM, TIER_MODS, TIER_WORDS, type Behavior, type EnemyFamily, type EnemyTier, type Loot } from './enemies'
 import { ammoFor, defenseValue, mainWeapon } from './gear'
 import { itemTemplate } from './items'
+import { backfire, knownSpells, spellAmount, spellCheck, type Spell } from './spells'
 import { applyEvent, type CampaignSettings, type CombatMode, type GameEvent, type GameState } from './state'
 import type { Work } from './crafting'
 import { TIER_INFO } from './tables'
@@ -13,7 +14,7 @@ import { TIER_INFO } from './tables'
  * engine decided. One player message is one round: the player's action and every enemy's.
  */
 
-export type FoeStatus = 'fighting' | 'fled' | 'down' | 'surrendered'
+export type FoeStatus = 'fighting' | 'fled' | 'down' | 'surrendered' | 'asleep'
 
 export type Foe = {
   id: string
@@ -45,13 +46,15 @@ export type Combat = {
   surprise: 'player' | 'foes' | null
   /** The player is fighting defensively this round (+2 Defense). */
   dodging: boolean
+  /** Defense from magic (a ward or stoneskin) for the rest of the fight. */
+  ward?: number
 }
 
 /** What the Referee or the DM asks for. `kind` is free text ("cave bear"); the engine picks the template. */
 export type FoeSpec = { kind: string; count?: number; tier?: EnemyTier; name?: string; strength?: 'weaker' | 'even' | 'stronger' }
 
 export type CombatAction =
-  | { kind: 'attack' | 'power' | 'cast'; target?: string }
+  | { kind: 'attack' | 'power' | 'cast'; target?: string; spell?: string }
   | { kind: 'defend' }
   | { kind: 'flee' }
   | { kind: 'use_item'; item: string }
@@ -73,6 +76,8 @@ export type RefereeCall = {
   fight: { starts: boolean; foes: FoeSpec[]; playerAttacks: boolean; sneakAttack: boolean }
   /** Gathering or crafting: the engine rolls it and moves the items. */
   work?: Work
+  /** A spell cast (its id): the engine rolls Spellcasting and applies it. */
+  spell?: string
 }
 
 export const NO_FIGHT: RefereeCall['fight'] = { starts: false, foes: [], playerAttacks: false, sneakAttack: false }
@@ -166,6 +171,7 @@ export function buildFoes(specs: FoeSpec[], playerLevel: number, rng: Rng): Foe[
 export function foeHealth(f: Foe): string {
   if (f.status === 'fled') return 'fled'
   if (f.status === 'surrendered') return 'surrendered'
+  if (f.status === 'asleep') return 'asleep'
   if (f.status === 'down' || f.hp <= 0) return 'down'
   const r = f.hp / f.maxHp
   return r >= 1 ? 'unhurt' : r > 0.7 ? 'scratched' : r > 0.4 ? 'hurt' : 'badly hurt'
@@ -294,7 +300,7 @@ export function resolveRound(
       return
     }
     const c = working.character
-    const def = defenseValue(c, working.combat?.dodging ? 2 : 0).total
+    const def = defenseValue(c, (working.combat?.dodging ? 2 : 0) + (working.combat?.ward ?? 0)).total
     const roll = d(rng, 20)
     const total = roll + f.attack
     const crit = roll === 20
@@ -317,11 +323,107 @@ export function resolveRound(
     }
   }
 
+  // ---- a known spell, cast in the fight ---------------------------------------------------
+  const castKnown = (sp: Spell, targetId?: string) => {
+    const foes = fighting(working)
+    const target = foes.find((f) => f.id === targetId) ?? foes.find((f) => f.name.toLowerCase() === (targetId ?? '').toLowerCase()) ?? foes[0]
+    if (!sp.combat) return void log.push(`${sp.name} is no use in a fight; the character hesitates.`)
+    if (working.character.mana < sp.cost) return void log.push(`The character reaches for ${sp.name}, but hasn't the mana (needs ${sp.cost}, has ${working.character.mana}). Nothing happens.`)
+    push({ type: 'mana', delta: -sp.cost })
+    const unseen = combat.surprise === 'foes' && round === 1
+    const roll = (against?: Foe) => {
+      const req = spellCheck(working, sp, against ? `${sp.name} at ${against.name}` : `casting ${sp.name}`, against ? { dc: against.defense, what: `${against.name}'s Defense` } : undefined)
+      if (unseen && against && req.advantage === 'none') req.advantage = 'advantage'
+      const r = resolveCheck(working, settings, req, rng)
+      results.push(r.result)
+      r.events.forEach(push)
+      return r.result
+    }
+    const said = (res: CheckResult) => `rolled ${res.kept} + ${res.bonus} = ${res.total} vs ${res.dc}: ${TIER_INFO[res.tier].label.toUpperCase()}`
+    /** A natural 1 backfires (and a backfire can drop the caster). */
+    const fumbled = (res: CheckResult, what: string) => {
+      if (res.kept !== 1) return false
+      const b = backfire(rng)
+      log.push(`The character casts ${what}: ${said(res)}.`, b.line)
+      b.events.forEach(push)
+      for (const ev of defeatEvents(working, settings, 'magic', rng)) push(ev)
+      if (working.character.status !== 'alive') end('defeat')
+      return true
+    }
+    switch (sp.effect) {
+      case 'damage': {
+        for (const t of sp.area ? foes : target ? [target] : []) {
+          if (over()) return
+          const res = roll(t)
+          if (fumbled(res, `${sp.name} at ${t.name}`)) return
+          if (!TIER_INFO[res.tier].success) {
+            log.push(`The character casts ${sp.name} at ${t.name}: ${said(res)}, a miss.`)
+            continue
+          }
+          const dmg = spellAmount(working, sp, res.tier === 'crit_success', rng)
+          push({ type: 'foe_hit', id: t.id, amount: dmg, name: t.name })
+          const now = working.combat?.foes.find((f) => f.id === t.id)
+          log.push(`The character casts ${sp.name} at ${t.name} (${sp.looks}): ${said(res)}, ${dmg} damage. ${t.name} is now ${now ? foeHealth(now) : 'down'}.`)
+          if (now?.status === 'down') push({ type: 'xp', amount: now.xp, reason: `Defeated ${now.name}` })
+          if (sp.drain) {
+            const back = Math.max(1, Math.floor(dmg / 2))
+            push({ type: 'heal', amount: back, reason: sp.name })
+            log.push(`The stolen warmth flows into the caster: ${back} health back.`)
+          }
+        }
+        return
+      }
+      case 'heal':
+      case 'buff': {
+        const res = roll()
+        if (fumbled(res, sp.name)) return
+        if (!TIER_INFO[res.tier].success) return void log.push(`The character tries ${sp.name}: ${said(res)}; the magic slips away.`)
+        for (const cond of sp.cures ?? []) if (working.character.conditions.includes(cond)) push({ type: 'condition', id: cond, on: false })
+        if (sp.effect === 'heal') {
+          const amount = spellAmount(working, sp, res.tier === 'crit_success', rng)
+          push({ type: 'heal', amount, reason: sp.name })
+          return void log.push(`The character casts ${sp.name} (${sp.looks}): ${said(res)}, ${amount} health back.`)
+        }
+        if (sp.ward) push({ type: 'combat_ward', amount: sp.ward })
+        if (sp.condition && sp.condition !== 'hidden') push({ type: 'condition', id: sp.condition, on: true })
+        return void log.push(`The character casts ${sp.name} (${sp.looks}): ${said(res)}${sp.ward ? `, +${sp.ward} Defense for the rest of the fight` : ''}.`)
+      }
+      case 'debuff': {
+        if (!target) return
+        if (sp.sleep && (target.tier === 'elite' || target.tier === 'boss' || target.family === 'undead')) return void log.push(`The character casts ${sp.name} at ${target.name}, but ${target.family === 'undead' ? 'the dead do not sleep' : 'their will is too strong'}: it shrugs the spell off.`)
+        if (sp.fear && target.behavior === 'fearless') return void log.push(`The character casts ${sp.name} at ${target.name}, who doesn't know fear: nothing happens.`)
+        const res = roll(target)
+        if (fumbled(res, `${sp.name} at ${target.name}`)) return
+        if (!TIER_INFO[res.tier].success) return void log.push(`The character casts ${sp.name} at ${target.name}: ${said(res)}; it doesn't take hold.`)
+        if (sp.weaken) {
+          push({ type: 'foe_weaken', id: target.id, attack: -sp.weaken, name: target.name })
+          log.push(`The character casts ${sp.name} at ${target.name} (${sp.looks}): ${said(res)}. ${target.name} fights at −${sp.weaken} for the rest of the fight.`)
+        } else if (sp.sleep) {
+          push({ type: 'foe_status', id: target.id, status: 'asleep', name: target.name })
+          push({ type: 'xp', amount: target.xp, reason: `Put ${target.name} to sleep` })
+          log.push(`The character casts ${sp.name} at ${target.name} (${sp.looks}): ${said(res)}. ${target.name} slumps down, fast asleep.`)
+        } else if (sp.fear) {
+          push({ type: 'foe_status', id: target.id, status: 'fled', name: target.name })
+          log.push(`The character casts ${sp.name} at ${target.name} (${sp.looks}): ${said(res)}. ${target.name} breaks and runs in terror.`)
+        }
+        return
+      }
+      default:
+        log.push(`${sp.name} is no use in a fight; the character hesitates.`)
+    }
+  }
+
   // ---- the player's turn --------------------------------------------------------------
   const playerTurn = () => {
     if (over()) return
     const c = working.character
     const foes = fighting(working)
+    // A character who knows spells casts one of them (the chosen one, else their best attack).
+    if (action.kind === 'cast') {
+      const known = knownSpells(working)
+      const sp = known.find((k) => k.id === action.spell) ?? known.find((k) => k.combat && k.effect === 'damage') ?? known.find((k) => k.combat)
+      if (sp) return castKnown(sp, action.target)
+    }
     switch (action.kind) {
       case 'attack':
       case 'power':
@@ -454,7 +556,7 @@ export function resolveRound(
 
   if (!over() && working.combat && !fighting(working).length) {
     // Victory: what the fallen carried.
-    const fallen = working.combat.foes.filter((f) => f.status === 'down')
+    const fallen = working.combat.foes.filter((f) => f.status === 'down' || f.status === 'asleep')
     let coins = 0
     const items: { name: string; qty: number }[] = []
     for (const f of fallen) {

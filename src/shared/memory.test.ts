@@ -162,7 +162,8 @@ describe('Scribe memory output', () => {
     placeKind: 'unknown',
     ate: 'none',
     itemsUsed: [],
-    itemsEquipped: []
+    itemsEquipped: [],
+    spellsLearned: []
   }
 
   it('records people and places, but never the player character or nameless extras', () => {

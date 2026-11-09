@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { CONDITION_IDS, findTemplate, PLACE_KINDS, templateOf, type ConditionId, type GameEvent, type GameState, type InventoryItem } from '@shared/rules'
+import { CONDITION_IDS, findSpell, findTemplate, PLACE_KINDS, SPELLS, templateOf, type ConditionId, type GameEvent, type GameState, type InventoryItem } from '@shared/rules'
 import type { Provider } from '../providers'
 import { entityLine, findEntity, relevantEntities, RELATIONS, sameName, samePlace, type Memory } from '@shared/memory'
 
@@ -26,6 +26,7 @@ export const ScribeSchema = z.object({
     .array(z.object({ name: z.string(), qty: z.number().int() }))
     .describe("Things from the character's own pack used up for their effect: eaten, drunk, a bandage or salve applied. Use the names from Carrying. Not things given away, sold or lost (those go in itemsLost)"),
   itemsEquipped: z.array(z.string()).describe('Things from the pack the character put on, wielded or took in hand in this exchange. Usually empty'),
+  spellsLearned: z.array(z.string()).default([]).describe('Spells the character clearly learns in this exchange (from a teacher, a tome, a revelation), by name. Usually empty'),
   people: z
     .array(
       z.object({
@@ -63,6 +64,7 @@ const SYSTEM = `You are the Scribe for a fantasy roleplaying game. You keep the 
 - Facts are what someone would still need to know a month later: "owes the player 5 silver", "lost two fingers to the river-thing", "is secretly the baron's son", "took the player prisoner". Never moods, gestures, smells, what a room looks like, or a blow-by-blow of a fight. Never guesses ("possibly", "seems to"): only what the story states. For someone already in KNOWN, add only what's new, and most turns add nothing.
 - When someone recorded under a description ("grey-bearded man") gives their name, record them under the name and put the description in otherNames, so the record is renamed rather than duplicated.
 - relation: only ties the story makes clear. A child is the player character's own son or daughter.
+- spellsLearned: only when the story says the character now knows the spell. The spells that exist: ${SPELLS.map((sp) => sp.name).join(', ')}.
 - Whatever the GAME ENGINE block lists was already recorded by the game: damage, a fight's blows, loot taken from fallen foes, spells and potions used in a fight, and things gathered or crafted (with the materials used up). Never record those again.
 - Eating from the pack goes in itemsUsed ("Travel rations", 1), not in ate. Drinking a potion or using a bandage goes in itemsUsed too; the game works out the healing, so leave healing at 0 for those.`
 
@@ -169,6 +171,10 @@ export function scribeToEvents(out: ScribeOutput, state: GameState, memory?: Mem
   for (const name of (out.itemsEquipped ?? []).slice(0, 3)) {
     const have = findInPack(state, name) ?? (events.some((e) => e.type === 'item' && e.delta > 0 && sameName(e.name, name)) ? { name } : undefined)
     if (have) events.push({ type: 'equip', name: have.name })
+  }
+  for (const name of (out.spellsLearned ?? []).slice(0, 2)) {
+    const sp = findSpell(name)
+    if (sp && !(state.character.spells ?? []).includes(sp.id) && !events.some((e) => e.type === 'learn_spell' && e.id === sp.id)) events.push({ type: 'learn_spell', id: sp.id, name: sp.name })
   }
   const coins = clamp(out.coinsChange, -state.character.coins, lim.coins)
   if (coins) events.push({ type: 'coins', delta: coins })
