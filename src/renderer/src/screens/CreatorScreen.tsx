@@ -18,7 +18,7 @@ import {
   SKILLS,
   START_SKILL_MAX,
   attrCapBreakdown,
-  attrStepCost,
+  attrRange,
   fmtMod,
   generateName,
   maxHp,
@@ -556,12 +556,47 @@ function CallingStep({ build, update }: { build: CharacterBuild; update: (p: Par
   )
 }
 
-function CapBar({ value, cap, max = 20 }: { value: number; cap: number; max?: number }) {
-  return (
+/**
+ * A score out of 20, with the ember mark at its cap. Given `onPick`, it can also be dragged or
+ * tapped to a score (to the nearest whole point); the caller keeps that within the limits.
+ */
+function CapBar({ value, cap, max = 20, onPick }: { value: number; cap: number; max?: number; onPick?: (score: number) => void }) {
+  const [dragging, setDragging] = useState(false)
+  const bar = (
     <div className="relative h-2 w-full overflow-hidden rounded-full bg-ink-950 ring-1 ring-white/5">
       <div className="absolute inset-y-0 right-0 bg-[repeating-linear-gradient(135deg,transparent_0_4px,rgb(255_255_255/0.04)_4px_8px)]" style={{ left: `${(cap / max) * 100}%` }} />
-      <motion.div className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-gold-500 to-gold-300" initial={false} animate={{ width: `${(value / max) * 100}%` }} />
+      {/* While dragging, the gold keeps up with the finger instead of easing after it. */}
+      <motion.div className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-gold-500 to-gold-300" initial={false} animate={{ width: `${(value / max) * 100}%` }} transition={dragging ? { duration: 0 } : undefined} />
       <div className="absolute inset-y-[-2px] w-0.5 bg-ember-400 shadow-[0_0_6px_var(--color-ember-400)]" style={{ left: `calc(${(cap / max) * 100}% - 1px)` }} />
+    </div>
+  )
+  if (!onPick) return bar
+  const pick = (e: React.PointerEvent<HTMLDivElement>) => {
+    const box = e.currentTarget.getBoundingClientRect()
+    onPick(Math.round(((e.clientX - box.left) / box.width) * max))
+  }
+  // A strip taller than the bar, for fingers. The pointer is captured, so a drag keeps going off
+  // the bar, and touch-none stops the page scrolling under it. A finger here sets the score, so
+  // it doesn't also open the cap tooltip, which would cover the numbers while dragging.
+  return (
+    <div
+      className="no-drag -my-3 cursor-pointer touch-none py-3 select-none"
+      onTouchStart={(e) => e.stopPropagation()}
+      onPointerDown={(e) => {
+        if (e.button !== 0) return
+        e.currentTarget.setPointerCapture(e.pointerId)
+        setDragging(true)
+        pick(e)
+      }}
+      onPointerMove={(e) => {
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) pick(e)
+      }}
+      onPointerUp={(e) => {
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) pick(e)
+      }}
+      onLostPointerCapture={() => setDragging(false)}
+    >
+      {bar}
     </div>
   )
 }
@@ -583,7 +618,6 @@ function Stepper({ onMinus, onPlus, canMinus, canPlus }: { onMinus: () => void; 
 function AttributesStep({ build, update, sexMode }: { build: CharacterBuild; update: (p: Partial<CharacterBuild>) => void; sexMode: SexMode }) {
   const caps = attrCapBreakdown(build, sexMode)
   const left = pointsLeft(build.attributes)
-  const set = (a: Attr, v: number) => update({ attributes: { ...build.attributes, [a]: v } })
   return (
     <>
       <StepTitle title="Attributes" text="Spend 24 points. Raising a score past 14 costs 2 points. The ember mark is your limit for life." />
@@ -616,6 +650,12 @@ function AttributesStep({ build, update, sexMode }: { build: CharacterBuild; upd
         {ATTRS.map((a) => {
           const v = build.attributes[a]
           const cap = caps[a].cap
+          // The buttons and the bar both go through here, so they keep to the same limits.
+          const range = attrRange(build.attributes, a, cap)
+          const set = (score: number) => {
+            const next = Math.max(range.min, Math.min(range.max, score))
+            if (next !== v) update({ attributes: { ...build.attributes, [a]: next } })
+          }
           return (
             <div key={a} className="grid grid-cols-[1fr_auto_auto] items-center gap-x-4 gap-y-2 rounded-lg px-2 py-2.5 hover:bg-white/[0.03] md:grid-cols-[10rem_1fr_auto_auto] md:gap-4 md:px-3">
               <div>
@@ -624,7 +664,7 @@ function AttributesStep({ build, update, sexMode }: { build: CharacterBuild; upd
               </div>
               <Tip content={<>Cap {cap}: {caps[a].sources.map((s) => `${s.label} ${s.value > 0 && s.label !== 'Base' ? '+' : ''}${s.value}`).join(', ')}</>} className="order-last col-span-3 md:order-none md:col-span-1">
                 <div className="w-full md:min-w-48">
-                  <CapBar value={v} cap={cap} />
+                  <CapBar value={v} cap={cap} onPick={set} />
                 </div>
               </Tip>
               <div className="w-20 text-right">
@@ -632,7 +672,7 @@ function AttributesStep({ build, update, sexMode }: { build: CharacterBuild; upd
                 <span className="ml-1.5 text-sm text-parchment-400">{fmtMod(mod(v))}</span>
                 <div className="text-[0.68rem] text-parchment-500">cap {cap}</div>
               </div>
-              <Stepper onMinus={() => set(a, v - 1)} onPlus={() => set(a, v + 1)} canMinus={v > ATTR_START} canPlus={v < cap && attrStepCost(v) <= left} />
+              <Stepper onMinus={() => set(v - 1)} onPlus={() => set(v + 1)} canMinus={v > range.min} canPlus={v < range.max} />
             </div>
           )
         })}
@@ -690,6 +730,15 @@ function SkillsStep({ build, update, sexMode }: { build: CharacterBuild; update:
   )
 }
 
+/** The die in the corner of a box that suggests something for it (out here so it isn't rebuilt at every keystroke). */
+function Roll({ onClick, title }: { onClick: () => void; title: string }) {
+  return (
+    <motion.button whileTap={{ rotate: 180, scale: 0.85 }} onClick={onClick} title={title} className="no-drag absolute top-1/2 right-2 -translate-y-1/2 cursor-pointer rounded-md p-1.5 text-gold-400 hover:bg-white/5 hover:text-gold-200">
+      <Icon name="d20" size={18} />
+    </motion.button>
+  )
+}
+
 function IdentityStep({
   build,
   update,
@@ -704,11 +753,6 @@ function IdentityStep({
   onUnlink: () => void
 }) {
   const long = build.appearance.length > 240 || build.personality.length > 300
-  const Roll = ({ onClick, title }: { onClick: () => void; title: string }) => (
-    <motion.button whileTap={{ rotate: 180, scale: 0.85 }} onClick={onClick} title={title} className="no-drag absolute top-1/2 right-2 -translate-y-1/2 cursor-pointer rounded-md p-1.5 text-gold-400 hover:bg-white/5 hover:text-gold-200">
-      <Icon name="d20" size={18} />
-    </motion.button>
-  )
   return (
     <>
       <StepTitle title="Identity" text="Who are you? The Dungeon Master will use all of this." />
@@ -750,6 +794,23 @@ function IdentityStep({
   )
 }
 
+/**
+ * One setting on the Adventure step. It lives out here, not inside AdventureStep: a component
+ * made inside another is a new one on every render, so React would throw every row away and
+ * build it again at each click, and the page jumped back towards the top.
+ */
+function Row({ label, text, children }: { label: string; text: string; children: React.ReactNode }) {
+  return (
+    <div className="grid gap-2 border-b border-gold-500/10 py-4 md:grid-cols-[14rem_1fr] md:items-center">
+      <div>
+        <div className="font-display tracking-wide text-parchment-50">{label}</div>
+        <div className="text-xs text-parchment-500">{text}</div>
+      </div>
+      <div>{children}</div>
+    </div>
+  )
+}
+
 function AdventureStep({
   settings,
   setSettings,
@@ -784,15 +845,6 @@ function AdventureStep({
   const worldBook = WORLDS.find((w) => w.id === world)?.lorebook.id
   const chosen = library.filter((b) => lorebooks.includes(b.id) && b.id !== worldBook)
   const set = (p: Partial<CampaignSettings>) => setSettings({ ...settings, ...p })
-  const Row = ({ label, text, children }: { label: string; text: string; children: React.ReactNode }) => (
-    <div className="grid gap-2 border-b border-gold-500/10 py-4 md:grid-cols-[14rem_1fr] md:items-center">
-      <div>
-        <div className="font-display tracking-wide text-parchment-50">{label}</div>
-        <div className="text-xs text-parchment-500">{text}</div>
-      </div>
-      <div>{children}</div>
-    </div>
-  )
   return (
     <>
       <StepTitle title="Adventure" text="How the Dungeon Master runs this campaign. You can change these later." />

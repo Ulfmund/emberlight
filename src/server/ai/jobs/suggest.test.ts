@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_SETTINGS, initialState, type CharacterBuild } from '@shared/rules'
 import type { Provider } from '../providers'
+import { parseJsonReply } from '../providers/types'
 import { ghostText, suggestActions } from './suggest'
 
 const build: CharacterBuild = {
@@ -30,6 +31,11 @@ function says(answer: unknown) {
   return p as unknown as Provider & { asked: string[] }
 }
 
+/** A model that replies with this text, read the way the providers read a reply. */
+function replies(text: string) {
+  return { complete: async (_m: string, opts: { schema: Parameters<typeof parseJsonReply>[1] }) => parseJsonReply(text, opts.schema) } as unknown as Provider
+}
+
 describe('help with what to do', () => {
   it('offers three kinds of idea, tidied up', async () => {
     const p = says({ bold: 'Bold: I charge the bridge.', careful: '"I wait in the reeds and watch."', say: '"Who goes there?" I call.' })
@@ -41,6 +47,19 @@ describe('help with what to do', () => {
     ])
     expect(p.asked[0]).toContain('A bridge, and a troll.')
     expect(p.asked[0]).toContain('Wielding Shortbow. Carrying: Shortbow, Arrows ×20, Skinning knife')
+  })
+
+  it('keeps the ideas that came back when the model leaves one out, and drops the rest', async () => {
+    // No "say" at all. This used to fail: "Invalid input: expected string, received undefined".
+    expect(await suggestActions(replies('{"bold": "I charge the bridge.", "careful": "I wait in the reeds."}'), 'm', state, [])).toEqual([
+      { kind: 'bold', text: 'I charge the bridge.' },
+      { kind: 'careful', text: 'I wait in the reeds.' }
+    ])
+    // Something that isn't text, or has no words in it, is dropped too.
+    expect(await suggestActions(replies('{"bold": null, "careful": ["I hide."], "say": "\\"Who goes there?\\""}'), 'm', state, [])).toEqual([{ kind: 'say', text: '"Who goes there?"' }])
+    // Nothing usable: no ideas (the Ideas box says so), not an error.
+    expect(await suggestActions(replies('{"options": ["I run."]}'), 'm', state, [])).toEqual([])
+    expect(await suggestActions(replies('{"bold": "...", "careful": " ", "say": "\\"\\""}'), 'm', state, [])).toEqual([])
   })
 
   it('ghost text carries on where the player stopped, never repeating them', async () => {

@@ -117,6 +117,18 @@ export function pointsSpent(attributes: Record<Attr, number>): number {
 
 export const pointsLeft = (attributes: Record<Attr, number>) => ATTR_POINTS - pointsSpent(attributes)
 
+/**
+ * The scores one attribute can be given in the point-buy: down to the starting score, and up to
+ * its cap or as far as the points left will go, whichever comes first. The creator's + and −
+ * buttons and its draggable bars both keep to this, so they can't disagree.
+ */
+export function attrRange(attributes: Record<Attr, number>, a: Attr, cap: number): { min: number; max: number } {
+  let left = pointsLeft(attributes)
+  let max = attributes[a]
+  while (max < cap && attrStepCost(max) <= left) left -= attrStepCost(max++)
+  return { min: ATTR_START, max }
+}
+
 export const startingSkillBudget = (b: Pick<CharacterBuild, 'age'>) => START_SKILL_LEVELS + AGES[b.age].skillLevels
 
 /** Starting level of a skill: 1 + background levels + levels the player added. */

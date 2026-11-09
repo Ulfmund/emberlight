@@ -12,7 +12,8 @@ import {
   STALLED,
   stallGuard,
   ThinkTagSplitter,
-  toJsonSchema
+  toJsonSchema,
+  withFormat
 } from './types'
 import { describeContext } from './context'
 
@@ -199,7 +200,8 @@ export async function openAiComplete<T>(
       stream: false,
       temperature: 0.3,
       max_tokens: 1500,
-      messages: [{ role: 'system', content: opts.system + JSON_ONLY }, ...withImages(opts)],
+      // Without response_format the model only knows the field names if the prompt gives them.
+      messages: [{ role: 'system', content: withSchema ? opts.system + JSON_ONLY : withFormat(opts.system, opts.schema) }, ...withImages(opts)],
       ...(withSchema
         ? { response_format: { type: 'json_schema', json_schema: { name: opts.name, schema: toJsonSchema(opts.schema) } } }
         : {})

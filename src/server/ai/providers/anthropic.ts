@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import type { ContextReport, ModelInfo, StreamEvent } from '@shared/types'
-import { parseJsonReply, STALLED, stallGuard, toJsonSchema, type ChatOptions, type CompleteOptions, type Provider } from './types'
+import { parseJsonReply, STALLED, stallGuard, withFormat, type ChatOptions, type CompleteOptions, type Provider } from './types'
 import { describeContext } from './context'
 
 /** Models that take adaptive thinking (and reject a fixed thinking budget). */
@@ -81,7 +81,7 @@ export class AnthropicProvider implements Provider {
       }
     }
     // The format is written into the prompt instead, and the answer checked here.
-    const system = `${opts.system}\n\nAnswer with one JSON object and nothing else, matching this JSON Schema:\n${JSON.stringify(toJsonSchema(opts.schema))}`
+    const system = withFormat(opts.system, opts.schema)
     try {
       const response = await this.client.messages.create(
         { model, max_tokens: 8000, system, messages, ...(ADAPTIVE.test(model) ? { output_config: effort } : {}) } as unknown as Parameters<typeof this.client.messages.create>[0],

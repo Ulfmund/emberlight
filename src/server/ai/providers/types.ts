@@ -93,6 +93,11 @@ export function parseJsonReply<T>(text: string, schema: z.ZodType<T>): T {
 export const JSON_ONLY =
   '\n\nReply with a single JSON object only, matching the requested format. No other text.'
 
+/** The system prompt with the format written in, for when the server can't be handed the schema itself. */
+export function withFormat(system: string, schema: z.ZodType): string {
+  return `${system}\n\nAnswer with one JSON object and nothing else, matching this JSON Schema:\n${JSON.stringify(toJsonSchema(schema))}`
+}
+
 /** A short, readable error for the UI, from whatever fetch/HTTP failure happened. */
 export function friendlyError(err: unknown, serverName: string): string {
   const e = err as { name?: string; message?: string; cause?: { code?: string } }

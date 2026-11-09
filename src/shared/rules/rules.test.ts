@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   validateBuild as validate,
   attrCaps,
+  attrRange,
   charLevelFromXp,
   charXpForLevel,
   maxHp,
@@ -17,7 +18,7 @@ import {
 } from './character'
 import { checkBreakdown, deathRollEvents, defeatEvents, resolveCheck, tierFor, type CheckRequest } from './checks'
 import { applyEvent, DEFAULT_SETTINGS, derived, initialState, project, type GameState } from './state'
-import { ATTRS, BACKGROUND_IDS, BACKGROUNDS, BANNED_NAMES, RACE_BACKGROUNDS, RACE_IDS } from './index'
+import { ATTRS, attrStepCost, BACKGROUND_IDS, BACKGROUNDS, BANNED_NAMES, RACE_BACKGROUNDS, RACE_IDS } from './index'
 import { generateName } from './names'
 
 /** Deterministic random numbers for tests. */
@@ -91,6 +92,38 @@ describe('point-buy and validation', () => {
   it('costs 1 per point up to 14 and 2 above', () => {
     const attrs = { STR: 16, AGI: 8, END: 8, INT: 8, ARC: 8, WIT: 8, PRE: 8 }
     expect(24 - pointsLeft(attrs)).toBe(6 + 2 + 2)
+  })
+
+  it('lets a score go from 8 up to its cap, or as far as the points left reach', () => {
+    const eights = { STR: 8, AGI: 8, END: 8, INT: 8, ARC: 8, WIT: 8, PRE: 8 }
+    expect(attrRange(eights, 'STR', 16)).toEqual({ min: 8, max: 16 })
+    expect(attrRange({ ...eights, STR: 16 }, 'STR', 16)).toEqual({ min: 8, max: 16 })
+    // 21 points spent elsewhere: the 3 left take AGI from 8 to 11.
+    expect(attrRange({ ...eights, END: 15, INT: 15, WIT: 13 }, 'AGI', 20)).toEqual({ min: 8, max: 11 })
+    // 2 left at 13: one more point reaches 14, but past 14 a point costs 2.
+    expect(attrRange({ ...eights, END: 15, INT: 15, PRE: 9, AGI: 13 }, 'AGI', 20)).toEqual({ min: 8, max: 14 })
+    // Nothing left: it can only come down.
+    expect(attrRange({ ...eights, STR: 16, END: 16, INT: 10, AGI: 10 }, 'AGI', 20)).toEqual({ min: 8, max: 10 })
+  })
+
+  it('keeps to the rules the + and − buttons always had', () => {
+    const rng = seeded(7)
+    for (let i = 0; i < 200; i++) {
+      const sexMode = i % 2 ? 'realistic' : 'off'
+      const b = randomBuild(rng, sexMode, 'Test')
+      // Some points back, so there's room to move.
+      const attributes = { ...b.attributes, [ATTRS[i % ATTRS.length]]: 8 }
+      const caps = attrCaps(b, sexMode)
+      const left = pointsLeft(attributes)
+      for (const a of ATTRS) {
+        const v = attributes[a]
+        const r = attrRange(attributes, a, caps[a])
+        expect(v > r.min).toBe(v > 8)
+        expect(v < r.max).toBe(v < caps[a] && attrStepCost(v) <= left)
+        expect(pointsLeft({ ...attributes, [a]: r.max })).toBeGreaterThanOrEqual(0)
+        if (r.max < caps[a]) expect(pointsLeft({ ...attributes, [a]: r.max + 1 })).toBeLessThan(0)
+      }
+    }
   })
 
   it('accepts the example build', () => {

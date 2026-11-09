@@ -10,10 +10,12 @@ import type { Provider } from '../providers'
 
 export type Suggestion = { kind: 'bold' | 'careful' | 'say'; text: string }
 
+// Models without a schema to hold them to sometimes leave one of these out, or send something
+// that isn't text. That one comes back empty and is dropped; the other ideas are still shown.
 const SuggestSchema = z.object({
-  bold: z.string().describe('A bold or risky action, in the first person ("I ...")'),
-  careful: z.string().describe('A careful, clever or sneaky action, in the first person'),
-  say: z.string().describe('Something to say aloud, in "quotation marks", maybe with a small action')
+  bold: z.string().describe('A bold or risky action, in the first person ("I ...")').catch(''),
+  careful: z.string().describe('A careful, clever or sneaky action, in the first person').catch(''),
+  say: z.string().describe('Something to say aloud, in "quotation marks", maybe with a small action').catch('')
 })
 
 const SUGGEST_SYSTEM = `You help the player of a fantasy roleplaying game decide what to do next. Read the story and offer three different things their character could do right now, each in the player's own voice: first person, present tense, one or two short sentences, under 30 words. Speech goes in "quotation marks". Use only people, places and things that are in the story or in the character's pack. Don't decide outcomes; only say what they try.`
@@ -48,7 +50,8 @@ export async function suggestActions(provider: Provider, model: string, state: G
     { kind: 'careful', text: tidy(out.careful, false) },
     { kind: 'say', text: tidy(out.say, true) }
   ]
-  return list.filter((s) => s.text)
+  // Only ideas with words in them. None at all, and the Ideas box says so.
+  return list.filter((s) => /\p{L}/u.test(s.text))
 }
 
 // ---- ghost text -------------------------------------------------------------------------------
