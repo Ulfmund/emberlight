@@ -86,12 +86,14 @@ Optional. Configured once under *Settings → Images*.
 | OpenAI-compatible image APIs | Cloud |
 
 - The prompt is built automatically from the sheet (race, sex, age, appearance) plus a **style preset** the artist can edit (e.g. "painterly fantasy portrait"). It can be edited before generating.
-- Used for: player portraits, NPC portraits (optional auto-generate when an NPC is promoted), and later location art and item icons.
+- Used for: player portraits, NPC portraits (painted unasked when someone comes to matter, if turned on: 0.22.0), pictures of places, emblems for factions (0.19.0) and pictures of notable things (0.22.0).
 - Generated images are saved to the campaign's media folder and attached to the entity.
 
 *Built (0.14.0)* (`src/server/images/generate.ts`, `src/shared/images.ts`): an **Images** section on the Connect screen (on the computer only, like API keys): the generator, its address, a model (a checkpoint for SD or ComfyUI, e.g. `gpt-image-1` for an images API), an API key for images APIs (encrypted with the other keys), the **art style** added to every portrait, what to leave out, size and steps, and for ComfyUI an optional workflow of your own in API format with `{{prompt}}`, `{{negative}}`, `{{seed}}`, `{{width}}`, `{{height}}`, `{{steps}}` and `{{model}}` placeholders (otherwise a basic checkpoint text-to-image graph). **Test** paints a sample. Portraits are made from the **picture dialog**: tap your character's portrait (character panel) or a person's circle in the Journal; the prompt (style + what the sheet or the Journal says about them) can be edited first. Pictures live in the save file (a `media` table) and travel with an exported adventure.
 
 *Built (0.19.0):* **places and factions** take pictures too, from their circle in the Journal. A place is painted wide (half as wide again as tall; 1536×1024 from an images API) from a scenery prompt ("landscape painting of …, wide view, no figures"), and shows as a banner on its Journal card, on the map, and under the character panel while you're there. A faction gets an emblem ("heraldic emblem of …, a banner or crest").
+
+*Built (0.22.0):* **notable things** (the Journal's Things) take pictures as a still life ("still life painting of …, on a plain cloth"), shown in a square frame. **Unasked portraits** (*Images → Paint people who matter*, off unless turned on): after a turn, someone who has come to matter (recorded four times or more, tied to the character, or travelling with them) and has no picture yet, and no card picture, is painted in the background with the usual portrait prompt. One at a time per story, each person tried once per run of the app; a failure is logged, never shown as an error. The picture appears with the next update of the screen.
 
 ## Image input (show the AI a picture)
 

@@ -2,7 +2,7 @@ import type { Hono } from 'hono'
 import { z } from 'zod'
 import { ImageSettingsSchema, emblemPrompt, portraitPrompt, scenePrompt, stillLifePrompt } from '@shared/images'
 import { AGES, BACKGROUNDS, RACES, SEXES } from '@shared/rules'
-import { projectMemory } from '@shared/memory'
+import { projectMemory, sameName, type Entity } from '@shared/memory'
 import type { Campaigns } from '../core/campaigns'
 import type { TurnEngine } from '../core/turn'
 import type { SettingsStore } from '../store/settings'
@@ -147,17 +147,60 @@ export function registerMediaRoutes(app: Hono, campaigns: Campaigns, turns: Turn
 }
 
 /** What a portrait prompt says: the sheet for the player, the Journal for anyone else. */
+/** The prompt for a picture of anyone or anything in the Journal: a portrait, a scene, an emblem, a still life. */
+export function recordPrompt(style: string, e: Entity): string {
+  const what = e.summary ? `${e.name}, ${e.summary.replace(/\.$/, '')}` : e.name
+  if (e.kind === 'place') return scenePrompt(style, { what, details: e.facts.slice(-2) })
+  if (e.kind === 'faction') return emblemPrompt(style, { what, details: e.facts.filter((f) => !/\([+−-]\d\)$/.test(f)).slice(-1) })
+  if (e.kind === 'item') return stillLifePrompt(style, { what, details: e.facts.slice(-2) })
+  return portraitPrompt(style, { kind: e.summary ? e.summary.replace(/\.$/, '') : e.name, details: e.facts.slice(-2) })
+}
+
+/** How often the Scribe must have recorded someone before they "matter" (for unasked portraits). */
+export const MATTERS_AFTER = 4
+
+/**
+ * Unasked portraits (docs/spec/03-characters-and-cards.md#image-generation): after a turn, if the
+ * player wants it and an image generator is set up, someone who has come to matter (seen often,
+ * tied to the character, or travelling with them) and has no picture yet is painted, in the
+ * background, one at a time per story. Each person is tried once per run of the app.
+ */
+export function makePainter(campaigns: Campaigns, settings: SettingsStore, secrets: SecretStore) {
+  const busy = new Set<string>()
+  const tried = new Set<string>()
+  return (id: string): Promise<void> | undefined => {
+    const s = settings.images
+    if (!s.autoPortraits || s.backend === 'none' || !s.baseUrl.trim() || busy.has(id)) return undefined
+    const c = campaigns.db.getCampaign(id)
+    if (!c) return undefined
+    const path = campaigns.path(c)
+    const memory = projectMemory(campaigns.activeEvents(c, path).map((x) => x.event))
+    const party = campaigns.state(c, { path }).party ?? []
+    const hasCard = (e: Entity) => c.cast.some((m) => m.hasImage && sameName(m.name, e.name))
+    const who = memory.entities
+      .filter((e) => e.kind === 'person' && e.status !== 'dead' && !e.image && !hasCard(e) && !tried.has(`${id}:${e.id}`))
+      .filter((e) => e.mentions >= MATTERS_AFTER || (e.relation && e.relation !== 'none') || party.some((a) => sameName(a.name, e.name)))
+      .sort((a, b) => b.mentions - a.mentions)[0]
+    if (!who) return undefined
+    busy.add(id)
+    tried.add(`${id}:${who.id}`)
+    return (async () => {
+      const pic = await generateImage(s, await secrets.get('images'), recordPrompt(s.style, who))
+      const media = campaigns.db.addMedia({ campaignId: id, kind: 'generated', mime: pic.mime, data: pic.data })
+      campaigns.journal(id, { type: 'entity_edit', id: who.id, image: media })
+    })()
+      .catch((err) => console.warn(`Couldn't paint ${who.name}: ${(err as Error).message}`))
+      .finally(() => busy.delete(id))
+  }
+}
+
 function portraitFor(campaigns: Campaigns, settings: SettingsStore, id: string, entityId?: string): string {
   const style = settings.images.style
   const view = campaigns.view(id)
   if (entityId) {
     const e = projectMemory(campaigns.activeEvents(campaigns.get(id), campaigns.path(campaigns.get(id))).map((x) => x.event)).entities.find((x) => x.id === entityId)
     if (!e) throw new Error('That is no longer in the Journal.')
-    const what = e.summary ? `${e.name}, ${e.summary.replace(/\.$/, '')}` : e.name
-    if (e.kind === 'place') return scenePrompt(style, { what, details: e.facts.slice(-2) })
-    if (e.kind === 'faction') return emblemPrompt(style, { what, details: e.facts.filter((f) => !/\([+−-]\d\)$/.test(f)).slice(-1) })
-    if (e.kind === 'item') return stillLifePrompt(style, { what, details: e.facts.slice(-2) })
-    return portraitPrompt(style, { kind: e.summary ? e.summary.replace(/\.$/, '') : e.name, details: e.facts.slice(-2) })
+    return recordPrompt(style, e)
   }
   const b = view.state.character.build
   const sex = SEXES[view.settings.sexModifiers][b.sex].label.toLowerCase()

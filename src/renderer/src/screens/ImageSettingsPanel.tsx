@@ -107,6 +107,14 @@ export function ImageSettingsPanel() {
                   <input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder={hasKey ? '••••••••' : 'sk-…'} className="input" autoComplete="off" />
                 )}
               <div className="md:col-span-2">{label('Art style', 'Added to every portrait. The artist can make it their own.', <textarea value={s.style} onChange={(e) => set({ style: e.target.value })} rows={2} className="input w-full resize-y text-sm" />)}</div>
+              {label(
+                'Paint people who matter',
+                'When someone keeps coming up in the story, is tied to you, or travels with you, their portrait is painted in the background, unasked. Each person once.',
+                <select value={s.autoPortraits ? 'on' : 'off'} onChange={(e) => set({ autoPortraits: e.target.value === 'on' })} className="input">
+                  <option value="off">Off: only when I ask</option>
+                  <option value="on">On</option>
+                </select>
+              )}
               {s.backend !== 'openai' && (
                 <div className="md:col-span-2">{label('Leave out', undefined, <textarea value={s.negative} onChange={(e) => set({ negative: e.target.value })} rows={2} className="input w-full resize-y text-sm" />)}</div>
               )}

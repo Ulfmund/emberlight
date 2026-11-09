@@ -22,7 +22,9 @@ export const ImageSettingsSchema = z.object({
   size: z.union([z.literal(512), z.literal(768), z.literal(1024)]),
   steps: z.number().int().min(4).max(80),
   /** ComfyUI: a workflow in API format, with {{prompt}}, {{negative}}, {{seed}}, {{width}}, {{height}}, {{steps}} and {{model}} where they go. */
-  workflow: z.string().max(100_000)
+  workflow: z.string().max(100_000),
+  /** Paint people who come to matter in the story (seen often, tied to the character, travelling with them), unasked. */
+  autoPortraits: z.boolean().default(false)
 })
 export type ImageSettings = z.infer<typeof ImageSettingsSchema>
 
@@ -34,7 +36,8 @@ export const DEFAULT_IMAGE_SETTINGS: ImageSettings = {
   negative: 'text, watermark, signature, blurry, deformed hands, extra fingers, modern clothing',
   size: 768,
   steps: 28,
-  workflow: ''
+  workflow: '',
+  autoPortraits: false
 }
 
 export function normalizeImageSettings(x: unknown): ImageSettings {

@@ -14,7 +14,7 @@ import { createProvider } from './ai/providers'
 import { Campaigns } from './core/campaigns'
 import { TurnEngine } from './core/turn'
 import { registerGameRoutes } from './routes/game'
-import { registerMediaRoutes } from './routes/media'
+import { makePainter, registerMediaRoutes } from './routes/media'
 import { registerAudioRoutes } from './routes/audio'
 import { registerEmbeddingRoutes } from './routes/embeddings'
 import { Embedder } from './ai/embeddings'
@@ -228,6 +228,7 @@ export async function startServer(opts: ServerOptions): Promise<{ port: number; 
   // Memory by meaning, when an embedding model is set up.
   const embedder = new Embedder(db, () => ({ embeddings: settings.embeddings, connection: settings.connection }), (id) => secrets.get(id))
   turns.embedder = embedder
+  turns.painter = makePainter(campaigns, settings, secrets)
   const library = new CardLibrary(db)
   registerCardRoutes(app, library)
   registerLoreRoutes(app, new LoreLibrary(db))

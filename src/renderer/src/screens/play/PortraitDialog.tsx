@@ -45,6 +45,7 @@ export function PortraitDialog({ open, onClose, entity }: { open: boolean; onClo
   const current = entity ? (record?.image ? mediaUrl(record.image) : undefined) : playerPortrait(view)
   const place = record?.kind === 'place'
   const group = record?.kind === 'faction'
+  const thing = record?.kind === 'item'
   const name = entity?.name ?? view.build.name
   const setView = (v: typeof view) => useGame.setState({ view: v })
 
@@ -127,6 +128,10 @@ export function PortraitDialog({ open, onClose, entity }: { open: boolean; onClo
                 <div className="grid h-[110px] w-[165px] shrink-0 place-items-center overflow-hidden rounded-xl border-2 border-gold-500/40 bg-ink-800">
                   {current ? <img src={current} alt="" className="h-full w-full object-cover" /> : <Icon name="map" size={34} className="text-gold-400/60" />}
                 </div>
+              ) : thing ? (
+                <div className="grid h-[110px] w-[110px] shrink-0 place-items-center overflow-hidden rounded-xl border-2 border-gold-500/40 bg-ink-800">
+                  {current ? <img src={current} alt="" className="h-full w-full object-cover" /> : <Icon name="amulet" size={34} className="text-gold-400/60" />}
+                </div>
               ) : (
                 <Medallion name={name} race={entity ? 'human' : view.build.race} size={110} badge={false} image={current} />
               )}
@@ -173,7 +178,7 @@ export function PortraitDialog({ open, onClose, entity }: { open: boolean; onClo
                       </Button>
                     )}
                     <Button variant="primary" size="sm" icon="sparkle" disabled={Boolean(working) || prompt.trim().length < 3} onClick={() => void make()}>
-                      {working === 'make' ? 'Painting… (this can take a minute)' : place ? 'Paint the place' : group ? 'Make their emblem' : 'Make a portrait'}
+                      {working === 'make' ? 'Painting… (this can take a minute)' : place ? 'Paint the place' : group ? 'Make their emblem' : thing ? 'Paint it' : 'Make a portrait'}
                     </Button>
                   </div>
                 </>

@@ -107,6 +107,9 @@ export class TurnEngine {
   /** Memory by meaning (set when an embedding model may be used). */
   embedder?: Embedder
 
+  /** Paints someone who has come to matter, unasked, if the player wants that (set by the app). */
+  painter?: (campaignId: string) => Promise<void> | undefined
+
   /**
    * What bears on the scene by meaning, not only by name. Quick (embeddings are kept), and never
    * holds up the story: if the embedding server is slow or down, names and keywords decide.
@@ -702,6 +705,7 @@ export class TurnEngine {
         }
       }
       this.remember(id, ctx)
+      this.painter?.(id)
     }
     yield { type: 'view', view: this.campaigns.view(id) }
   }
