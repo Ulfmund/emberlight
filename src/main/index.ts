@@ -13,6 +13,9 @@ const devUrl = process.env.ELECTRON_RENDERER_URL
 
 let serverPort = 0
 
+// Testing aid: run against a separate data folder so real saves and keys are untouched.
+if (process.env.EMBERLIGHT_DATA_DIR) app.setPath('userData', process.env.EMBERLIGHT_DATA_DIR)
+
 async function createWindow() {
   const win = new BrowserWindow({
     width: 1440,

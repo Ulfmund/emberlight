@@ -1,138 +1,278 @@
 import { create } from 'zustand'
 import type { SettingsView } from '@shared/types'
+import type { Attr, CampaignSettings, CharacterBuild, CheckResult } from '@shared/rules'
+import type { CampaignSummary, CampaignView, MessageView, TurnEvent } from '@shared/view'
 import { api } from './api'
 
-export type Screen = 'title' | 'connect' | 'play'
+export type Screen = 'title' | 'connect' | 'creator' | 'play' | 'load'
 
-export type StoryMessage = {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  thinking?: string
-  /** Sent to the model but not shown (e.g. the "begin the adventure" nudge). */
-  hidden?: boolean
-  error?: string
-  notice?: string
-  streaming?: boolean
+/** Something worth celebrating or warning about, shown as a toast. */
+export type Toast = { id: number; title: string; text?: string; tone: 'good' | 'bad' | 'level' | 'info'; icon: string }
+
+type Live = {
+  /** The DM message currently being written. */
+  messageId: string | null
+  text: string
+  thinking: string
+  /** Rolls waiting to be shown in the dice tray, in order. */
+  dice: CheckResult[]
+  /** While the dice tray is up, narration is held back so the result isn't spoiled. */
+  hold: boolean
+  error: string | null
+  notice: string | null
 }
+
+const idleLive: Live = { messageId: null, text: '', thinking: '', dice: [], hold: false, error: null, notice: null }
 
 type State = {
   screen: Screen
   settings: SettingsView | null
-  messages: StoryMessage[]
-  streaming: boolean
+  campaigns: CampaignSummary[]
+  view: CampaignView | null
+  busy: boolean
+  live: Live
   abort: AbortController | null
+  toasts: Toast[]
+  /** A finished turn's results, held back until the player has thrown the dice. */
+  pendingView: CampaignView | null
 
   go(screen: Screen): void
   loadSettings(): Promise<void>
   setSettings(s: SettingsView): void
-  send(text: string, opts?: { hidden?: boolean }): Promise<void>
+  loadCampaigns(): Promise<void>
+  open(id: string): Promise<void>
+  create(build: CharacterBuild, settings: CampaignSettings): Promise<void>
+  remove(id: string): Promise<void>
+
+  act(text: string): Promise<void>
+  answer(messageId: string): Promise<void>
   regenerate(): Promise<void>
+  reroll(checkId: string): Promise<void>
+  narrateHead(): Promise<void>
   stop(): void
-  newStory(): void
+  swipe(messageId: string): Promise<void>
+  rewind(messageId: string): Promise<void>
+  spend(attr: Attr): Promise<void>
+  saveSlot(name: string): Promise<void>
+  loadSlot(saveId: string): Promise<void>
+  deleteSlot(saveId: string): Promise<void>
+  updateCampaignSettings(s: CampaignSettings): Promise<void>
+
+  diceDone(): void
+  toast(t: Omit<Toast, 'id'>): void
+  dismissToast(id: number): void
 }
 
-const uid = () => Math.random().toString(36).slice(2, 10)
+let toastId = 0
 
-export const OPENING_NUDGE = '((Begin the adventure: set an opening scene for my character.))'
-
-export const useGame = create<State>((set, get) => ({
-  screen: 'title',
-  settings: null,
-  messages: [],
-  streaming: false,
-  abort: null,
-
-  go: (screen) => set({ screen }),
-
-  loadSettings: async () => {
-    // The local server may still be starting when the page first loads, so retry briefly.
-    for (let attempt = 0; attempt < 8; attempt++) {
-      try {
-        set({ settings: await api.settings() })
-        return
-      } catch {
-        await new Promise((r) => setTimeout(r, 400))
-      }
+export const useGame = create<State>((set, get) => {
+  /** Compare before/after views and celebrate level-ups and new skill levels. */
+  const announce = (before: CampaignView | null, after: CampaignView) => {
+    if (!before || before.id !== after.id) return
+    const b = before.state.character
+    const a = after.state.character
+    if (a.level > b.level) {
+      get().toast({ title: `Level ${a.level}!`, text: '+1 attribute point to spend · +2 Renown', tone: 'level', icon: 'star' })
     }
-  },
-  setSettings: (settings) => set({ settings }),
-
-  send: async (text, opts) => {
-    if (get().streaming) return
-    const user: StoryMessage = { id: uid(), role: 'user', content: text, hidden: opts?.hidden }
-    set({ messages: [...get().messages, user] })
-    await streamReply(set, get)
-  },
-
-  regenerate: async () => {
-    if (get().streaming) return
-    const msgs = [...get().messages]
-    while (msgs.length && msgs[msgs.length - 1].role === 'assistant') msgs.pop()
-    if (!msgs.length) return
-    set({ messages: msgs })
-    await streamReply(set, get)
-  },
-
-  stop: () => get().abort?.abort(),
-
-  newStory: () => {
-    get().abort?.abort()
-    set({ messages: [], streaming: false, abort: null })
-  }
-}))
-
-async function streamReply(set: (p: Partial<State>) => void, get: () => State) {
-  const controller = new AbortController()
-  const reply: StoryMessage = { id: uid(), role: 'assistant', content: '', thinking: '', streaming: true }
-  const history = get()
-    .messages.filter((m) => !m.error || m.content)
-    .map((m) => ({ role: m.role, content: m.content }))
-  set({ messages: [...get().messages, reply], streaming: true, abort: controller })
-
-  const patch = (p: Partial<StoryMessage>) =>
-    set({ messages: get().messages.map((m) => (m.id === reply.id ? { ...m, ...p } : m)) })
-  const current = () => get().messages.find((m) => m.id === reply.id)!
-
-  // Batch text into animation frames so long streams don't re-render on every token.
-  let pendingText = ''
-  let pendingThinking = ''
-  let frame = 0
-  const flush = () => {
-    frame = 0
-    const cur = current()
-    patch({ content: cur.content + pendingText, thinking: (cur.thinking ?? '') + pendingThinking })
-    pendingText = ''
-    pendingThinking = ''
-  }
-  const schedule = () => {
-    if (!frame) frame = requestAnimationFrame(flush)
+    for (const [skill, lvl] of Object.entries(after.derived.skillLevels)) {
+      const old = before.derived.skillLevels[skill] ?? lvl
+      if (lvl > old) get().toast({ title: `${skill[0].toUpperCase()}${skill.slice(1)} ${lvl}`, text: 'Skill level up', tone: 'good', icon: 'star' })
+    }
+    if (a.renown > b.renown && a.deeds.length > b.deeds.length) {
+      const deed = a.deeds[a.deeds.length - 1]
+      get().toast({ title: 'Renown grows', text: deed.text, tone: 'good', icon: 'laurel' })
+    }
+    if (a.status === 'downed' && b.status !== 'downed') get().toast({ title: 'You are down', text: 'Death rolls each turn: three failures and it is over.', tone: 'bad', icon: 'skull' })
+    if (a.conditions.includes('captured') && !b.conditions.includes('captured')) get().toast({ title: 'Captured', text: 'Taken prisoner.', tone: 'bad', icon: 'chain' })
   }
 
-  await api.chat(
-    history,
-    (ev) => {
-      if (ev.type === 'text') {
-        pendingText += ev.text
-        schedule()
-      } else if (ev.type === 'thinking') {
-        pendingThinking += ev.text
-        schedule()
-      } else if (ev.type === 'error') {
-        patch({ error: ev.message })
-      } else if (ev.type === 'notice') {
-        patch({ notice: ev.message })
+  const setView = (view: CampaignView) => {
+    // Don't spoil the roll: while the dice tray is up, keep the new results back.
+    if (get().live.hold) {
+      set({ pendingView: view })
+      return
+    }
+    const before = get().view
+    set({ view, pendingView: null })
+    announce(before, view)
+  }
+
+  /** Runs one streamed turn endpoint and folds its events into the view. */
+  const run = async (path: string, body: unknown) => {
+    const view = get().view
+    if (!view || get().busy) return
+    const controller = new AbortController()
+    set({ busy: true, abort: controller, live: { ...idleLive } })
+    const rollMode = view.settings.rollMode
+
+    await api.stream(
+      `/api/campaigns/${view.id}/${path}`,
+      body,
+      (ev: TurnEvent) => {
+        const cur = get().view
+        if (!cur) return
+        switch (ev.type) {
+          case 'player':
+            set({ view: { ...cur, messages: [...cur.messages, ev.message], awaitingNarration: true } })
+            break
+          case 'checks': {
+            if (!ev.checks.length) break
+            // Attach the rolls to the player's message right away (the roll cards).
+            const msgs = [...cur.messages]
+            const lastUser = [...msgs].reverse().find((m) => m.role === 'user')
+            if (lastUser) msgs[msgs.lastIndexOf(lastUser)] = { ...lastUser, checks: ev.checks }
+            const needThrow = ev.checks.filter((c) => rollMode === 'always' || (rollMode === 'dramatic' && c.dramatic))
+            set({ view: { ...cur, messages: msgs }, live: { ...get().live, dice: needThrow, hold: needThrow.length > 0 } })
+            break
+          }
+          case 'narration_start': {
+            // A new DM message replaces whatever came after the player's turn on screen.
+            const msgs = cur.messages.slice(0, lastUserIndex(cur.messages) + 1)
+            set({ view: { ...cur, messages: msgs }, live: { ...get().live, messageId: ev.messageId, text: '', thinking: '' } })
+            break
+          }
+          case 'text':
+            set({ live: { ...get().live, text: get().live.text + ev.text } })
+            break
+          case 'thinking':
+            set({ live: { ...get().live, thinking: get().live.thinking + ev.text } })
+            break
+          case 'notice':
+            set({ live: { ...get().live, notice: ev.message } })
+            break
+          case 'error':
+            set({ live: { ...get().live, error: ev.message } })
+            break
+          case 'view':
+            setView(ev.view)
+            break
+        }
+      },
+      controller.signal
+    )
+    // Make sure we end on the saved state, even if the stream was cut short.
+    try {
+      setView(await api.campaign(view.id))
+    } catch {
+      /* keep what we have */
+    }
+    const live = get().live
+    set({ busy: false, abort: null, live: { ...idleLive, error: live.error, notice: live.notice, dice: live.dice, hold: live.hold } })
+  }
+
+  return {
+    screen: 'title',
+    settings: null,
+    campaigns: [],
+    view: null,
+    busy: false,
+    live: idleLive,
+    abort: null,
+    toasts: [],
+    pendingView: null,
+
+    go: (screen) => set({ screen }),
+
+    loadSettings: async () => {
+      // The local server may still be starting when the page first loads, so retry briefly.
+      for (let attempt = 0; attempt < 8; attempt++) {
+        try {
+          set({ settings: await api.settings() })
+          await get().loadCampaigns()
+          return
+        } catch {
+          await new Promise((r) => setTimeout(r, 400))
+        }
       }
     },
-    controller.signal
-  )
-  if (frame) cancelAnimationFrame(frame)
-  flush()
-  const cur = current()
-  patch({
-    streaming: false,
-    content: cur.content.replace(/^\s+/, ''),
-    error: cur.error ?? (controller.signal.aborted && !cur.content ? 'Stopped.' : undefined)
-  })
-  set({ streaming: false, abort: null })
+    setSettings: (settings) => set({ settings }),
+
+    loadCampaigns: async () => {
+      set({ campaigns: await api.campaigns() })
+    },
+
+    open: async (id) => {
+      const view = await api.campaign(id)
+      set({ view, screen: 'play', live: idleLive })
+      if (view.awaitingNarration) void get().narrateHead()
+    },
+
+    create: async (build, settings) => {
+      const { id } = await api.createCampaign(build, settings)
+      await get().loadCampaigns()
+      await get().open(id)
+    },
+
+    remove: async (id) => {
+      await api.deleteCampaign(id)
+      if (get().view?.id === id) set({ view: null })
+      await get().loadCampaigns()
+    },
+
+    act: (text) => run('act', { text }),
+    answer: (messageId) => run('answer', { messageId }),
+    regenerate: () => run('regenerate', {}),
+    reroll: (checkId) => run('reroll', { checkId }),
+    narrateHead: () => run('narrate', {}),
+    stop: () => get().abort?.abort(),
+
+    swipe: async (messageId) => {
+      const v = get().view
+      if (!v || get().busy) return
+      set({ view: await api.swipe(v.id, messageId), live: idleLive })
+    },
+    rewind: async (messageId) => {
+      const v = get().view
+      if (!v || get().busy) return
+      const view = await api.rewind(v.id, messageId)
+      set({ view, live: idleLive })
+      if (view.awaitingNarration) void get().narrateHead()
+    },
+    spend: async (attr) => {
+      const v = get().view
+      if (!v) return
+      set({ view: await api.spend(v.id, attr) })
+    },
+    saveSlot: async (name) => {
+      const v = get().view
+      if (!v) return
+      set({ view: await api.addSave(v.id, name) })
+      get().toast({ title: 'Saved', text: name, tone: 'info', icon: 'check' })
+    },
+    loadSlot: async (saveId) => {
+      const v = get().view
+      if (!v || get().busy) return
+      set({ view: await api.loadSave(v.id, saveId), live: idleLive })
+    },
+    deleteSlot: async (saveId) => {
+      const v = get().view
+      if (!v) return
+      set({ view: await api.deleteSave(v.id, saveId) })
+    },
+    updateCampaignSettings: async (s) => {
+      const v = get().view
+      if (!v) return
+      set({ view: await api.updateCampaignSettings(v.id, s) })
+    },
+
+    diceDone: () => {
+      const live = get().live
+      const rest = live.dice.slice(1)
+      set({ live: { ...live, dice: rest, hold: rest.length > 0 } })
+      const pending = get().pendingView
+      if (!rest.length && pending) setView(pending)
+    },
+
+    toast: (t) => {
+      const id = ++toastId
+      set({ toasts: [...get().toasts, { ...t, id }] })
+      setTimeout(() => get().dismissToast(id), t.tone === 'level' ? 6000 : 4200)
+    },
+    dismissToast: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) })
+  }
+})
+
+function lastUserIndex(msgs: MessageView[]) {
+  for (let i = msgs.length - 1; i >= 0; i--) if (msgs[i].role === 'user') return i
+  return -1
 }

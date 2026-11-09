@@ -9,6 +9,8 @@ import {
   parseJsonReply,
   readHttpError,
   readLines,
+  STALLED,
+  stallGuard,
   ThinkTagSplitter,
   toJsonSchema
 } from './types'
@@ -93,12 +95,21 @@ export class OllamaProvider implements Provider {
   }
 
   async *chat(model: string, opts: ChatOptions): AsyncIterable<StreamEvent> {
+    const guard = stallGuard(opts.signal)
+    try {
+      yield* this.streamChat(model, opts, guard)
+    } finally {
+      guard.done()
+    }
+  }
+
+  private async *streamChat(model: string, opts: ChatOptions, guard: ReturnType<typeof stallGuard>): AsyncIterable<StreamEvent> {
     let res: Response
     try {
       res = await fetch(`${this.baseUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        signal: opts.signal,
+        signal: guard.signal,
         body: JSON.stringify({
           model,
           stream: true,
@@ -107,7 +118,7 @@ export class OllamaProvider implements Provider {
         })
       })
     } catch (err) {
-      yield { type: 'error', message: friendlyError(err, 'Ollama') }
+      yield { type: 'error', message: guard.stalled ? STALLED : friendlyError(err, 'Ollama') }
       return
     }
     if (!res.ok || !res.body) {
@@ -119,6 +130,7 @@ export class OllamaProvider implements Provider {
     let stopReason: string | null = null
     try {
       for await (const line of readLines(res.body)) {
+        guard.poke()
         if (!line.trim()) continue
         let j: { message?: { content?: string; thinking?: string }; done?: boolean; done_reason?: string; error?: string }
         try {
@@ -138,7 +150,7 @@ export class OllamaProvider implements Provider {
         }
       }
     } catch (err) {
-      yield { type: 'error', message: friendlyError(err, 'Ollama') }
+      yield { type: 'error', message: guard.stalled ? STALLED : friendlyError(err, 'Ollama') }
       return
     }
     for (const ev of splitter.flush()) yield ev

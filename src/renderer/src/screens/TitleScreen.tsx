@@ -19,16 +19,13 @@ const rise = {
 }
 
 export function TitleScreen() {
-  const { settings, messages, go, newStory } = useGame()
+  const { settings, campaigns, go, open } = useGame()
   const conn = settings?.connection
   const connected = Boolean(conn?.model)
-  const hasStory = messages.some((m) => m.role === 'assistant' && m.content)
+  const latest = campaigns.find((c) => c.status !== 'dead') ?? campaigns[0]
+  const hasStory = Boolean(latest)
 
-  const begin = () => {
-    if (!connected) return go('connect')
-    newStory()
-    go('play')
-  }
+  const begin = () => go(connected ? 'creator' : 'connect')
 
   return (
     <div className="relative flex-1 overflow-hidden">
@@ -71,21 +68,25 @@ export function TitleScreen() {
           </motion.p>
 
           <motion.div custom={3} variants={rise} className="mt-12 flex flex-col items-start gap-3">
-            {hasStory && (
-              <Button variant="primary" size="lg" icon="scroll" onClick={() => go('play')} className="min-w-64">
-                Continue
+            {hasStory && latest && (
+              <Button variant="primary" size="lg" icon="scroll" onClick={() => (connected ? void open(latest.id) : go('connect'))} className="min-w-72">
+                <span className="flex flex-col items-start leading-tight">
+                  <span>Continue</span>
+                  <span className="text-xs font-normal opacity-75">
+                    {latest.characterName} · level {latest.level}
+                  </span>
+                </span>
               </Button>
             )}
-            <Button
-              variant={hasStory ? 'secondary' : 'primary'}
-              size="lg"
-              icon="d20"
-              onClick={begin}
-              className="min-w-64"
-            >
-              {connected ? 'Begin a New Adventure' : 'Begin'}
+            <Button variant={hasStory ? 'secondary' : 'primary'} size="lg" icon="d20" onClick={begin} className="min-w-72">
+              {connected ? 'New Adventure' : 'Begin'}
             </Button>
-            <Button variant="secondary" size="lg" icon="plug" onClick={() => go('connect')} className="min-w-64">
+            {campaigns.length > 0 && (
+              <Button variant="secondary" size="lg" icon="save" onClick={() => go('load')} className="min-w-72">
+                Load Adventure
+              </Button>
+            )}
+            <Button variant="secondary" size="lg" icon="plug" onClick={() => go('connect')} className="min-w-72">
               Connect a Model
             </Button>
           </motion.div>

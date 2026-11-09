@@ -9,6 +9,8 @@ import {
   parseJsonReply,
   readHttpError,
   readLines,
+  STALLED,
+  stallGuard,
   ThinkTagSplitter,
   toJsonSchema
 } from './types'
@@ -101,12 +103,21 @@ export class OpenAICompatProvider implements Provider {
   }
 
   async *chat(model: string, opts: ChatOptions): AsyncIterable<StreamEvent> {
+    const guard = stallGuard(opts.signal)
+    try {
+      yield* this.streamChat(model, opts, guard)
+    } finally {
+      guard.done()
+    }
+  }
+
+  private async *streamChat(model: string, opts: ChatOptions, guard: ReturnType<typeof stallGuard>): AsyncIterable<StreamEvent> {
     let res: Response
     try {
       res = await fetch(`${this.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: this.headers(),
-        signal: opts.signal,
+        signal: guard.signal,
         body: JSON.stringify({
           model,
           stream: true,
@@ -116,7 +127,7 @@ export class OpenAICompatProvider implements Provider {
         })
       })
     } catch (err) {
-      yield { type: 'error', message: friendlyError(err, this.serverName) }
+      yield { type: 'error', message: guard.stalled ? STALLED : friendlyError(err, this.serverName) }
       return
     }
     if (!res.ok || !res.body) {
@@ -128,6 +139,7 @@ export class OpenAICompatProvider implements Provider {
     let stopReason: string | null = null
     try {
       for await (const line of readLines(res.body)) {
+        guard.poke()
         if (!line.startsWith('data:')) continue
         const data = line.slice(5).trim()
         if (data === '[DONE]') break
@@ -152,7 +164,7 @@ export class OpenAICompatProvider implements Provider {
         if (choice?.finish_reason) stopReason = choice.finish_reason
       }
     } catch (err) {
-      yield { type: 'error', message: friendlyError(err, this.serverName) }
+      yield { type: 'error', message: guard.stalled ? STALLED : friendlyError(err, this.serverName) }
       return
     }
     for (const ev of splitter.flush()) yield ev

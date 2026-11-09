@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import type { ContextReport, ModelInfo, StreamEvent } from '@shared/types'
-import type { ChatOptions, CompleteOptions, Provider } from './types'
+import { STALLED, stallGuard, type ChatOptions, type CompleteOptions, type Provider } from './types'
 import { describeContext } from './context'
 
 /** Models that take adaptive thinking (and reject a fixed thinking budget). */
@@ -86,12 +86,14 @@ export class AnthropicProvider implements Provider {
       params.fallbacks = 'default'
     }
 
+    const guard = stallGuard(opts.signal)
     try {
       const stream = this.client.beta.messages.stream(
         params as unknown as Anthropic.Beta.Messages.MessageCreateParamsStreaming,
-        { signal: opts.signal }
+        { signal: guard.signal }
       )
       for await (const event of stream) {
+        guard.poke()
         if (event.type === 'content_block_delta') {
           if (event.delta.type === 'text_delta') yield { type: 'text', text: event.delta.text }
           else if (event.delta.type === 'thinking_delta') yield { type: 'thinking', text: event.delta.thinking }
@@ -103,7 +105,9 @@ export class AnthropicProvider implements Provider {
       }
       yield { type: 'done', stopReason: final.stop_reason ?? null }
     } catch (err) {
-      yield { type: 'error', message: describeAnthropicError(err) }
+      yield { type: 'error', message: guard.stalled ? STALLED : describeAnthropicError(err) }
+    } finally {
+      guard.done()
     }
   }
 }

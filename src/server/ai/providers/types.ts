@@ -31,6 +31,34 @@ export interface Provider {
   complete<T>(model: string, opts: CompleteOptions<T>): Promise<T>
 }
 
+/**
+ * Stops waiting on a model that has gone quiet: up to `firstMs` for the first piece of text
+ * (big local models can take a while to start), then `gapMs` between pieces.
+ */
+export function stallGuard(outer: AbortSignal, firstMs = 240_000, gapMs = 90_000) {
+  const ctl = new AbortController()
+  let timer = setTimeout(() => ctl.abort(), firstMs)
+  const onAbort = () => ctl.abort()
+  outer.addEventListener('abort', onAbort)
+  return {
+    signal: ctl.signal,
+    /** Call whenever text arrives. */
+    poke() {
+      clearTimeout(timer)
+      timer = setTimeout(() => ctl.abort(), gapMs)
+    },
+    done() {
+      clearTimeout(timer)
+      outer.removeEventListener('abort', onAbort)
+    },
+    get stalled() {
+      return ctl.signal.aborted && !outer.aborted
+    }
+  }
+}
+
+export const STALLED = 'The model stopped responding. Try again, or check that the model server is still running.'
+
 /** JSON Schema for servers that take one (LM Studio, llama.cpp, Ollama…). */
 export function toJsonSchema(schema: z.ZodType): Record<string, unknown> {
   const js = z.toJSONSchema(schema, { target: 'draft-7' }) as Record<string, unknown>

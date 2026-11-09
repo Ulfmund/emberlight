@@ -52,8 +52,12 @@ const p = <T>(rng: Rng, xs: readonly T[]) => xs[Math.floor(rng() * xs.length)]
 export function generateName(rng: Rng, race: RaceId, sex: SexId, withSurname = true): string {
   const parts = PARTS[race]
   for (let i = 0; i < 20; i++) {
-    const first = p(rng, parts.start) + p(rng, parts.mid) + p(rng, parts.end[sex])
-    const clean = first.charAt(0).toUpperCase() + first.slice(1).toLowerCase()
+    const first = (p(rng, parts.start) + p(rng, parts.mid) + p(rng, parts.end[sex]))
+      .toLowerCase()
+      // Smooth awkward joins: no doubled vowels ("Edaa") or triple letters.
+      .replace(/([aeiouy])\1+/g, '$1')
+      .replace(/(.)\1\1+/g, '$1$1')
+    const clean = first.charAt(0).toUpperCase() + first.slice(1)
     if (BANNED.has(clean.toLowerCase()) || clean.length < 3 || clean.length > 11) continue
     return withSurname ? `${clean} ${p(rng, parts.surname)}` : clean
   }

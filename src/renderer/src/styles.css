@@ -227,3 +227,11 @@ select.input option {
     animation: none !important;
   }
 }
+
+/* Testing aid (see main.tsx): no CSS animations either. */
+.test-mode *,
+.test-mode *::before,
+.test-mode *::after {
+  animation-duration: 0s !important;
+  transition-duration: 0s !important;
+}

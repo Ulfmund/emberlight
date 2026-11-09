@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { MotionConfig } from 'motion/react'
+import { MotionConfig, MotionGlobalConfig } from 'motion/react'
 import '@fontsource/cinzel/500.css'
 import '@fontsource/cinzel/700.css'
 import '@fontsource/crimson-pro/400.css'
@@ -9,6 +9,13 @@ import '@fontsource/crimson-pro/600.css'
 import '@fontsource-variable/inter'
 import './styles.css'
 import { App } from './App'
+
+// Testing aid (development only): ?test=1 makes animations finish instantly, so screens can
+// be checked in a background browser tab where animation frames don't run.
+if (import.meta.env.DEV && new URLSearchParams(location.search).has('test')) {
+  MotionGlobalConfig.skipAnimations = true
+  document.documentElement.classList.add('test-mode')
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

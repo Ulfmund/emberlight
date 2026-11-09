@@ -128,7 +128,8 @@ export class Campaigns {
         thinking: m.thinking,
         hidden: Boolean(m.meta.hidden),
         kind: m.meta.kind,
-        error: m.meta.error,
+        // An empty DM message with no error was cut off (app closed mid-response, crash…).
+        error: m.meta.error ?? (m.role === 'assistant' && !m.content.trim() ? 'This response was interrupted. Use Rewrite to try again.' : undefined),
         notice: m.meta.notice,
         requestCheck: m.meta.requestCheck as MessageView['requestCheck'],
         swipe: m.role === 'assistant' && sibs.length > 1 ? { index: sibs.findIndex((s) => s.id === m.id), count: sibs.length, ids: sibs.map((s) => s.id) } : undefined,

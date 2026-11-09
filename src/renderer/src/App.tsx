@@ -6,7 +6,9 @@ import { TitleBar } from './components/TitleBar'
 import { Button } from './components/Button'
 import { TitleScreen } from './screens/TitleScreen'
 import { ConnectScreen } from './screens/ConnectScreen'
+import { CreatorScreen } from './screens/CreatorScreen'
 import { PlayScreen } from './screens/PlayScreen'
+import { LoadScreen } from './screens/LoadScreen'
 
 export function App() {
   const { screen, loadSettings } = useGame()
@@ -27,10 +29,12 @@ export function App() {
           initial={{ opacity: 0, filter: 'blur(8px)' }}
           animate={{ opacity: 1, filter: 'blur(0px)' }}
           exit={{ opacity: 0, filter: 'blur(8px)' }}
-          transition={{ duration: 0.35 }}
+          transition={{ duration: 0.3 }}
         >
           {screen === 'title' && <TitleScreen />}
           {screen === 'connect' && <ConnectScreen />}
+          {screen === 'creator' && <CreatorScreen />}
+          {screen === 'load' && <LoadScreen />}
           {screen === 'play' && <PlayScreen />}
         </motion.div>
       </AnimatePresence>
@@ -38,34 +42,38 @@ export function App() {
   )
 }
 
+const LABEL: Record<string, string> = { connect: 'CONNECT', creator: 'NEW ADVENTURER', load: 'ADVENTURES', play: 'ADVENTURE' }
+
 function BarContent() {
-  const { screen, go, settings, newStory, streaming } = useGame()
-  if (screen !== 'play') return null
+  const { screen, go, settings, view, loadCampaigns } = useGame()
+  if (screen === 'title') return null
   const conn = settings?.connection
   return (
     <>
       <span className="text-parchment-500">/</span>
-      <span className="font-display text-[0.78rem] tracking-[0.2em] text-parchment-200">ADVENTURE</span>
-      <div className="ml-auto flex items-center gap-1">
-        {conn && (
-          <span className="mr-2 hidden truncate text-xs text-parchment-500 md:inline">
-            {findPreset(conn.presetId)?.label} · {conn.model}
-          </span>
-        )}
-        <Button
-          variant="ghost"
-          size="sm"
-          icon="d20"
-          disabled={streaming}
-          onClick={newStory}
-          title="Start a fresh adventure"
-        >
-          New
-        </Button>
-        <Button variant="ghost" size="sm" icon="back" onClick={() => go('title')}>
-          Menu
-        </Button>
-      </div>
+      <span className="truncate font-display text-[0.78rem] tracking-[0.2em] text-parchment-200">
+        {screen === 'play' && view ? view.name.toUpperCase() : LABEL[screen]}
+      </span>
+      {screen === 'play' && (
+        <div className="ml-auto flex items-center gap-1">
+          {conn && (
+            <button onClick={() => go('connect')} className="no-drag mr-2 hidden cursor-pointer truncate text-xs text-parchment-500 hover:text-gold-300 md:inline" title="Change model">
+              {findPreset(conn.presetId)?.label} · {conn.model}
+            </button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            icon="back"
+            onClick={() => {
+              void loadCampaigns()
+              go('title')
+            }}
+          >
+            Menu
+          </Button>
+        </div>
+      )}
     </>
   )
 }

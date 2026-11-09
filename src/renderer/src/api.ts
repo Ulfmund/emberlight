@@ -1,4 +1,6 @@
-import type { ChatMessage, Connection, SettingsView, StreamEvent, TestResult, UpdateStatus } from '@shared/types'
+import type { Connection, SettingsView, TestResult, UpdateStatus } from '@shared/types'
+import type { CampaignSettings, CharacterBuild, Attr } from '@shared/rules'
+import type { CampaignSummary, CampaignView, TurnEvent } from '@shared/view'
 
 async function json<T>(res: Response): Promise<T> {
   const body = await res.json().catch(() => ({}))
@@ -6,50 +8,53 @@ async function json<T>(res: Response): Promise<T> {
   return body as T
 }
 
+const post = (url: string, body?: unknown) =>
+  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body ?? {}) })
+const put = (url: string, body: unknown) =>
+  fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+
 export const api = {
+  // ---- settings & connection
   settings: () => fetch('/api/settings').then((r) => json<SettingsView>(r)),
-
-  saveConnection: (c: Connection) =>
-    fetch('/api/settings/connection', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(c)
-    }).then((r) => json<SettingsView>(r)),
-
-  saveKey: (presetId: string, key: string) =>
-    fetch(`/api/keys/${encodeURIComponent(presetId)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key })
-    }).then((r) => json<SettingsView>(r)),
-
+  saveConnection: (c: Connection) => put('/api/settings/connection', c).then((r) => json<SettingsView>(r)),
+  saveKey: (presetId: string, key: string) => put(`/api/keys/${encodeURIComponent(presetId)}`, { key }).then((r) => json<SettingsView>(r)),
   deleteKey: (presetId: string) =>
     fetch(`/api/keys/${encodeURIComponent(presetId)}`, { method: 'DELETE' }).then((r) => json<SettingsView>(r)),
-
-  updateStatus: () => fetch('/api/update').then((r) => json<UpdateStatus>(r)),
-  downloadUpdate: () => fetch('/api/update/download', { method: 'POST' }).then((r) => json<UpdateStatus>(r)),
-  installUpdate: () => fetch('/api/update/install', { method: 'POST' }).then((r) => json<{ ok: boolean }>(r)),
-
   testConnection: (connection: Connection, key?: string) =>
-    fetch('/api/connection/test', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ connection, key })
-    }).then((r) => json<TestResult>(r)),
+    post('/api/connection/test', { connection, key }).then((r) => json<TestResult>(r)),
 
-  /** Streams the DM's response. Calls onEvent for every chunk; resolves when the stream ends. */
-  async chat(messages: ChatMessage[], onEvent: (ev: StreamEvent) => void, signal: AbortSignal) {
+  // ---- updates
+  updateStatus: () => fetch('/api/update').then((r) => json<UpdateStatus>(r)),
+  downloadUpdate: () => post('/api/update/download').then((r) => json<UpdateStatus>(r)),
+  installUpdate: () => post('/api/update/install').then((r) => json<{ ok: boolean }>(r)),
+
+  // ---- campaigns
+  campaigns: () => fetch('/api/campaigns').then((r) => json<CampaignSummary[]>(r)),
+  campaign: (id: string) => fetch(`/api/campaigns/${id}`).then((r) => json<CampaignView>(r)),
+  createCampaign: (build: CharacterBuild, settings: CampaignSettings, name?: string) =>
+    post('/api/campaigns', { build, settings, name }).then((r) => json<{ id: string }>(r)),
+  deleteCampaign: (id: string) => fetch(`/api/campaigns/${id}`, { method: 'DELETE' }).then((r) => json<{ ok: boolean }>(r)),
+  updateCampaignSettings: (id: string, s: CampaignSettings) => put(`/api/campaigns/${id}/settings`, s).then((r) => json<CampaignView>(r)),
+  swipe: (id: string, messageId: string) => post(`/api/campaigns/${id}/swipe`, { messageId }).then((r) => json<CampaignView>(r)),
+  rewind: (id: string, messageId: string) => post(`/api/campaigns/${id}/rewind`, { messageId }).then((r) => json<CampaignView>(r)),
+  spend: (id: string, attr: Attr) => post(`/api/campaigns/${id}/spend`, { attr }).then((r) => json<CampaignView>(r)),
+  addSave: (id: string, name: string) => post(`/api/campaigns/${id}/saves`, { name }).then((r) => json<CampaignView>(r)),
+  loadSave: (id: string, saveId: string) => post(`/api/campaigns/${id}/saves/${saveId}/load`).then((r) => json<CampaignView>(r)),
+  deleteSave: (id: string, saveId: string) =>
+    fetch(`/api/campaigns/${id}/saves/${saveId}`, { method: 'DELETE' }).then((r) => json<CampaignView>(r)),
+
+  /** Runs a streamed turn endpoint, calling onEvent for every step. */
+  async stream(url: string, body: unknown, onEvent: (ev: TurnEvent) => void, signal: AbortSignal) {
     let res: Response
     try {
-      res = await fetch('/api/chat', {
+      res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages }),
+        body: JSON.stringify(body ?? {}),
         signal
       })
     } catch (err) {
-      if ((err as Error).name === 'AbortError') return
-      onEvent({ type: 'error', message: "Couldn't reach the app's local server." })
+      if ((err as Error).name !== 'AbortError') onEvent({ type: 'error', message: "Couldn't reach the app's local server." })
       return
     }
     if (!res.ok || !res.body) {
@@ -75,9 +80,9 @@ export const api = {
             .join('\n')
           if (data) {
             try {
-              onEvent(JSON.parse(data) as StreamEvent)
+              onEvent(JSON.parse(data) as TurnEvent)
             } catch {
-              /* ignore malformed chunk */
+              /* ignore a malformed chunk */
             }
           }
         }

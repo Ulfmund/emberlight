@@ -1,0 +1,676 @@
+import { useId, useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
+import {
+  AGE_IDS,
+  AGES,
+  ATTR_INFO,
+  ATTR_START,
+  ATTRS,
+  BACKGROUND_IDS,
+  BACKGROUNDS,
+  DEFAULT_SETTINGS,
+  GROUP_INFO,
+  RACE_IDS,
+  RACES,
+  SEXES,
+  SKILL_GROUPS,
+  SKILL_IDS,
+  SKILLS,
+  START_SKILL_MAX,
+  attrCapBreakdown,
+  attrStepCost,
+  fmtMod,
+  generateName,
+  maxHp,
+  maxMana,
+  maxStamina,
+  mod,
+  pointsLeft,
+  randomBuild,
+  skillCapBreakdown,
+  skillLevelsSpent,
+  startingSkillBudget,
+  startingSkillLevel,
+  validateBuild,
+  type Attr,
+  type CampaignSettings,
+  type CharacterBuild,
+  type SexMode,
+  type SkillId
+} from '@shared/rules'
+import { useGame } from '../store'
+import { Button } from '../components/Button'
+import { Icon } from '../components/Icon'
+import { Medallion } from '../components/Medallion'
+import { Tip } from '../components/Tip'
+import { EmberField } from '../components/EmberField'
+
+const STEPS = [
+  { id: 'origin', label: 'Origin', icon: 'user' },
+  { id: 'calling', label: 'Calling', icon: 'hammer' },
+  { id: 'attributes', label: 'Attributes', icon: 'bolt' },
+  { id: 'skills', label: 'Skills', icon: 'star' },
+  { id: 'identity', label: 'Identity', icon: 'quill' },
+  { id: 'adventure', label: 'Adventure', icon: 'map' }
+] as const
+
+const APPEARANCE: string[] = [
+  'Weathered skin and a crooked nose, broken more than once.',
+  'Tall and lean, with ink-black hair tied back and grey eyes.',
+  'Broad-shouldered, freckled, a braid down to the waist.',
+  'A burn scar along one jaw, half hidden by a short beard.',
+  'Slight and quick, with a mop of copper curls.',
+  'Sun-browned, with laugh lines and calloused hands.',
+  'Pale as milk, with sharp cheekbones and a cool stare.',
+  'Stocky and strong, with a shaved head and a silver earring.',
+  'Soft-spoken eyes, mismatched: one green, one brown.',
+  'Plain-faced and forgettable, which is useful.'
+]
+const PERSONALITY: string[] = [
+  'Quiet and stubborn; slow to trust, loyal once won.',
+  'Cheerful, nosy and incapable of leaving a mystery alone.',
+  'Proud and short-tempered, but fiercely fair.',
+  'Careful with words, careless with coin.',
+  'Superstitious, kind to animals, rude to priests.',
+  'A dreamer who reads everything and believes half of it.',
+  'Ambitious and calculating, with a soft spot for underdogs.',
+  'Gruff on the outside, sentimental underneath.',
+  'Restless; hates staying anywhere longer than a week.',
+  'Honest to a fault, which has caused trouble before.'
+]
+
+const rng = () => Math.random()
+
+/** Keeps a build legal after a choice changes its caps or budget. */
+function normalize(b: CharacterBuild, sexMode: SexMode): CharacterBuild {
+  const humanBonus = b.race === 'human' ? (b.humanBonus.length === 2 ? b.humanBonus : (['STR', 'AGI'] as Attr[])) : []
+  const caps = attrCapBreakdown({ ...b, humanBonus }, sexMode)
+  const attributes = { ...b.attributes }
+  for (const a of ATTRS) attributes[a] = Math.max(ATTR_START, Math.min(caps[a].cap, attributes[a]))
+  const next = { ...b, humanBonus, attributes }
+  const sCaps = skillCapBreakdown(next, sexMode)
+  const skills = { ...b.skills }
+  for (const s of SKILL_IDS) {
+    const limit = Math.min(START_SKILL_MAX, sCaps[s].cap)
+    while ((skills[s] ?? 0) > 0 && startingSkillLevel({ background: b.background, skills }, s) > limit) skills[s] = (skills[s] ?? 0) - 1
+    if (!skills[s]) delete skills[s]
+  }
+  let over = skillLevelsSpent({ skills }) - startingSkillBudget(b)
+  for (const s of SKILL_IDS) {
+    while (over > 0 && (skills[s] ?? 0) > 0) {
+      skills[s] = (skills[s] ?? 0) - 1
+      over--
+    }
+    if (!skills[s]) delete skills[s]
+  }
+  return { ...next, skills }
+}
+
+export function CreatorScreen() {
+  const { go, create } = useGame()
+  const [settings, setSettings] = useState<CampaignSettings>({ ...DEFAULT_SETTINGS })
+  const [build, setBuild] = useState<CharacterBuild>(() => {
+    const b = randomBuild(rng, DEFAULT_SETTINGS.sexModifiers, '')
+    return { ...b, name: generateName(rng, b.race, b.sex), appearance: '', personality: '' }
+  })
+  const [step, setStep] = useState(0)
+  const [starting, setStarting] = useState(false)
+  const [error, setError] = useState('')
+  const [rolling, setRolling] = useState(0)
+
+  const sexMode = settings.sexModifiers
+  const update = (patch: Partial<CharacterBuild>) => setBuild((b) => normalize({ ...b, ...patch }, sexMode))
+  const errors = useMemo(() => validateBuild(build, sexMode), [build, sexMode])
+
+  const rollAdventurer = () => {
+    const b = randomBuild(rng, sexMode, '')
+    setBuild({ ...b, name: generateName(rng, b.race, b.sex), appearance: pickOne(APPEARANCE), personality: pickOne(PERSONALITY) })
+    setRolling((r) => r + 1)
+    setStep(4)
+  }
+
+  const begin = async () => {
+    setStarting(true)
+    setError('')
+    try {
+      await create(build, settings)
+    } catch (err) {
+      setError((err as Error).message)
+      setStarting(false)
+    }
+  }
+
+  return (
+    <div className="relative flex min-h-0 flex-1">
+      <EmberField density={0.25} className="opacity-40" />
+
+      {/* Steps */}
+      <nav className="relative z-10 flex w-56 shrink-0 flex-col gap-1 border-r border-gold-500/15 bg-ink-950/60 p-4">
+        <Button variant="ghost" size="sm" icon="back" onClick={() => go('title')} className="mb-3 self-start">
+          Back
+        </Button>
+        {STEPS.map((s, i) => (
+          <button
+            key={s.id}
+            onClick={() => setStep(i)}
+            className={`no-drag relative flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
+              i === step ? 'text-gold-200' : 'text-parchment-400 hover:bg-white/5 hover:text-parchment-100'
+            }`}
+          >
+            {i === step && (
+              <motion.span layoutId="step-bg" className="absolute inset-0 rounded-lg border border-gold-400/40 bg-gold-500/10" />
+            )}
+            <span className="relative grid h-7 w-7 place-items-center rounded-full border border-gold-500/30 bg-ink-850 text-xs">
+              <Icon name={s.icon} size={15} />
+            </span>
+            <span className="relative font-display tracking-wider">{s.label}</span>
+          </button>
+        ))}
+        <div className="mt-auto">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.96, rotate: -2 }}
+            onClick={rollAdventurer}
+            className="no-drag focus-ring w-full cursor-pointer rounded-xl border border-ember-500/40 bg-gradient-to-b from-ember-500/20 to-ink-900 p-3 text-left shadow-[0_0_30px_-10px_rgb(255_122_47/0.8)]"
+          >
+            <motion.span key={rolling} initial={{ rotate: -200, scale: 0.6 }} animate={{ rotate: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 220, damping: 14 }} className="mb-1 inline-block text-ember-400">
+              <Icon name="d20" size={26} />
+            </motion.span>
+            <span className="block font-display text-sm tracking-wider text-gold-200">Roll a New Adventurer</span>
+            <span className="block text-xs text-parchment-400">Random everything, in one click</span>
+          </motion.button>
+        </div>
+      </nav>
+
+      {/* Step content */}
+      <div className="relative z-10 min-w-0 flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-4xl px-8 pt-8 pb-24">
+          <AnimatePresence mode="wait">
+            <motion.div key={step} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.22 }}>
+              {step === 0 && <OriginStep build={build} update={update} settings={settings} setSettings={(s) => { setSettings(s); setBuild((b) => normalize(b, s.sexModifiers)) }} />}
+              {step === 1 && <CallingStep build={build} update={update} />}
+              {step === 2 && <AttributesStep build={build} update={update} sexMode={sexMode} />}
+              {step === 3 && <SkillsStep build={build} update={update} sexMode={sexMode} />}
+              {step === 4 && <IdentityStep build={build} update={update} />}
+              {step === 5 && <AdventureStep settings={settings} setSettings={setSettings} />}
+            </motion.div>
+          </AnimatePresence>
+
+          <div className="mt-10 flex items-center gap-3 border-t border-gold-500/15 pt-6">
+            {step > 0 && (
+              <Button variant="ghost" icon="left" onClick={() => setStep(step - 1)}>
+                {STEPS[step - 1].label}
+              </Button>
+            )}
+            <div className="ml-auto flex items-center gap-3">
+              {(error || (step === STEPS.length - 1 && errors[0])) && <span className="text-sm text-blood-400">{error || errors[0]}</span>}
+              {step < STEPS.length - 1 ? (
+                <Button variant="secondary" onClick={() => setStep(step + 1)}>
+                  {STEPS[step + 1].label}
+                  <Icon name="right" size={16} />
+                </Button>
+              ) : (
+                <Button variant="primary" size="lg" icon="d20" onClick={() => void begin()} disabled={errors.length > 0 || starting}>
+                  {starting ? 'Setting the scene…' : 'Begin the Adventure'}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Live preview */}
+      <aside className="relative z-10 hidden w-80 shrink-0 overflow-y-auto border-l border-gold-500/15 bg-ink-950/60 p-6 xl:block">
+        <Preview build={build} sexMode={sexMode} rolling={rolling} />
+      </aside>
+    </div>
+  )
+}
+
+const pickOne = <T,>(xs: T[]) => xs[Math.floor(Math.random() * xs.length)]
+
+// ---- Steps -------------------------------------------------------------------------------
+
+function StepTitle({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="mb-6">
+      <h2 className="font-display text-3xl tracking-wider text-gold-300">{title}</h2>
+      <p className="mt-1 text-parchment-400">{text}</p>
+    </div>
+  )
+}
+
+function Card({ active, onClick, children, className = '' }: { active: boolean; onClick: () => void; children: React.ReactNode; className?: string }) {
+  return (
+    <motion.button
+      whileHover={{ y: -3 }}
+      whileTap={{ scale: 0.97 }}
+      onClick={onClick}
+      className={`focus-ring no-drag relative cursor-pointer overflow-hidden rounded-xl border p-4 text-left transition-colors ${
+        active ? 'border-gold-400/80 bg-gradient-to-b from-gold-500/15 to-ink-850 shadow-[0_0_30px_-8px_rgb(255_160_50/0.5)]' : 'border-gold-500/15 bg-ink-850/80 hover:border-gold-500/45'
+      } ${className}`}
+    >
+      {children}
+    </motion.button>
+  )
+}
+
+function ModChips({ mods }: { mods: Partial<Record<string, number>> }) {
+  const entries = Object.entries(mods).filter(([, v]) => v)
+  if (!entries.length) return <span className="text-xs text-parchment-500">No attribute changes</span>
+  return (
+    <span className="flex flex-wrap gap-1">
+      {entries.map(([k, v]) => (
+        <span key={k} className={`rounded px-1.5 py-px text-[0.68rem] font-semibold ${v! > 0 ? 'bg-moss-400/15 text-moss-400' : 'bg-blood-500/20 text-blood-400'}`}>
+          {k} {fmtMod(v!)}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+function Segmented<T extends string>({ value, options, onChange }: { value: T; options: { id: T; label: string; hint?: string }[]; onChange: (v: T) => void }) {
+  // Each control needs its own sliding highlight, even when two have the same options.
+  const uid = useId()
+  return (
+    <div className="inline-flex flex-wrap gap-1 rounded-xl border border-gold-500/20 bg-ink-900/80 p-1">
+      {options.map((o) => (
+        <Tip key={o.id} content={o.hint}>
+          <button
+            onClick={() => onChange(o.id)}
+            className={`no-drag relative cursor-pointer rounded-lg px-3.5 py-1.5 text-sm transition-colors ${value === o.id ? 'text-ink-950' : 'text-parchment-300 hover:text-gold-200'}`}
+          >
+            {value === o.id && <motion.span layoutId={`seg-${uid}`} className="absolute inset-0 rounded-lg bg-gradient-to-b from-gold-300 to-gold-500" />}
+            <span className="relative font-medium">{o.label}</span>
+          </button>
+        </Tip>
+      ))}
+    </div>
+  )
+}
+
+function OriginStep({ build, update, settings, setSettings }: { build: CharacterBuild; update: (p: Partial<CharacterBuild>) => void; settings: CampaignSettings; setSettings: (s: CampaignSettings) => void }) {
+  return (
+    <>
+      <StepTitle title="Origin" text="Where you come from shapes what you can become. Every choice moves your limits." />
+      <h3 className="mb-3 text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">Race</h3>
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+        {RACE_IDS.map((r) => {
+          const race = RACES[r]
+          return (
+            <Card key={r} active={build.race === r} onClick={() => update({ race: r })}>
+              <div className="mb-2 flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-full border border-gold-500/30 bg-ink-800 text-gold-300">
+                  <Icon name={`race-${r}`} size={22} />
+                </span>
+                <span className="font-display text-lg tracking-wide text-parchment-50">{race.label}</span>
+              </div>
+              <p className="mb-2 text-[0.82rem] leading-snug text-parchment-300">{race.blurb}</p>
+              <ModChips mods={race.attrs} />
+              <p className="mt-2 text-xs text-gold-300/90">
+                <span className="font-semibold">{race.trait.name}:</span> <span className="text-parchment-400">{race.trait.text}</span>
+              </p>
+            </Card>
+          )
+        })}
+      </div>
+
+      <div className="mt-8 mb-3 flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">Sex</h3>
+        <div className="flex items-center gap-2 text-xs text-parchment-400">
+          Sex modifiers
+          <Segmented
+            value={settings.sexModifiers}
+            onChange={(v) => setSettings({ ...settings, sexModifiers: v })}
+            options={[
+              { id: 'realistic', label: 'Realistic', hint: 'Men are stronger but must prove themselves; women are welcomed but fragile, and fight mostly with magic.' },
+              { id: 'off', label: 'Off', hint: 'No differences between the sexes in this campaign.' }
+            ]}
+          />
+        </div>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        {(['male', 'female'] as const).map((s) => {
+          const row = SEXES[settings.sexModifiers][s]
+          return (
+            <Card key={s} active={build.sex === s} onClick={() => update({ sex: s })}>
+              <span className="font-display text-lg tracking-wide text-parchment-50">{row.label}</span>
+              <p className="my-2 text-[0.82rem] leading-snug text-parchment-300">{row.blurb}</p>
+              <ModChips mods={row.attrs} />
+              {settings.sexModifiers === 'realistic' && (
+                <p className="mt-2 text-xs text-parchment-400">
+                  Base health {row.baseHp} · Social {fmtMod(row.socialBase)} with strangers · Captured instead of killed by people {Math.round(row.captureChance * 100)}% of the time
+                </p>
+              )}
+            </Card>
+          )
+        })}
+      </div>
+
+      <h3 className="mt-8 mb-3 text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">Age</h3>
+      <div className="grid gap-3 md:grid-cols-4">
+        {AGE_IDS.map((a) => {
+          const age = AGES[a]
+          return (
+            <Card key={a} active={build.age === a} onClick={() => update({ age: a })} className="p-3">
+              <span className="font-display tracking-wide text-parchment-50">{age.label}</span>
+              <span className="ml-2 text-xs text-parchment-500">{age.years}</span>
+              <div className="mt-2">
+                <ModChips mods={age.attrs} />
+              </div>
+              {(age.skillLevels > 0 || age.xpBonus > 0) && (
+                <p className="mt-1.5 text-[0.7rem] text-gold-300/80">
+                  {age.xpBonus ? `+${age.xpBonus * 100}% skill XP` : `+${age.skillLevels} skill levels, +${age.renown} Renown`}
+                </p>
+              )}
+            </Card>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
+function CallingStep({ build, update }: { build: CharacterBuild; update: (p: Partial<CharacterBuild>) => void }) {
+  return (
+    <>
+      <StepTitle title="Calling" text="What you did before the adventure. It sets your first skills, your gear and what you have a gift for." />
+      <div className="grid gap-3 md:grid-cols-2">
+        {BACKGROUND_IDS.map((id) => {
+          const bg = BACKGROUNDS[id]
+          return (
+            <Card key={id} active={build.background === id} onClick={() => update({ background: id })}>
+              <span className="font-display text-lg tracking-wide text-parchment-50">{bg.label}</span>
+              <p className="my-2 text-[0.82rem] leading-snug text-parchment-300">{bg.blurb}</p>
+              <div className="flex flex-wrap gap-1">
+                {Object.entries(bg.skills).map(([s, lvl]) => (
+                  <span key={s} className="rounded bg-gold-500/15 px-1.5 py-px text-[0.68rem] font-semibold text-gold-200">
+                    {SKILLS[s as SkillId].label} {1 + (lvl as number)}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-parchment-400">
+                <Icon name="bag" size={13} className="mr-1 inline -translate-y-px text-gold-400" />
+                {bg.kit.map((k) => ('qty' in k && k.qty ? `${k.name} ×${k.qty}` : k.name)).join(', ')} · {bg.coins / 10} silver
+              </p>
+            </Card>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
+function CapBar({ value, cap, max = 20 }: { value: number; cap: number; max?: number }) {
+  return (
+    <div className="relative h-2 w-full overflow-hidden rounded-full bg-ink-950 ring-1 ring-white/5">
+      <div className="absolute inset-y-0 right-0 bg-[repeating-linear-gradient(135deg,transparent_0_4px,rgb(255_255_255/0.04)_4px_8px)]" style={{ left: `${(cap / max) * 100}%` }} />
+      <motion.div className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-gold-500 to-gold-300" initial={false} animate={{ width: `${(value / max) * 100}%` }} />
+      <div className="absolute inset-y-[-2px] w-0.5 bg-ember-400 shadow-[0_0_6px_var(--color-ember-400)]" style={{ left: `calc(${(cap / max) * 100}% - 1px)` }} />
+    </div>
+  )
+}
+
+function Stepper({ onMinus, onPlus, canMinus, canPlus }: { onMinus: () => void; onPlus: () => void; canMinus: boolean; canPlus: boolean }) {
+  const btn = 'no-drag grid h-7 w-7 cursor-pointer place-items-center rounded-md border border-gold-500/25 bg-ink-800 text-gold-300 transition hover:border-gold-400 disabled:cursor-not-allowed disabled:opacity-25'
+  return (
+    <span className="flex items-center gap-1">
+      <motion.button whileTap={{ scale: 0.85 }} className={btn} onClick={onMinus} disabled={!canMinus}>
+        <Icon name="minus" size={14} />
+      </motion.button>
+      <motion.button whileTap={{ scale: 0.85 }} className={btn} onClick={onPlus} disabled={!canPlus}>
+        <Icon name="plus" size={14} />
+      </motion.button>
+    </span>
+  )
+}
+
+function AttributesStep({ build, update, sexMode }: { build: CharacterBuild; update: (p: Partial<CharacterBuild>) => void; sexMode: SexMode }) {
+  const caps = attrCapBreakdown(build, sexMode)
+  const left = pointsLeft(build.attributes)
+  const set = (a: Attr, v: number) => update({ attributes: { ...build.attributes, [a]: v } })
+  return (
+    <>
+      <StepTitle title="Attributes" text="Spend 24 points. Raising a score past 14 costs 2 points. The ember mark is your limit for life." />
+      <div className="mb-5 flex flex-wrap items-center gap-4">
+        <motion.div key={left} initial={{ scale: 1.15 }} animate={{ scale: 1 }} className={`rounded-xl border px-4 py-2 font-display text-lg ${left < 0 ? 'border-blood-400/50 text-blood-400' : left === 0 ? 'border-moss-400/40 text-moss-400' : 'border-gold-400/50 text-gold-200'}`}>
+          {left} point{left === 1 ? '' : 's'} left
+        </motion.div>
+        <Button variant="ghost" size="sm" icon="d20" onClick={() => update({ attributes: randomBuild(Math.random, sexMode, build.name, { ...build, attributes: undefined, skills: build.skills }).attributes })}>
+          Spread randomly
+        </Button>
+        {build.race === 'human' && (
+          <div className="flex flex-wrap items-center gap-2 text-sm text-parchment-300">
+            <span className="text-gold-300">Adaptable:</span> +1 cap to
+            {ATTRS.map((a) => {
+              const on = build.humanBonus.includes(a)
+              return (
+                <button
+                  key={a}
+                  onClick={() => update({ humanBonus: on ? build.humanBonus.filter((x) => x !== a) : [...build.humanBonus.slice(-1), a] })}
+                  className={`no-drag cursor-pointer rounded-md border px-2 py-0.5 text-xs font-semibold ${on ? 'border-gold-300 bg-gold-400/20 text-gold-200' : 'border-gold-500/20 text-parchment-400 hover:text-gold-200'}`}
+                >
+                  {a}
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+      <div className="panel space-y-1 rounded-2xl p-3">
+        {ATTRS.map((a) => {
+          const v = build.attributes[a]
+          const cap = caps[a].cap
+          return (
+            <div key={a} className="grid grid-cols-[10rem_1fr_auto_auto] items-center gap-4 rounded-lg px-3 py-2.5 hover:bg-white/[0.03]">
+              <div>
+                <div className="font-display tracking-wide text-parchment-50">{ATTR_INFO[a].label}</div>
+                <div className="text-[0.72rem] leading-tight text-parchment-500">{ATTR_INFO[a].blurb}</div>
+              </div>
+              <Tip content={<>Cap {cap}: {caps[a].sources.map((s) => `${s.label} ${s.value > 0 && s.label !== 'Base' ? '+' : ''}${s.value}`).join(', ')}</>}>
+                <div className="w-full min-w-48">
+                  <CapBar value={v} cap={cap} />
+                </div>
+              </Tip>
+              <div className="w-20 text-right">
+                <span className="font-display text-xl text-gold-200 tabular-nums">{v}</span>
+                <span className="ml-1.5 text-sm text-parchment-400">{fmtMod(mod(v))}</span>
+                <div className="text-[0.68rem] text-parchment-500">cap {cap}</div>
+              </div>
+              <Stepper onMinus={() => set(a, v - 1)} onPlus={() => set(a, v + 1)} canMinus={v > ATTR_START} canPlus={v < cap && attrStepCost(v) <= left} />
+            </div>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
+function SkillsStep({ build, update, sexMode }: { build: CharacterBuild; update: (p: Partial<CharacterBuild>) => void; sexMode: SexMode }) {
+  const caps = skillCapBreakdown(build, sexMode)
+  const budget = startingSkillBudget(build)
+  const spent = skillLevelsSpent(build)
+  const set = (s: SkillId, delta: number) => {
+    const skills = { ...build.skills, [s]: Math.max(0, (build.skills[s] ?? 0) + delta) }
+    if (!skills[s]) delete skills[s]
+    update({ skills })
+  }
+  return (
+    <>
+      <StepTitle title="Skills" text="Skills grow only by doing. Give yourself a head start: spread a few extra levels. Caps show how far each can ever go." />
+      <motion.div key={spent} initial={{ scale: 1.1 }} animate={{ scale: 1 }} className="mb-5 inline-block rounded-xl border border-gold-400/50 px-4 py-2 font-display text-lg text-gold-200">
+        {budget - spent} level{budget - spent === 1 ? '' : 's'} left to spread
+      </motion.div>
+      <div className="grid gap-4 md:grid-cols-2">
+        {SKILL_GROUPS.map((g) => (
+          <div key={g} className="panel rounded-2xl p-3">
+            <div className="mb-1 flex items-center gap-2 px-2 pt-1 text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">
+              <Icon name={GROUP_INFO[g].icon} size={15} />
+              {GROUP_INFO[g].label}
+            </div>
+            {SKILL_IDS.filter((s) => SKILLS[s].group === g).map((s) => {
+              const lvl = startingSkillLevel(build, s)
+              const cap = caps[s].cap
+              const limit = Math.min(START_SKILL_MAX, cap)
+              return (
+                <div key={s} className="grid grid-cols-[1fr_auto_auto] items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-white/[0.03]">
+                  <Tip content={<>{SKILLS[s].blurb}. Uses {SKILLS[s].attr}. Cap {cap}: {caps[s].sources.map((x) => `${x.label} ${x.value}`).join(', ')}</>}>
+                    <span className="text-sm text-parchment-100">
+                      {SKILLS[s].label}
+                      <span className="ml-1.5 text-[0.68rem] text-parchment-500">{SKILLS[s].attr}</span>
+                    </span>
+                  </Tip>
+                  <span className="text-right text-sm tabular-nums">
+                    <span className={`font-semibold ${lvl > 1 ? 'text-gold-200' : 'text-parchment-400'}`}>{lvl}</span>
+                    <span className="text-parchment-500"> / {cap}</span>
+                  </span>
+                  <Stepper onMinus={() => set(s, -1)} onPlus={() => set(s, 1)} canMinus={(build.skills[s] ?? 0) > 0} canPlus={spent < budget && lvl < limit} />
+                </div>
+              )
+            })}
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+function IdentityStep({ build, update }: { build: CharacterBuild; update: (p: Partial<CharacterBuild>) => void }) {
+  const Roll = ({ onClick, title }: { onClick: () => void; title: string }) => (
+    <motion.button whileTap={{ rotate: 180, scale: 0.85 }} onClick={onClick} title={title} className="no-drag absolute top-1/2 right-2 -translate-y-1/2 cursor-pointer rounded-md p-1.5 text-gold-400 hover:bg-white/5 hover:text-gold-200">
+      <Icon name="d20" size={18} />
+    </motion.button>
+  )
+  return (
+    <>
+      <StepTitle title="Identity" text="Who are you? The Dungeon Master will use all of this." />
+      <div className="space-y-5">
+        <label className="block">
+          <span className="mb-1.5 block text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">Name</span>
+          <div className="relative">
+            <input value={build.name} onChange={(e) => update({ name: e.target.value })} maxLength={60} className="input pr-12 font-display text-lg tracking-wide" placeholder="Your name" />
+            <Roll onClick={() => update({ name: generateName(Math.random, build.race, build.sex) })} title="Suggest a name" />
+          </div>
+        </label>
+        <label className="block">
+          <span className="mb-1.5 block text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">Appearance</span>
+          <div className="relative">
+            <textarea value={build.appearance} onChange={(e) => update({ appearance: e.target.value })} maxLength={600} rows={3} className="input resize-none pr-12 font-story text-[1.05rem]" placeholder="What do people notice first?" />
+            <Roll onClick={() => update({ appearance: pickOne(APPEARANCE) })} title="Suggest an appearance" />
+          </div>
+        </label>
+        <label className="block">
+          <span className="mb-1.5 block text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">Personality</span>
+          <div className="relative">
+            <textarea value={build.personality} onChange={(e) => update({ personality: e.target.value })} maxLength={600} rows={3} className="input resize-none pr-12 font-story text-[1.05rem]" placeholder="How do you carry yourself?" />
+            <Roll onClick={() => update({ personality: pickOne(PERSONALITY) })} title="Suggest a personality" />
+          </div>
+        </label>
+      </div>
+    </>
+  )
+}
+
+function AdventureStep({ settings, setSettings }: { settings: CampaignSettings; setSettings: (s: CampaignSettings) => void }) {
+  const set = (p: Partial<CampaignSettings>) => setSettings({ ...settings, ...p })
+  const Row = ({ label, text, children }: { label: string; text: string; children: React.ReactNode }) => (
+    <div className="grid gap-2 border-b border-gold-500/10 py-4 md:grid-cols-[14rem_1fr] md:items-center">
+      <div>
+        <div className="font-display tracking-wide text-parchment-50">{label}</div>
+        <div className="text-xs text-parchment-500">{text}</div>
+      </div>
+      <div>{children}</div>
+    </div>
+  )
+  return (
+    <>
+      <StepTitle title="Adventure" text="How the Dungeon Master runs this campaign. You can change these later." />
+      <div className="panel rounded-2xl px-5">
+        <Row label="Tone" text="The feel of the world">
+          <Segmented value={settings.tone} onChange={(tone) => set({ tone })} options={[{ id: 'grim', label: 'Grim' }, { id: 'grounded', label: 'Grounded' }, { id: 'heroic', label: 'Heroic' }, { id: 'whimsical', label: 'Whimsical' }, { id: 'horror', label: 'Horror' }]} />
+        </Row>
+        <Row label="Mercy" text="What happens at zero health">
+          <Segmented
+            value={settings.mercy}
+            onChange={(mercy) => set({ mercy })}
+            options={[
+              { id: 'brutal', label: 'Brutal', hint: 'Zero health means death.' },
+              { id: 'harsh', label: 'Harsh', hint: 'You go down and make death rolls. Real death is likely. (Recommended)' },
+              { id: 'forgiving', label: 'Forgiving', hint: 'You are captured or left for dead, but never killed.' }
+            ]}
+          />
+        </Row>
+        <Row label="Dice" text="When you throw the dice yourself">
+          <Segmented
+            value={settings.rollMode}
+            onChange={(rollMode) => set({ rollMode })}
+            options={[
+              { id: 'auto', label: 'Automatic', hint: 'All rolls happen by themselves.' },
+              { id: 'dramatic', label: 'Big moments', hint: 'Routine rolls are automatic; you throw the ones that matter.' },
+              { id: 'always', label: 'Always', hint: 'You throw every roll.' }
+            ]}
+          />
+        </Row>
+        <Row label="Response length" text="How much the DM writes per turn">
+          <Segmented value={settings.length} onChange={(length) => set({ length })} options={[{ id: 'short', label: 'Short' }, { id: 'medium', label: 'Medium' }, { id: 'long', label: 'Long' }]} />
+        </Row>
+        <Row label="Fail forward" text="Narrow failures can succeed at a cost">
+          <Segmented value={settings.failForward ? 'on' : 'off'} onChange={(v) => set({ failForward: v === 'on' })} options={[{ id: 'off', label: 'Off' }, { id: 'on', label: 'On' }]} />
+        </Row>
+        <Row label="Ironman" text="No rerolls and no rewinds">
+          <Segmented value={settings.ironman ? 'on' : 'off'} onChange={(v) => set({ ironman: v === 'on' })} options={[{ id: 'off', label: 'Off' }, { id: 'on', label: 'On' }]} />
+        </Row>
+      </div>
+    </>
+  )
+}
+
+// ---- Preview -----------------------------------------------------------------------------
+
+function Preview({ build, sexMode, rolling }: { build: CharacterBuild; sexMode: SexMode; rolling: number }) {
+  const caps = attrCapBreakdown(build, sexMode)
+  const hp = maxHp(build.sex, sexMode, build.attributes.END, 1)
+  const st = maxStamina(build.attributes.END, build.attributes.AGI)
+  const mp = maxMana(build.attributes.ARC, 1)
+  return (
+    <motion.div key={rolling} initial={{ opacity: 0, rotateY: 30 }} animate={{ opacity: 1, rotateY: 0 }} transition={{ duration: 0.5 }} className="flex flex-col items-center text-center">
+      <Medallion name={build.name} race={build.race} size={104} />
+      <div className="mt-4 font-display text-xl tracking-wide text-gold-200">{build.name || 'Unnamed'}</div>
+      <div className="text-sm text-parchment-400">
+        {RACES[build.race].label} · {SEXES[sexMode][build.sex].label} · {AGES[build.age].label}
+      </div>
+      <div className="text-sm text-gold-300/80">{BACKGROUNDS[build.background].label}</div>
+
+      <div className="gilt-rule my-5 w-full" />
+      <div className="grid w-full grid-cols-3 gap-2 text-center">
+        {[
+          { label: 'Health', v: hp, c: 'text-blood-400', icon: 'heart' },
+          { label: 'Stamina', v: st, c: 'text-moss-400', icon: 'bolt' },
+          { label: 'Mana', v: mp, c: 'text-arcane-400', icon: 'sparkle' }
+        ].map((x) => (
+          <div key={x.label} className="rounded-lg border border-gold-500/15 bg-ink-850/80 py-2">
+            <Icon name={x.icon} size={16} className={`mx-auto ${x.c}`} />
+            <div className="font-display text-lg text-parchment-50">{x.v}</div>
+            <div className="text-[0.65rem] tracking-wider text-parchment-500 uppercase">{x.label}</div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 w-full space-y-1.5">
+        {ATTRS.map((a) => (
+          <div key={a} className="grid grid-cols-[2.5rem_1fr_3.5rem] items-center gap-2 text-xs">
+            <span className="text-left font-semibold text-parchment-300">{a}</span>
+            <CapBar value={build.attributes[a]} cap={caps[a].cap} />
+            <span className="text-right text-parchment-400 tabular-nums">
+              {build.attributes[a]}
+              <span className="text-parchment-500">/{caps[a].cap}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-4 text-left text-xs text-parchment-400">
+        <span className="font-semibold text-gold-300">{RACES[build.race].trait.name}:</span> {RACES[build.race].trait.text}
+      </p>
+      {build.appearance && <p className="mt-3 text-left font-story text-[0.95rem] text-parchment-300 italic">{build.appearance}</p>}
+    </motion.div>
+  )
+}
