@@ -2,26 +2,21 @@
 
 This takes about five minutes. You only need a web browser and a Windows PC.
 
-## 1. Accept the GitHub invite
+## 1. Download the installer
 
-Emberlight lives in a private GitHub project, so you need a (free) GitHub account to download it.
+No account is needed.
 
-1. Check your email for an invitation from GitHub (or go to [github.com/notifications](https://github.com/notifications)).
-2. Click **Accept invitation**.
-
-## 2. Download the installer
-
-1. On the project page, look at the right-hand side for **Releases** and click the newest one (it has a green **Latest** label).
+1. Open the [latest release](https://github.com/Ulfmund/emberlight/releases/latest) (or, on the project page, click **Releases** on the right-hand side and pick the one with the green **Latest** label).
 2. Under **Assets**, click **Emberlight-Setup-…exe** to download it (about 120 MB).
 3. If your browser warns that the file "isn't commonly downloaded", choose **Keep** (in Edge: click the **…** next to the download, then **Keep**).
 
-## 3. Install it
+## 2. Install it
 
 1. Double-click the downloaded file.
 2. Windows may show a blue box saying **"Windows protected your PC."** This appears for any new app that hasn't paid for a Microsoft certificate yet. Click **More info**, then **Run anyway**.
 3. Click through the installer (**Next**, **Install**, **Finish**). It puts an **Emberlight** shortcut on your desktop and in the Start menu.
 
-## 4. Connect a model
+## 3. Connect a model
 
 Open Emberlight and click **Connect a Model**, then pick where your model runs:
 
@@ -45,6 +40,16 @@ Click **Save connection**, then **Begin**.
 4. When an action is risky, the game asks for a roll. For big moments the **dice tray** appears: click to throw. The result (from Critical failure to Critical success) decides what happens, and the DM writes it that way. Failures can hurt, and your character can die.
 5. Your adventure saves itself after every turn. **Continue** on the title screen picks up where you left off; **Load Adventure** lists them all.
 
+### Character cards (from SillyTavern, Chub…)
+
+In the character creator, click **Character Cards** (bottom left), then drop card files onto the box, or click it to pick them. PNG cards, `.json` and `.charx` all work, several at once. You can also drop cards anywhere on the creator. Your SillyTavern cards live in `SillyTavern\data\default-user\characters`.
+
+Each card in the library has two buttons:
+- **Play as**: you become that character. Their name, description and personality fill in, the app guesses their race and sex (check the Origin step), and the card's picture becomes your portrait. Stats are still yours to choose. If you rename them, their description follows the new name.
+- **Bring along** (up to 3): they travel with you and the DM plays them. Their picture shows on their speech bubbles. On the **Adventure** step you can start with their greeting (extra greetings can be flipped through with **‹ ›**) or let the DM set the scene.
+
+Lorebooks inside cards work too: an entry is given to the DM when its keyword comes up in the story. A card stays in the library for next time; removing it from the library doesn't affect adventures that already use it.
+
 Handy buttons:
 - **↻ on a roll card**: a free reroll (rewrites the DM's response to match).
 - **Rewrite**: the DM writes its last response again; **‹ 1/2 ›** flips between versions.
@@ -62,7 +67,7 @@ Emberlight checks for new versions by itself. When one is out, a glowing **Updat
 
 ## Something went wrong?
 
-- **"Couldn't reach LM Studio / Ollama…"**: the model app isn't running, or its server is switched off (see step 4).
+- **"Couldn't reach LM Studio / Ollama…"**: the model app isn't running, or its server is switched off (see step 3).
 - **"…no models are available"**: the model app is running but no model is loaded or downloaded.
 - **"rejected the API key"**: the key was mistyped or has expired. Paste it again.
 

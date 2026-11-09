@@ -9,7 +9,7 @@ Built in milestones. Each one ends with something playable, so the artist can te
 - `.env` for dev keys, encrypted key storage in the app
 - Local server only accepts requests from the app's own pages
 
-## Milestone 1 — Playable core (the MVP) ✅ (2026-11-09, except card import)
+## Milestone 1 — Playable core (the MVP) ✅ (2026-11-09)
 *The smallest version that's fun:*
 - Description → action turn structure; free input with **"quoted speech" + action in the same turn**
 - Referee → dice → resolve → narrate loop, with **result tiers** (nat 20 vs. 15 vs. 10 read differently)
@@ -21,7 +21,7 @@ Built in milestones. Each one ends with something playable, so the artist can te
 - Dialogue bubbles with portraits, separate from narration
 - Event log tied to messages: swipes, regenerate, edit, rewind all keep state correct
 - Autosave, multiple campaigns, save slots
-- Character Card V2/V3 import *(moved to the next update)*
+- Character Card V1/V2/V3 import (PNG, `.json`, `.charx`) into a character library: play as a card, or bring up to 3 along as DM-played companions; card greetings can open the story; embedded lorebooks trigger by keyword ✅ (0.2.0)
 
 ## Milestone 2 — Memory
 - Scribe job; entity registry; relationships and dispositions

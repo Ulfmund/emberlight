@@ -1,4 +1,5 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { portraitMap, PortraitContext } from '../portraits'
+import { useLayoutEffect, useRef, useState, useMemo } from 'react'
 import { motion } from 'motion/react'
 import { useGame } from '../store'
 import { Button } from '../components/Button'
@@ -12,6 +13,7 @@ import { DeathScreen, Toasts } from './play/Overlays'
 export function PlayScreen() {
   const { view, busy, act, stop, live } = useGame()
   const [tab, setTab] = useState<Tab>('sheet')
+  const portraits = useMemo(() => (view ? portraitMap(view) : {}), [view])
   if (!view) return null
   const dead = view.state.character.status === 'dead'
 
@@ -23,7 +25,9 @@ export function PlayScreen() {
       <CharacterPanel view={view} onOpenSheet={() => setTab('sheet')} />
 
       <main className="relative flex min-w-0 flex-1 flex-col">
-        <Story view={view} />
+        <PortraitContext.Provider value={portraits}>
+          <Story view={view} />
+        </PortraitContext.Provider>
         <Composer disabled={dead} busy={busy} holding={live.hold} onSend={(t) => void act(t)} onStop={stop} />
         <DiceTray />
       </main>

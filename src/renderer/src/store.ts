@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { SettingsView } from '@shared/types'
 import type { Attr, CampaignSettings, CharacterBuild, CheckResult } from '@shared/rules'
 import type { CampaignSummary, CampaignView, MessageView, TurnEvent } from '@shared/view'
-import { api } from './api'
+import { api, type CreateOptions } from './api'
 
 export type Screen = 'title' | 'connect' | 'creator' | 'play' | 'load'
 
@@ -41,7 +41,7 @@ type State = {
   setSettings(s: SettingsView): void
   loadCampaigns(): Promise<void>
   open(id: string): Promise<void>
-  create(build: CharacterBuild, settings: CampaignSettings): Promise<void>
+  create(build: CharacterBuild, settings: CampaignSettings, opts?: CreateOptions): Promise<void>
   remove(id: string): Promise<void>
 
   act(text: string): Promise<void>
@@ -197,8 +197,8 @@ export const useGame = create<State>((set, get) => {
       if (view.awaitingNarration) void get().narrateHead()
     },
 
-    create: async (build, settings) => {
-      const { id } = await api.createCampaign(build, settings)
+    create: async (build, settings, opts) => {
+      const { id } = await api.createCampaign(build, settings, opts)
       await get().loadCampaigns()
       await get().open(id)
     },

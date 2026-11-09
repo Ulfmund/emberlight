@@ -16,6 +16,8 @@ import {
 import type { TurnEvent } from '@shared/view'
 import type { Campaigns } from '../core/campaigns'
 import type { TurnEngine } from '../core/turn'
+import type { CardLibrary } from '../cards/library'
+import { MAX_COMPANIONS, type CastMember } from '@shared/cards'
 
 const tuple = <T extends string>(xs: readonly T[]) => xs as unknown as [T, ...T[]]
 
@@ -28,8 +30,9 @@ const BuildSchema = z.object({
   humanBonus: z.array(z.enum(tuple(ATTRS))).max(2),
   attributes: z.record(z.enum(tuple(ATTRS)), z.number().int()),
   skills: z.partialRecord(z.enum(tuple(SKILL_IDS)), z.number().int()),
-  appearance: z.string().max(600),
-  personality: z.string().max(600)
+  // Long enough for an imported card's description.
+  appearance: z.string().max(8000),
+  personality: z.string().max(4000)
 })
 
 const SettingsSchema = z.object({
@@ -43,7 +46,7 @@ const SettingsSchema = z.object({
 })
 
 /** Campaign and turn endpoints (the interface's whole view of the game). */
-export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnEngine) {
+export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnEngine, library: CardLibrary) {
   const body = async <T>(c: { req: { json(): Promise<unknown> } }, schema: z.ZodType<T>) => {
     const parsed = schema.safeParse(await c.req.json().catch(() => null))
     return parsed.success ? parsed.data : null
@@ -76,15 +79,32 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
   app.post('/api/campaigns', async (c) => {
     const b = await body(
       c,
-      z.object({ build: BuildSchema, settings: SettingsSchema.partial().optional(), name: z.string().max(80).optional() })
+      z.object({
+        build: BuildSchema,
+        settings: SettingsSchema.partial().optional(),
+        name: z.string().max(80).optional(),
+        /** The card the player plays as (portrait and lorebook). */
+        playerCard: z.string().max(80).optional(),
+        /** Cards the DM plays as companions. */
+        companions: z.array(z.string().max(80)).max(MAX_COMPANIONS).optional(),
+        /** Open with the first companion's greetings instead of a new scene. */
+        useGreeting: z.boolean().optional()
+      })
     )
     if (!b) return c.json({ error: 'Invalid character.' }, 400)
     const settings: CampaignSettings = { ...DEFAULT_SETTINGS, ...(b.settings ?? {}) }
     const build = b.build as CharacterBuild
     const problems = validateBuild(build, settings.sexModifiers)
     if (problems.length) return c.json({ error: problems[0] }, 400)
-    const id = campaigns.create(build, settings, b.name)
-    return c.json({ id })
+    const made = guard(() => {
+      const cast: CastMember[] = []
+      if (b.playerCard) cast.push(library.castMember(b.playerCard, 'player', build.name))
+      for (const cid of new Set(b.companions ?? [])) cast.push(library.castMember(cid, 'companion', build.name))
+      const first = cast.find((m) => m.role === 'companion')
+      const greetings = b.useGreeting && first ? library.greetings(first.cardId, build.name) : []
+      return campaigns.create(build, settings, b.name, { cast, greetings })
+    })
+    return made.ok ? c.json({ id: made.value }) : c.json({ error: made.error }, 400)
   })
 
   app.get('/api/campaigns/:id', (c) => {

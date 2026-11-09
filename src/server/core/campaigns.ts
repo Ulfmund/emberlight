@@ -20,9 +20,23 @@ import {
   type GameState
 } from '@shared/rules'
 import type { CampaignSummary, CampaignView, ChangeLine, MessageView } from '@shared/view'
+import type { CastMember } from '@shared/cards'
 import { GameDb, newId, type CampaignRow, type EventRow, type MessageRow } from '../store/db'
 
 export const OPENING_TEXT = '((Begin the adventure: set an opening scene for my character.))'
+
+export function openingText(cast: CastMember[]): string {
+  const names = cast.filter((m) => m.role === 'companion').map((m) => m.name)
+  if (!names.length) return OPENING_TEXT
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+  return `((Begin the adventure: set an opening scene for my character, with ${list} there too.))`
+}
+
+export type CreateExtras = {
+  cast?: CastMember[]
+  /** Open the story with these instead of asking the DM (a card's greetings; extra ones become swipes). */
+  greetings?: string[]
+}
 
 /**
  * Campaigns, their story trees and their event logs. The story is a tree: every reroll or
@@ -46,25 +60,36 @@ export class Campaigns {
         status: st.character.status,
         location: st.location,
         day: st.time.day,
-        updatedAt: c.updated_at
+        updatedAt: c.updated_at,
+        portraitId: c.cast.find((m) => m.role === 'player' && m.hasImage)?.cardId
       }
     })
   }
 
-  create(build: CharacterBuild, settings: CampaignSettings, name?: string): string {
+  create(build: CharacterBuild, settings: CampaignSettings, name?: string, extras: CreateExtras = {}): string {
     const id = newId('cmp')
     const opening = newId('msg')
+    const cast = extras.cast ?? []
+    const greetings = extras.greetings ?? []
     this.db.transaction(() => {
-      this.db.createCampaign({ id, name: name?.trim() || `The tale of ${build.name}`, head_id: opening, settings, build })
+      this.db.createCampaign({ id, name: name?.trim() || `The tale of ${build.name}`, head_id: opening, settings, build, cast })
+      const now = Date.now()
       this.db.addMessage({
         id: opening,
         campaign_id: id,
         parent_id: null,
         role: 'user',
-        content: OPENING_TEXT,
+        content: openingText(cast),
         thinking: '',
-        meta: { hidden: true, kind: 'opening' }
+        meta: { hidden: true, kind: 'opening' },
+        created_at: now
       })
+      let first: string | null = null
+      greetings.forEach((g, i) => {
+        const m = this.db.addMessage({ id: newId('msg'), campaign_id: id, parent_id: opening, role: 'assistant', content: g, thinking: '', meta: { kind: 'narration' }, created_at: now + 1 + i })
+        first ??= m.id
+      })
+      if (first) this.db.setHead(id, first)
     })
     return id
   }
@@ -157,6 +182,7 @@ export class Campaigns {
         xpIntoLevel: state.character.xp - charXpForLevel(level),
         xpForNext: charXpForLevel(level + 1) - charXpForLevel(level)
       },
+      cast: c.cast.map((m) => ({ cardId: m.cardId, role: m.role, name: m.name, hasImage: m.hasImage })),
       messages,
       awaitingNarration: last?.role === 'user',
       saves: this.db.savesFor(id).map((s) => ({ id: s.id, name: s.name, messageId: s.message_id, createdAt: s.created_at }))

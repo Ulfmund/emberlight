@@ -38,7 +38,10 @@ import {
   type SexMode,
   type SkillId
 } from '@shared/rules'
+import { cardImageUrl, fillMacros, guessFromCard, type CardSummary } from '@shared/cards'
 import { useGame } from '../store'
+import { api } from '../api'
+import { CardLibrary } from './CardLibrary'
 import { Button } from '../components/Button'
 import { Icon } from '../components/Icon'
 import { Medallion } from '../components/Medallion'
@@ -117,14 +120,70 @@ export function CreatorScreen() {
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState('')
   const [rolling, setRolling] = useState(0)
+  /** Imported cards: the one the player plays as, and companions the DM plays. */
+  const [playerCard, setPlayerCard] = useState<CardSummary | null>(null)
+  const [companions, setCompanions] = useState<CardSummary[]>([])
+  const [useGreeting, setUseGreeting] = useState(true)
+  const [library, setLibrary] = useState<{ open: boolean; dropped: File[] }>({ open: false, dropped: [] })
 
   const sexMode = settings.sexModifiers
   const update = (patch: Partial<CharacterBuild>) => setBuild((b) => normalize({ ...b, ...patch }, sexMode))
+
+  /** The name the card's description currently uses (it follows renames). */
+  const [descName, setDescName] = useState('')
+
+  /** Renaming a character from a card: their description follows the new name. */
+  const withSyncedName = (b: CharacterBuild): CharacterBuild => {
+    const now = b.name.trim()
+    if (!playerCard || !descName || !now || now === descName) return b
+    const swap = (text: string, from: string, to: string) => text.replace(new RegExp(`\\b${from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g'), to)
+    const [oldFirst] = descName.split(/\s+/)
+    const [newFirst] = now.split(/\s+/)
+    const fix = (text: string) => {
+      let t = swap(text, descName, now)
+      // Cards often use just the first name ("Mira smiles").
+      if (oldFirst.length >= 3 && oldFirst !== newFirst && oldFirst !== descName) t = swap(t, oldFirst, newFirst)
+      return t
+    }
+    return { ...b, appearance: fix(b.appearance), personality: fix(b.personality) }
+  }
+  const syncName = () => {
+    if (!playerCard || !build.name.trim()) return
+    setBuild(withSyncedName(build))
+    setDescName(build.name.trim())
+  }
+
+  const playAs = async (card: CardSummary) => {
+    try {
+      const { data } = await api.card(card.id)
+      const name = card.name.slice(0, 60)
+      const guess = guessFromCard(data)
+      const fill = (t: string) => fillMacros(t, name, 'someone').trim()
+      update({
+        name,
+        appearance: fill(data.description).slice(0, 8000),
+        personality: fill(data.personality).slice(0, 4000),
+        ...(guess.race ? { race: guess.race } : {}),
+        ...(guess.sex ? { sex: guess.sex } : {})
+      })
+      setPlayerCard(card)
+      setDescName(name)
+      setCompanions((cs) => cs.filter((c) => c.id !== card.id))
+      setLibrary({ open: false, dropped: [] })
+      setStep(0)
+    } catch (err) {
+      setError((err as Error).message)
+    }
+  }
+
+  const toggleCompanion = (card: CardSummary) =>
+    setCompanions((cs) => (cs.some((c) => c.id === card.id) ? cs.filter((c) => c.id !== card.id) : [...cs, card]))
   const errors = useMemo(() => validateBuild(build, sexMode), [build, sexMode])
 
   const rollAdventurer = () => {
     const b = randomBuild(rng, sexMode, '')
     setBuild({ ...b, name: generateName(rng, b.race, b.sex), appearance: pickOne(APPEARANCE), personality: pickOne(PERSONALITY) })
+    setPlayerCard(null)
     setRolling((r) => r + 1)
     setStep(4)
   }
@@ -133,7 +192,8 @@ export function CreatorScreen() {
     setStarting(true)
     setError('')
     try {
-      await create(build, settings)
+      const greet = useGreeting && (companions[0]?.greetings ?? 0) > 0
+      await create(withSyncedName(build), settings, { playerCard: playerCard?.id, companions: companions.map((c) => c.id), useGreeting: greet })
     } catch (err) {
       setError((err as Error).message)
       setStarting(false)
@@ -141,8 +201,27 @@ export function CreatorScreen() {
   }
 
   return (
-    <div className="relative flex min-h-0 flex-1">
+    <div
+      className="relative flex min-h-0 flex-1"
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes('Files')) e.preventDefault()
+      }}
+      onDrop={(e) => {
+        if (!e.dataTransfer.files.length) return
+        e.preventDefault()
+        setLibrary({ open: true, dropped: [...e.dataTransfer.files] })
+      }}
+    >
       <EmberField density={0.25} className="opacity-40" />
+      <CardLibrary
+        open={library.open}
+        dropped={library.dropped}
+        onClose={() => setLibrary({ open: false, dropped: [] })}
+        playerCardId={playerCard?.id}
+        companionIds={companions.map((c) => c.id)}
+        onPlayAs={(c) => void playAs(c)}
+        onToggleCompanion={toggleCompanion}
+      />
 
       {/* Steps */}
       <nav className="relative z-10 flex w-56 shrink-0 flex-col gap-1 border-r border-gold-500/15 bg-ink-950/60 p-4">
@@ -166,7 +245,21 @@ export function CreatorScreen() {
             <span className="relative font-display tracking-wider">{s.label}</span>
           </button>
         ))}
-        <div className="mt-auto">
+        <div className="mt-auto space-y-2">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setLibrary({ open: true, dropped: [] })}
+            className="no-drag focus-ring flex w-full cursor-pointer items-center gap-3 rounded-xl border border-gold-500/25 bg-ink-900/80 p-3 text-left hover:border-gold-400/60"
+          >
+            <Icon name="cards" size={24} className="shrink-0 text-gold-300" />
+            <span className="min-w-0">
+              <span className="block font-display text-sm tracking-wider text-gold-200">Character Cards</span>
+              <span className="block truncate text-xs text-parchment-400">
+                {playerCard ? `Playing as ${build.name || playerCard.name}` : companions.length ? `${companions.length} companion${companions.length === 1 ? '' : 's'}` : 'Import, or bring a friend'}
+              </span>
+            </span>
+          </motion.button>
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.96, rotate: -2 }}
@@ -191,8 +284,18 @@ export function CreatorScreen() {
               {step === 1 && <CallingStep build={build} update={update} />}
               {step === 2 && <AttributesStep build={build} update={update} sexMode={sexMode} />}
               {step === 3 && <SkillsStep build={build} update={update} sexMode={sexMode} />}
-              {step === 4 && <IdentityStep build={build} update={update} />}
-              {step === 5 && <AdventureStep settings={settings} setSettings={setSettings} />}
+              {step === 4 && <IdentityStep build={build} update={update} onNameDone={syncName} playerCard={playerCard} onUnlink={() => setPlayerCard(null)} />}
+              {step === 5 && (
+                <AdventureStep
+                  settings={settings}
+                  setSettings={setSettings}
+                  companions={companions}
+                  onRemoveCompanion={toggleCompanion}
+                  onAddCompanion={() => setLibrary({ open: true, dropped: [] })}
+                  useGreeting={useGreeting}
+                  setUseGreeting={setUseGreeting}
+                />
+              )}
             </motion.div>
           </AnimatePresence>
 
@@ -221,7 +324,7 @@ export function CreatorScreen() {
 
       {/* Live preview */}
       <aside className="relative z-10 hidden w-80 shrink-0 overflow-y-auto border-l border-gold-500/15 bg-ink-950/60 p-6 xl:block">
-        <Preview build={build} sexMode={sexMode} rolling={rolling} />
+        <Preview build={build} sexMode={sexMode} rolling={rolling} image={playerCard?.hasImage ? cardImageUrl(playerCard.id) : undefined} companions={companions} />
       </aside>
     </div>
   )
@@ -535,7 +638,20 @@ function SkillsStep({ build, update, sexMode }: { build: CharacterBuild; update:
   )
 }
 
-function IdentityStep({ build, update }: { build: CharacterBuild; update: (p: Partial<CharacterBuild>) => void }) {
+function IdentityStep({
+  build,
+  update,
+  onNameDone,
+  playerCard,
+  onUnlink
+}: {
+  build: CharacterBuild
+  update: (p: Partial<CharacterBuild>) => void
+  onNameDone: () => void
+  playerCard: CardSummary | null
+  onUnlink: () => void
+}) {
+  const long = build.appearance.length > 240 || build.personality.length > 300
   const Roll = ({ onClick, title }: { onClick: () => void; title: string }) => (
     <motion.button whileTap={{ rotate: 180, scale: 0.85 }} onClick={onClick} title={title} className="no-drag absolute top-1/2 right-2 -translate-y-1/2 cursor-pointer rounded-md p-1.5 text-gold-400 hover:bg-white/5 hover:text-gold-200">
       <Icon name="d20" size={18} />
@@ -544,25 +660,36 @@ function IdentityStep({ build, update }: { build: CharacterBuild; update: (p: Pa
   return (
     <>
       <StepTitle title="Identity" text="Who are you? The Dungeon Master will use all of this." />
+      {playerCard && (
+        <div className="mb-5 flex items-center gap-3 rounded-xl border border-gold-400/40 bg-gold-500/10 px-4 py-3 text-sm">
+          <Icon name="cards" size={20} className="shrink-0 text-gold-300" />
+          <span className="flex-1 text-parchment-200">
+            From the card <span className="font-semibold text-gold-200">{playerCard.name}</span>. Edit anything; renaming them updates their description too.
+          </span>
+          <Button size="sm" variant="ghost" onClick={onUnlink}>
+            Don&apos;t use the card
+          </Button>
+        </div>
+      )}
       <div className="space-y-5">
         <label className="block">
           <span className="mb-1.5 block text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">Name</span>
           <div className="relative">
-            <input value={build.name} onChange={(e) => update({ name: e.target.value })} maxLength={60} className="input pr-12 font-display text-lg tracking-wide" placeholder="Your name" />
+            <input value={build.name} onChange={(e) => update({ name: e.target.value })} onBlur={onNameDone} maxLength={60} className="input pr-12 font-display text-lg tracking-wide" placeholder="Your name" />
             <Roll onClick={() => update({ name: generateName(Math.random, build.race, build.sex) })} title="Suggest a name" />
           </div>
         </label>
         <label className="block">
-          <span className="mb-1.5 block text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">Appearance</span>
+          <span className="mb-1.5 block text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">{playerCard ? 'Appearance & background' : 'Appearance'}</span>
           <div className="relative">
-            <textarea value={build.appearance} onChange={(e) => update({ appearance: e.target.value })} maxLength={600} rows={3} className="input resize-none pr-12 font-story text-[1.05rem]" placeholder="What do people notice first?" />
+            <textarea value={build.appearance} onChange={(e) => update({ appearance: e.target.value })} maxLength={8000} rows={long ? 9 : 3} className={`input pr-12 font-story text-[1.05rem] ${long ? 'resize-y' : 'resize-none'}`} placeholder="What do people notice first?" />
             <Roll onClick={() => update({ appearance: pickOne(APPEARANCE) })} title="Suggest an appearance" />
           </div>
         </label>
         <label className="block">
           <span className="mb-1.5 block text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">Personality</span>
           <div className="relative">
-            <textarea value={build.personality} onChange={(e) => update({ personality: e.target.value })} maxLength={600} rows={3} className="input resize-none pr-12 font-story text-[1.05rem]" placeholder="How do you carry yourself?" />
+            <textarea value={build.personality} onChange={(e) => update({ personality: e.target.value })} maxLength={4000} rows={long ? 5 : 3} className={`input pr-12 font-story text-[1.05rem] ${long ? 'resize-y' : 'resize-none'}`} placeholder="How do you carry yourself?" />
             <Roll onClick={() => update({ personality: pickOne(PERSONALITY) })} title="Suggest a personality" />
           </div>
         </label>
@@ -571,7 +698,24 @@ function IdentityStep({ build, update }: { build: CharacterBuild; update: (p: Pa
   )
 }
 
-function AdventureStep({ settings, setSettings }: { settings: CampaignSettings; setSettings: (s: CampaignSettings) => void }) {
+function AdventureStep({
+  settings,
+  setSettings,
+  companions,
+  onRemoveCompanion,
+  onAddCompanion,
+  useGreeting,
+  setUseGreeting
+}: {
+  settings: CampaignSettings
+  setSettings: (s: CampaignSettings) => void
+  companions: CardSummary[]
+  onRemoveCompanion: (c: CardSummary) => void
+  onAddCompanion: () => void
+  useGreeting: boolean
+  setUseGreeting: (v: boolean) => void
+}) {
+  const greeter = companions[0]?.greetings ? companions[0] : null
   const set = (p: Partial<CampaignSettings>) => setSettings({ ...settings, ...p })
   const Row = ({ label, text, children }: { label: string; text: string; children: React.ReactNode }) => (
     <div className="grid gap-2 border-b border-gold-500/10 py-4 md:grid-cols-[14rem_1fr] md:items-center">
@@ -586,6 +730,41 @@ function AdventureStep({ settings, setSettings }: { settings: CampaignSettings; 
     <>
       <StepTitle title="Adventure" text="How the Dungeon Master runs this campaign. You can change these later." />
       <div className="panel rounded-2xl px-5">
+        <Row label="Companions" text="Characters from cards who travel with you. The DM plays them.">
+          <div className="flex flex-wrap items-center gap-2">
+            {companions.map((c) => (
+              <span key={c.id} className="flex items-center gap-2 rounded-full border border-gold-500/30 bg-ink-850 py-1 pr-1 pl-1 text-sm text-parchment-100">
+                <Medallion name={c.name} race="human" size={26} badge={false} image={c.hasImage ? cardImageUrl(c.id) : undefined} />
+                {c.name}
+                <button onClick={() => onRemoveCompanion(c)} className="no-drag cursor-pointer rounded-full p-1 text-parchment-400 hover:bg-white/5 hover:text-blood-400" title={`Leave ${c.name} behind`}>
+                  <Icon name="x" size={14} />
+                </button>
+              </span>
+            ))}
+            <Button size="sm" variant="ghost" icon="plus" onClick={onAddCompanion}>
+              {companions.length ? 'Add another' : 'Bring a companion'}
+            </Button>
+          </div>
+        </Row>
+        {greeter && (
+          <Row label="Opening" text="How the story begins">
+            <Segmented
+              value={useGreeting ? 'card' : 'dm'}
+              onChange={(v) => setUseGreeting(v === 'card')}
+              options={[
+                {
+                  id: 'card',
+                  label: `${greeter.name}'s greeting`,
+                  hint:
+                    greeter.greetings > 1
+                      ? `Starts with the card's first message. Its other ${greeter.greetings - 1 === 1 ? 'greeting is' : `${greeter.greetings - 1} greetings are`} there to flip through.`
+                      : "Starts with the card's first message."
+                },
+                { id: 'dm', label: 'The DM sets the scene', hint: 'The Dungeon Master writes a new opening with your companions in it.' }
+              ]}
+            />
+          </Row>
+        )}
         <Row label="Tone" text="The feel of the world">
           <Segmented value={settings.tone} onChange={(tone) => set({ tone })} options={[{ id: 'grim', label: 'Grim' }, { id: 'grounded', label: 'Grounded' }, { id: 'heroic', label: 'Heroic' }, { id: 'whimsical', label: 'Whimsical' }, { id: 'horror', label: 'Horror' }]} />
         </Row>
@@ -627,14 +806,14 @@ function AdventureStep({ settings, setSettings }: { settings: CampaignSettings; 
 
 // ---- Preview -----------------------------------------------------------------------------
 
-function Preview({ build, sexMode, rolling }: { build: CharacterBuild; sexMode: SexMode; rolling: number }) {
+function Preview({ build, sexMode, rolling, image, companions }: { build: CharacterBuild; sexMode: SexMode; rolling: number; image?: string; companions: CardSummary[] }) {
   const caps = attrCapBreakdown(build, sexMode)
   const hp = maxHp(build.sex, sexMode, build.attributes.END, 1)
   const st = maxStamina(build.attributes.END, build.attributes.AGI)
   const mp = maxMana(build.attributes.ARC, 1)
   return (
     <motion.div key={rolling} initial={{ opacity: 0, rotateY: 30 }} animate={{ opacity: 1, rotateY: 0 }} transition={{ duration: 0.5 }} className="flex flex-col items-center text-center">
-      <Medallion name={build.name} race={build.race} size={104} />
+      <Medallion name={build.name} race={build.race} size={104} image={image} />
       <div className="mt-4 font-display text-xl tracking-wide text-gold-200">{build.name || 'Unnamed'}</div>
       <div className="text-sm text-parchment-400">
         {RACES[build.race].label} · {SEXES[sexMode][build.sex].label} · {AGES[build.age].label}
@@ -670,7 +849,20 @@ function Preview({ build, sexMode, rolling }: { build: CharacterBuild; sexMode: 
       <p className="mt-4 text-left text-xs text-parchment-400">
         <span className="font-semibold text-gold-300">{RACES[build.race].trait.name}:</span> {RACES[build.race].trait.text}
       </p>
-      {build.appearance && <p className="mt-3 text-left font-story text-[0.95rem] text-parchment-300 italic">{build.appearance}</p>}
+      {build.appearance && <p className="mt-3 line-clamp-6 text-left font-story text-[0.95rem] text-parchment-300 italic">{build.appearance}</p>}
+      {companions.length > 0 && (
+        <div className="mt-5 w-full text-left">
+          <div className="mb-2 text-[0.68rem] font-semibold tracking-[0.14em] text-gold-400 uppercase">Travelling with</div>
+          <div className="space-y-2">
+            {companions.map((c) => (
+              <div key={c.id} className="flex items-center gap-2.5 text-sm text-parchment-200">
+                <Medallion name={c.name} race="human" size={34} badge={false} image={c.hasImage ? cardImageUrl(c.id) : undefined} />
+                {c.name}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </motion.div>
   )
 }

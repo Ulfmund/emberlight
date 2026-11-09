@@ -23,8 +23,10 @@ The DM persona card controls the narrator's voice and attitude. The default is a
 ## Card compatibility
 
 - **Import:** Character Card V2 and V3 (PNG with embedded data, `.json`, and V3 `.charx`). This works with cards from SillyTavern, Chub, etc.
+  - *Built (0.2.0):* V1 JSON too. Cards go into a **character library** (SQLite `cards` table, picture kept as-is). A card is used two ways: **Play as** (fills name, description, personality; guesses race and sex; the picture becomes the portrait) or **Bring along** (a companion the DM voices, at most 3). The card's text is copied into the campaign when it starts (`{{char}}`/`{{user}}` filled in), so deleting a card never breaks a story. A companion's `first_mes` and `alternate_greetings` can open the story as swipes. Card names are exempt from the banned-name filter. `system_prompt` and `post_history_instructions` are ignored (the DM's own rules come first).
 - **Export:** the same formats, so cards made here work elsewhere.
 - **Embedded lorebooks** (`character_book`) are imported as a lorebook linked to that card.
+  - *Built (0.2.0), simple version:* constant entries plus entries whose keys (whole words, or `/regex/`) appear in the last four messages, highest priority first, within about 3,000 characters. The full lorebook engine comes in Milestone 2.
 - App-specific data (the default sheet template, voice settings) goes into the card's `extensions` field under our own namespace, so other apps ignore it safely.
 
 ## Character creator

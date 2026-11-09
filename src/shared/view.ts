@@ -38,6 +38,8 @@ export type CampaignView = {
     xpIntoLevel: number
     xpForNext: number
   }
+  /** Cards in this story: the player's own (for the portrait) and companions the DM plays. */
+  cast: { cardId: string; role: 'player' | 'companion'; name: string; hasImage: boolean }[]
   messages: MessageView[]
   /** The newest message is the player's and the DM hasn't answered yet. */
   awaitingNarration: boolean
@@ -56,6 +58,8 @@ export type CampaignSummary = {
   location: string | null
   day: number
   updatedAt: number
+  /** The player's card, if their portrait comes from one. */
+  portraitId?: string
 }
 
 /** Streamed while a turn is being played out. */

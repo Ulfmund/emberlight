@@ -4,7 +4,7 @@ A roleplaying app with an AI Dungeon Master that works with local models (LM Stu
 
 > **Just want to play?** Follow [docs/INSTALL.md](docs/INSTALL.md): download the installer from **Releases** and double-click it. No command line needed.
 
-The full design is in [docs/spec/](docs/spec/README.md). **Current state: Milestone 1** (playable core): character creator, rules engine, dice, an AI Referee/Narrator/Scribe turn loop, saving with rewinds and rerolls. Memory, lorebooks and combat depth come in Milestones 2 and 3.
+The full design is in [docs/spec/](docs/spec/README.md). **Current state: Milestone 1** (playable core): character creator, rules engine, dice, an AI Referee/Narrator/Scribe turn loop, saving with rewinds and rerolls, and SillyTavern-style character card import. Memory, lorebooks and combat depth come in Milestones 2 and 3.
 
 ## Running it (development)
 
@@ -42,7 +42,8 @@ src/
   main/        Electron: the window, starting the local server
   server/      The local game server (the desktop window and, later, the phone use it)
     ai/          Model providers (OpenAI-compatible, Ollama, Claude) and DM prompts
-    store/       Settings and encrypted API keys (saved in %APPDATA%/Emberlight)
+    cards/       Character card import (PNG / JSON / CHARX) and the character library
+    store/       Settings, encrypted API keys and the save file (in %APPDATA%/Emberlight)
   renderer/    The interface (React)
     src/screens/     Title, Connect, Play
     src/components/  Buttons, icons, embers, story text…

@@ -9,6 +9,7 @@ import { GameDb } from '../store/db'
 import { Campaigns } from './campaigns'
 import { TurnEngine } from './turn'
 import type { Provider, CompleteOptions } from '../ai/providers/types'
+import { CardLibrary } from '../cards/library'
 
 /** A scripted stand-in for a model: the test decides what the Referee, Narrator and Scribe say. */
 class FakeProvider implements Provider {
@@ -214,5 +215,48 @@ describe('turn engine', () => {
     expect(view.state.character.status).toBe('alive')
     expect(view.state.character.conditions).toContain('captured')
     expect(fake.lastMessages.at(-1)!.content).toContain('CAPTURED')
+  })
+  it('brings an imported companion card into the story', async () => {
+    const library = new CardLibrary(db)
+    const card = {
+      spec: 'chara_card_v2',
+      data: {
+        name: 'Elara',
+        description: '{{char}} is an elf archer who distrusts {{user}}.',
+        personality: 'sharp-tongued',
+        scenario: '{{char}} owes {{user}} a debt.',
+        first_mes: '"Well, {{user}}. You found me."',
+        alternate_greetings: ['"Not you again."'],
+        mes_example: '',
+        character_book: { entries: [{ keys: ['tower'], content: 'The Glass Tower burned ten years ago.', enabled: true }] }
+      }
+    }
+    const { card: summary } = library.import(new TextEncoder().encode(JSON.stringify(card)), 'elara.json')
+    // Importing the same file again gives back the same card.
+    expect(library.import(new TextEncoder().encode(JSON.stringify(card)), 'elara.json')).toMatchObject({ existing: true, card: { id: summary.id } })
+
+    const cast = [library.castMember(summary.id, 'companion', build.name)]
+    expect(cast[0].description).toBe('Elara is an elf archer who distrusts Brenna Rook.')
+    const id = campaigns.create(build, DEFAULT_SETTINGS, undefined, { cast, greetings: library.greetings(summary.id, build.name) })
+
+    // The card's greetings open the story, as two versions to flip between.
+    const v0 = campaigns.view(id)
+    expect(v0.awaitingNarration).toBe(false)
+    expect(v0.messages[1]).toMatchObject({ role: 'assistant', content: '"Well, Brenna Rook. You found me."', swipe: { index: 0, count: 2 } })
+    expect(v0.cast).toEqual([{ cardId: summary.id, role: 'companion', name: 'Elara', hasImage: false }])
+
+    fake.narration = 'Elara points at the tower.'
+    await run(engine.act(id, 'I ask her about the tower.', signal))
+    expect(fake.lastSystem).toContain('COMPANIONS (you play them)')
+    expect(fake.lastSystem).toContain('Elara is an elf archer')
+    expect(fake.lastSystem).toContain('The Glass Tower burned ten years ago.')
+    // Elara is normally a banned name, but not when she's an imported character. Kael still is.
+    const dm = campaigns.view(id).messages.at(-1)!.content
+    expect(dm).toMatch(/^Elara points/)
+    expect(dm).not.toMatch(/Kael/)
+
+    // Deleting the card from the library doesn't break the story.
+    library.delete(summary.id)
+    expect(campaigns.view(id).cast[0].name).toBe('Elara')
   })
 })

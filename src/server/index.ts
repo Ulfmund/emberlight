@@ -13,6 +13,8 @@ import { createProvider } from './ai/providers'
 import { Campaigns } from './core/campaigns'
 import { TurnEngine } from './core/turn'
 import { registerGameRoutes } from './routes/game'
+import { registerCardRoutes } from './routes/cards'
+import { CardLibrary } from './cards/library'
 
 export type ServerOptions = {
   dataDir: string
@@ -164,7 +166,9 @@ export async function startServer(opts: ServerOptions): Promise<{ port: number; 
   const db = new GameDb(opts.dataDir)
   const campaigns = new Campaigns(db)
   const turns = new TurnEngine(campaigns, () => settings.connection, (id) => secrets.get(id))
-  registerGameRoutes(app, campaigns, turns)
+  const library = new CardLibrary(db)
+  registerCardRoutes(app, library)
+  registerGameRoutes(app, campaigns, turns, library)
 
   // ---- The UI itself (production) ------------------------------------------------------
   if (opts.staticDir) {

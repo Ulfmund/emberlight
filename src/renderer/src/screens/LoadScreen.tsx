@@ -5,6 +5,7 @@ import { useGame } from '../store'
 import { Button } from '../components/Button'
 import { Icon } from '../components/Icon'
 import { Medallion } from '../components/Medallion'
+import { cardImageUrl } from '@shared/cards'
 import { EmberField } from '../components/EmberField'
 
 const RACE_BY_LABEL: Record<string, RaceId> = { Human: 'human', Dwarf: 'dwarf', Elf: 'elf', Halfling: 'halfling', Orc: 'orc' }
@@ -62,7 +63,7 @@ export function LoadScreen() {
                 exit={{ opacity: 0, scale: 0.95 }}
                 className="panel group relative flex items-center gap-4 rounded-2xl p-4"
               >
-                <Medallion name={c.characterName} race={RACE_BY_LABEL[c.race] ?? 'human'} size={60} dead={c.status === 'dead'} />
+                <Medallion name={c.characterName} race={RACE_BY_LABEL[c.race] ?? 'human'} size={60} dead={c.status === 'dead'} image={c.portraitId ? cardImageUrl(c.portraitId) : undefined} />
                 <button onClick={() => void open(c.id)} className="no-drag min-w-0 flex-1 cursor-pointer text-left">
                   <div className="truncate font-display tracking-wide text-gold-200">{c.name}</div>
                   <div className="truncate text-sm text-parchment-200">

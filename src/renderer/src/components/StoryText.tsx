@@ -1,4 +1,5 @@
 import { Fragment } from 'react'
+import { usePortrait } from '../portraits'
 
 /**
  * Renders DM prose: narration paragraphs, `@Name: "…"` dialogue lines as portrait bubbles,
@@ -63,6 +64,7 @@ export function speakerColor(name: string) {
 
 function Dialogue({ speaker, children }: { speaker: string; children: React.ReactNode }) {
   const color = speakerColor(speaker)
+  const portrait = usePortrait(speaker)
   const initials = speaker
     .split(/\s+/)
     .map((w) => w[0])
@@ -72,14 +74,18 @@ function Dialogue({ speaker, children }: { speaker: string; children: React.Reac
   return (
     <div className="flex items-start gap-3">
       <div
-        className="mt-1 grid h-11 w-11 shrink-0 place-items-center rounded-full border-2 font-display text-sm font-bold text-ink-950 shadow-[0_4px_14px_-4px_rgb(0_0_0/0.8)]"
+        className="mt-1 grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-full border-2 font-display text-sm font-bold text-ink-950 shadow-[0_4px_14px_-4px_rgb(0_0_0/0.8)]"
         style={{
           borderColor: color,
           background: `radial-gradient(circle at 35% 30%, ${color}, color-mix(in oklab, ${color} 40%, #120d10))`
         }}
         title={speaker}
       >
-        {initials}
+        {portrait ? (
+          <img src={portrait} alt="" draggable={false} className="h-full w-full rounded-full object-cover" style={{ objectPosition: 'center 18%' }} />
+        ) : (
+          initials
+        )}
       </div>
       <div className="min-w-0">
         <div className="mb-1 font-display text-[0.78rem] tracking-[0.12em]" style={{ color }}>

@@ -12,6 +12,7 @@ import {
 } from '@shared/rules'
 import type { ChatMessage, Connection } from '@shared/types'
 import type { MessageView, TurnEvent } from '@shared/view'
+import { activeLore } from '@shared/cards'
 import { createProvider, type Provider } from '../ai/providers'
 import { runReferee } from '../ai/jobs/referee'
 import { runScribe } from '../ai/jobs/scribe'
@@ -228,7 +229,10 @@ export class TurnEngine {
       return { role: 'user', content: m.content + extra }
     })
 
-    const system = narratorSystem(after, c.settings, nameSuggestions(this.rng))
+    // Lorebook entries wake up when the last few messages mention their keywords.
+    const recent = path.slice(-4).map((m) => m.content).join('\n')
+    const lore = activeLore(c.cast.flatMap((m) => m.book), recent)
+    const system = narratorSystem(after, c.settings, nameSuggestions(this.rng), c.cast, lore)
     const messages = fitHistory(history, Math.max(4000, ctx.contextChars - system.length - 6000))
 
     const dm = this.campaigns.db.addMessage({
@@ -243,7 +247,7 @@ export class TurnEngine {
     this.campaigns.db.setHead(id, dm.id)
     yield { type: 'narration_start', messageId: dm.id }
 
-    const filter = new NameFilter(id)
+    const filter = new NameFilter(id, [c.build.name, ...c.cast.map((m) => m.name)])
     let text = ''
     let thinking = ''
     let error: string | undefined

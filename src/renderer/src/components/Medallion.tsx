@@ -9,8 +9,8 @@ export const RACE_COLOR: Record<RaceId, string> = {
   orc: '#c45a4a'
 }
 
-/** Placeholder portrait: the character's initials in a gilt ring, coloured by race. */
-export function Medallion({ name, race, size = 72, dead = false }: { name: string; race: RaceId; size?: number; dead?: boolean }) {
+/** The character's portrait in a gilt ring, coloured by race. Without a picture: their initials. */
+export function Medallion({ name, race, size = 72, dead = false, image, badge = true }: { name: string; race: RaceId; size?: number; dead?: boolean; image?: string; badge?: boolean }) {
   const color = RACE_COLOR[race]
   const initials =
     name
@@ -31,15 +31,19 @@ export function Medallion({ name, race, size = 72, dead = false }: { name: strin
         filter: dead ? 'grayscale(1) brightness(0.6)' : undefined
       }}
     >
-      <span className="font-display font-bold text-ink-950/85" style={{ fontSize: size * 0.34 }}>
-        {initials}
-      </span>
-      <span
+      {image ? (
+        <img src={image} alt="" draggable={false} className="absolute inset-0 h-full w-full rounded-full object-cover" style={{ objectPosition: 'center 18%' }} />
+      ) : (
+        <span className="font-display font-bold text-ink-950/85" style={{ fontSize: size * 0.34 }}>
+          {initials}
+        </span>
+      )}
+      {badge && <span
         className="absolute -right-1 -bottom-1 grid place-items-center rounded-full border border-gold-500/50 bg-ink-900 text-gold-300"
         style={{ width: size * 0.4, height: size * 0.4 }}
       >
         <Icon name={`race-${race}`} size={size * 0.26} />
-      </span>
+      </span>}
     </div>
   )
 }

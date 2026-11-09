@@ -39,7 +39,13 @@ async function createWindow() {
     return { action: 'deny' }
   })
 
-  await win.loadURL(devUrl ?? `http://127.0.0.1:${serverPort}/`)
+  // Dropping a file outside a drop zone must never replace the app with that file.
+  const home = devUrl ?? `http://127.0.0.1:${serverPort}/`
+  win.webContents.on('will-navigate', (e, url) => {
+    if (new URL(url).origin !== new URL(home).origin) e.preventDefault()
+  })
+
+  await win.loadURL(home)
 }
 
 app.whenReady().then(async () => {

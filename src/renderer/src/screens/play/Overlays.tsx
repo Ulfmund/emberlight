@@ -4,6 +4,7 @@ import { useGame } from '../../store'
 import { Icon } from '../../components/Icon'
 import { Button } from '../../components/Button'
 import { Medallion } from '../../components/Medallion'
+import { playerPortrait } from '../../portraits'
 
 export function Toasts() {
   const { toasts, dismissToast } = useGame()
@@ -55,7 +56,7 @@ export function DeathScreen({ view }: { view: CampaignView }) {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1.2 }} className="absolute inset-0 z-40 grid place-items-center bg-[radial-gradient(circle,rgb(11_8_9/0.75),rgb(0_0_0/0.96))] backdrop-grayscale">
       <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.8, duration: 1 }} className="flex max-w-md flex-col items-center text-center">
-        <Medallion name={view.build.name} race={view.build.race} size={110} dead />
+        <Medallion name={view.build.name} race={view.build.race} size={110} dead image={playerPortrait(view)} />
         <div className="mt-6 font-display text-sm tracking-[0.4em] text-blood-400">HERE LIES</div>
         <h2 className="mt-1 font-display text-4xl tracking-wider text-parchment-100">{view.build.name}</h2>
         <p className="mt-2 font-story text-lg text-parchment-400 italic">

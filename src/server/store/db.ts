@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync, copyFileSync, existsSync, readdirSync, unlinkSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import type { CampaignSettings, CharacterBuild, GameEvent } from '@shared/rules'
+import type { CardData, CastMember } from '@shared/cards'
 
 /**
  * The save file: one SQLite database in the app's user-data folder.
@@ -41,6 +42,18 @@ export type CampaignRow = {
   head_id: string | null
   settings: CampaignSettings
   build: CharacterBuild
+  /** Cards in this story: the player's own card (if any) and companions the DM plays. */
+  cast: CastMember[]
+}
+
+export type CardRow = {
+  id: string
+  name: string
+  hash: string
+  data: CardData
+  raw: string
+  image_mime: string | null
+  created_at: number
 }
 
 export type EventRow = {
@@ -96,6 +109,16 @@ CREATE TABLE IF NOT EXISTS saves (
   created_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS cards (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  hash TEXT NOT NULL UNIQUE,
+  data TEXT NOT NULL,
+  raw TEXT NOT NULL,
+  image BLOB,
+  image_mime TEXT,
+  created_at INTEGER NOT NULL
+);
 `
 
 export const newId = (prefix: string) =>
@@ -111,7 +134,15 @@ export class GameDb {
     this.db = new DatabaseSync(file)
     this.db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;')
     this.db.exec(SCHEMA)
+    this.migrate()
+  }
+
+  /** Brings older save files up to date. Each step runs once. */
+  private migrate() {
     this.db.prepare("INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version', '1')").run()
+    const cols = (this.db.prepare('PRAGMA table_info(campaigns)').all() as { name: string }[]).map((c) => c.name)
+    if (!cols.includes('cast_json')) this.db.exec("ALTER TABLE campaigns ADD COLUMN cast_json TEXT NOT NULL DEFAULT '[]'")
+    this.db.prepare("UPDATE meta SET value = '2' WHERE key = 'schema_version' AND CAST(value AS INTEGER) < 2").run()
   }
 
   /** Keeps one backup per day for the last 7 days (docs/spec/05-game-state-and-saves.md). */
@@ -155,8 +186,8 @@ export class GameDb {
   createCampaign(c: Omit<CampaignRow, 'created_at' | 'updated_at'>) {
     const now = Date.now()
     this.db
-      .prepare('INSERT INTO campaigns (id, name, created_at, updated_at, head_id, settings, build) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(c.id, c.name, now, now, c.head_id, JSON.stringify(c.settings), JSON.stringify(c.build))
+      .prepare('INSERT INTO campaigns (id, name, created_at, updated_at, head_id, settings, build, cast_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(c.id, c.name, now, now, c.head_id, JSON.stringify(c.settings), JSON.stringify(c.build), JSON.stringify(c.cast))
   }
 
   getCampaign(id: string): CampaignRow | null {
@@ -187,6 +218,39 @@ export class GameDb {
       this.db.prepare('DELETE FROM saves WHERE campaign_id = ?').run(id)
       this.db.prepare('DELETE FROM campaigns WHERE id = ?').run(id)
     })
+  }
+
+  // ---- character library ------------------------------------------------------------
+
+  addCard(c: Omit<CardRow, 'created_at'> & { image: Uint8Array | null }): CardRow {
+    const now = Date.now()
+    this.db
+      .prepare('INSERT INTO cards (id, name, hash, data, raw, image, image_mime, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(c.id, c.name, c.hash, JSON.stringify(c.data), c.raw, c.image, c.image_mime, now)
+    return { id: c.id, name: c.name, hash: c.hash, data: c.data, raw: c.raw, image_mime: c.image_mime, created_at: now }
+  }
+
+  getCard(id: string): CardRow | null {
+    const r = this.db.prepare('SELECT id, name, hash, data, raw, image_mime, created_at FROM cards WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    return r ? toCard(r) : null
+  }
+
+  cardByHash(hash: string): CardRow | null {
+    const r = this.db.prepare('SELECT id, name, hash, data, raw, image_mime, created_at FROM cards WHERE hash = ?').get(hash) as Record<string, unknown> | undefined
+    return r ? toCard(r) : null
+  }
+
+  listCards(): CardRow[] {
+    return (this.db.prepare('SELECT id, name, hash, data, raw, image_mime, created_at FROM cards ORDER BY created_at DESC').all() as Record<string, unknown>[]).map(toCard)
+  }
+
+  cardImage(id: string): { bytes: Uint8Array; mime: string } | null {
+    const r = this.db.prepare('SELECT image, image_mime FROM cards WHERE id = ?').get(id) as { image: Uint8Array | null; image_mime: string | null } | undefined
+    return r?.image && r.image_mime ? { bytes: r.image, mime: r.image_mime } : null
+  }
+
+  deleteCard(id: string) {
+    this.db.prepare('DELETE FROM cards WHERE id = ?').run(id)
   }
 
   // ---- messages -----------------------------------------------------------------------
@@ -277,7 +341,20 @@ function toCampaign(r: Record<string, unknown>): CampaignRow {
     updated_at: Number(r.updated_at),
     head_id: r.head_id == null ? null : String(r.head_id),
     settings: JSON.parse(String(r.settings)),
-    build: JSON.parse(String(r.build))
+    build: JSON.parse(String(r.build)),
+    cast: JSON.parse(String(r.cast_json ?? '[]'))
+  }
+}
+
+function toCard(r: Record<string, unknown>): CardRow {
+  return {
+    id: String(r.id),
+    name: String(r.name),
+    hash: String(r.hash),
+    data: JSON.parse(String(r.data)),
+    raw: String(r.raw),
+    image_mime: r.image_mime == null ? null : String(r.image_mime),
+    created_at: Number(r.created_at)
   }
 }
 

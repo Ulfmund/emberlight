@@ -21,6 +21,7 @@ import {
   type SkillId
 } from '@shared/rules'
 import type { ChatMessage } from '@shared/types'
+import type { CardBookEntry, CastMember } from '@shared/cards'
 import { formatCoins } from '../core/campaigns'
 
 /**
@@ -37,7 +38,34 @@ const TONE = {
   horror: 'creeping horror: dread, the unknown, and fragile people'
 }
 
-export function narratorSystem(state: GameState, settings: CampaignSettings, names: string[]): string {
+const clip = (s: string, max: number) => (s.length > max ? `${s.slice(0, max).replace(/\s+\S*$/, '')} […]` : s)
+
+/** Companions from imported cards, played by the DM. */
+function companionBlock(cast: CastMember[]): string {
+  const comps = cast.filter((m) => m.role === 'companion')
+  if (!comps.length) return ''
+  const one = (m: CastMember) =>
+    [
+      `${m.name}:`,
+      m.description && clip(m.description, 4000),
+      m.personality && `Personality: ${clip(m.personality, 800)}`,
+      m.scenario && `Their situation: ${clip(m.scenario, 1200)}`,
+      m.mesExample && `How they talk (examples only; never repeat them):\n${clip(m.mesExample.replace(/<START>/gi, '').trim(), 1500)}`
+    ]
+      .filter(Boolean)
+      .join('\n')
+  return `\n\nCOMPANIONS (you play them)
+${comps.length === 1 ? 'This character travels' : 'These characters travel'} with the player. You voice them and decide what they do, like any other non-player character: they have their own will, can disagree, get hurt or die, and don't solve the player's problems for them. Their speech uses the @Name: line format too.
+${comps.map(one).join('\n\n')}`
+}
+
+/** Lorebook entries from the cast's cards that the recent story touches. */
+export function loreBlock(entries: CardBookEntry[]): string {
+  if (!entries.length) return ''
+  return `\n\nWORLD NOTES (background facts; use them when they matter)\n${entries.map((e) => `- ${e.content.trim()}`).join('\n')}`
+}
+
+export function narratorSystem(state: GameState, settings: CampaignSettings, names: string[], cast: CastMember[] = [], lore: CardBookEntry[] = []): string {
   const c = state.character
   const b = c.build
   const d = derived(state, settings)
@@ -83,7 +111,7 @@ Renown: ${tier}${deeds ? `, known for: ${deeds}` : ''}. ${renownGuide(tier, b.se
 Carrying: ${c.inventory.map((i) => `${i.name}${i.qty > 1 ? ` ×${i.qty}` : ''}`).join(', ') || 'nothing'}; ${formatCoins(c.coins)}.
 ${c.status === 'downed' ? 'STATUS: DOWNED: unconscious and dying.\n' : c.status === 'dead' ? 'STATUS: DEAD.\n' : ''}
 WHERE AND WHEN
-Day ${state.time.day}, ${timeOfDay}${state.location ? `, at ${state.location}` : ''}.`
+Day ${state.time.day}, ${timeOfDay}${state.location ? `, at ${state.location}` : ''}.${companionBlock(cast)}${loreBlock(lore)}`
 }
 
 function renownGuide(tier: string, sex: 'male' | 'female', settings: CampaignSettings) {
@@ -190,9 +218,16 @@ export function extractRollRequest(text: string): {
  */
 export class NameFilter {
   private pending = ''
-  private banned = new Set(BANNED_NAMES)
+  private banned: Set<string>
 
-  constructor(private campaignId: string) {}
+  /** `allowed`: names that must never be swapped (the player's, and imported characters'). */
+  constructor(
+    private campaignId: string,
+    allowed: string[] = []
+  ) {
+    const keep = new Set(allowed.flatMap((n) => n.split(/[^A-Za-z]+/)).filter(Boolean))
+    this.banned = new Set(BANNED_NAMES.filter((n) => !keep.has(n)))
+  }
 
   private replacement(name: string): string {
     let h = 2166136261

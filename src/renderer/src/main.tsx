@@ -17,6 +17,9 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has('test')) {
   document.documentElement.classList.add('test-mode')
 }
 
+// Files dropped anywhere but a drop zone are ignored (instead of the window opening them).
+for (const type of ['dragover', 'drop'] as const) window.addEventListener(type, (e) => e.preventDefault())
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     {/* "user" = follow the operating system's reduce-motion setting */}

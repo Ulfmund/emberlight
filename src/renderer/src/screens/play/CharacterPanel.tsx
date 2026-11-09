@@ -2,6 +2,8 @@ import { AnimatePresence, motion } from 'motion/react'
 import { AGES, BACKGROUNDS, CONDITIONS, RACES, SEXES } from '@shared/rules'
 import type { CampaignView } from '@shared/view'
 import { Medallion } from '../../components/Medallion'
+import { cardImageUrl } from '@shared/cards'
+import { playerPortrait } from '../../portraits'
 import { Bar } from '../../components/Bar'
 import { Icon } from '../../components/Icon'
 import { Tip } from '../../components/Tip'
@@ -29,7 +31,7 @@ export function CharacterPanel({ view, onOpenSheet }: { view: CampaignView; onOp
   return (
     <aside className="relative z-10 flex w-72 shrink-0 flex-col gap-5 overflow-y-auto border-r border-gold-500/15 bg-ink-950/70 p-5 backdrop-blur">
       <div className="flex flex-col items-center text-center">
-        <Medallion name={b.name} race={b.race} size={92} dead={c.status === 'dead'} />
+        <Medallion name={b.name} race={b.race} size={92} dead={c.status === 'dead'} image={playerPortrait(view)} />
         <div className="mt-3 font-display text-lg tracking-wide text-gold-200">{b.name}</div>
         <div className="text-xs text-parchment-400">
           {RACES[b.race].label} · {SEXES[view.settings.sexModifiers][b.sex].label} · {AGES[b.age].label}
@@ -48,6 +50,22 @@ export function CharacterPanel({ view, onOpenSheet }: { view: CampaignView; onOp
           </motion.div>
         )}
       </AnimatePresence>
+
+      {view.cast.some((m) => m.role === 'companion') && (
+        <div>
+          <div className="mb-2 text-[0.68rem] font-semibold tracking-[0.14em] text-gold-400 uppercase">Travelling with</div>
+          <div className="space-y-2">
+            {view.cast
+              .filter((m) => m.role === 'companion')
+              .map((m) => (
+                <div key={m.cardId} className="flex items-center gap-2.5 text-sm text-parchment-200">
+                  <Medallion name={m.name} race="human" size={32} badge={false} image={m.hasImage ? cardImageUrl(m.cardId) : undefined} />
+                  <span className="truncate">{m.name}</span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
 
       <div className="space-y-3">
         <Bar value={c.hp} max={d.maxHp} color="#d9574c" icon="heart" label="Health" />

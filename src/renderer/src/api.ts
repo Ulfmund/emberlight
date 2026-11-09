@@ -1,6 +1,9 @@
 import type { Connection, SettingsView, TestResult, UpdateStatus } from '@shared/types'
 import type { CampaignSettings, CharacterBuild, Attr } from '@shared/rules'
 import type { CampaignSummary, CampaignView, TurnEvent } from '@shared/view'
+import type { CardDetail, CardSummary } from '@shared/cards'
+
+export type CreateOptions = { playerCard?: string; companions?: string[]; useGreeting?: boolean }
 
 async function json<T>(res: Response): Promise<T> {
   const body = await res.json().catch(() => ({}))
@@ -31,8 +34,19 @@ export const api = {
   // ---- campaigns
   campaigns: () => fetch('/api/campaigns').then((r) => json<CampaignSummary[]>(r)),
   campaign: (id: string) => fetch(`/api/campaigns/${id}`).then((r) => json<CampaignView>(r)),
-  createCampaign: (build: CharacterBuild, settings: CampaignSettings, name?: string) =>
-    post('/api/campaigns', { build, settings, name }).then((r) => json<{ id: string }>(r)),
+  createCampaign: (build: CharacterBuild, settings: CampaignSettings, opts: CreateOptions = {}) =>
+    post('/api/campaigns', { build, settings, ...opts }).then((r) => json<{ id: string }>(r)),
+
+  // ---- character library
+  cards: () => fetch('/api/cards').then((r) => json<CardSummary[]>(r)),
+  card: (id: string) => fetch(`/api/cards/${encodeURIComponent(id)}`).then((r) => json<CardDetail>(r)),
+  importCard: (file: File) =>
+    fetch('/api/cards/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream', 'X-Filename': encodeURIComponent(file.name) },
+      body: file
+    }).then((r) => json<{ card: CardSummary; existing: boolean }>(r)),
+  deleteCard: (id: string) => fetch(`/api/cards/${encodeURIComponent(id)}`, { method: 'DELETE' }).then((r) => json<CardSummary[]>(r)),
   deleteCampaign: (id: string) => fetch(`/api/campaigns/${id}`, { method: 'DELETE' }).then((r) => json<{ ok: boolean }>(r)),
   updateCampaignSettings: (id: string, s: CampaignSettings) => put(`/api/campaigns/${id}/settings`, s).then((r) => json<CampaignView>(r)),
   swipe: (id: string, messageId: string) => post(`/api/campaigns/${id}/swipe`, { messageId }).then((r) => json<CampaignView>(r)),
