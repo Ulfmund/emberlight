@@ -48,4 +48,30 @@ export function portraitPrompt(style: string, who: { kind: string; details: stri
   return parts.join(', ').replace(/\s+/g, ' ').slice(0, 1500)
 }
 
+/**
+ * The art style without what only suits a portrait ("head and shoulders", "portrait"), for
+ * pictures of places and emblems.
+ */
+export function styleBeyondFaces(style: string): string {
+  return style
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s && !/\b(head and shoulders|head-and-shoulders|headshot|bust|close-?up|face)\b/i.test(s))
+    .map((s) => s.replace(/\bportraits?\b/gi, '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .join(', ')
+}
+
+/** A place, painted wide: the scene itself, with nobody in the way. */
+export function scenePrompt(style: string, place: { what: string; details: string[] }): string {
+  const parts = [styleBeyondFaces(style), `landscape painting of ${place.what}`, ...place.details.map((d) => d.trim().replace(/\.$/, '')), 'wide view, no figures'].filter(Boolean)
+  return parts.join(', ').replace(/\s+/g, ' ').slice(0, 1500)
+}
+
+/** A group's sign: the banner or crest its people would carry. */
+export function emblemPrompt(style: string, group: { what: string; details: string[] }): string {
+  const parts = [styleBeyondFaces(style), `heraldic emblem of ${group.what}`, ...group.details.map((d) => d.trim().replace(/\.$/, '')), 'a banner or crest, centred, plain background'].filter(Boolean)
+  return parts.join(', ').replace(/\s+/g, ' ').slice(0, 1500)
+}
+
 export const mediaUrl = (id: string) => `/api/media/${encodeURIComponent(id)}`

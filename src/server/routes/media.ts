@@ -1,6 +1,6 @@
 import type { Hono } from 'hono'
 import { z } from 'zod'
-import { ImageSettingsSchema, portraitPrompt } from '@shared/images'
+import { ImageSettingsSchema, emblemPrompt, portraitPrompt, scenePrompt } from '@shared/images'
 import { AGES, BACKGROUNDS, RACES, SEXES } from '@shared/rules'
 import { projectMemory } from '@shared/memory'
 import type { Campaigns } from '../core/campaigns'
@@ -134,7 +134,8 @@ export function registerMediaRoutes(app: Hono, campaigns: Campaigns, turns: Turn
     if (!p.success) return c.json({ error: 'Write a prompt first.' }, 400)
     if (!campaigns.db.getCampaign(id)) return c.json({ error: 'That adventure no longer exists.' }, 404)
     try {
-      const pic = await generateImage(settings.images, await secrets.get('images'), p.data.prompt, { signal: c.req.raw.signal })
+      const record = p.data.entity ? projectMemory(campaigns.activeEvents(campaigns.get(id), campaigns.path(campaigns.get(id))).map((x) => x.event)).entities.find((x) => x.id === p.data.entity) : undefined
+      const pic = await generateImage(settings.images, await secrets.get('images'), p.data.prompt, { signal: c.req.raw.signal, wide: record?.kind === 'place' })
       const media = campaigns.db.addMedia({ campaignId: id, kind: 'generated', mime: pic.mime, data: pic.data })
       if (p.data.entity) campaigns.journal(id, { type: 'entity_edit', id: p.data.entity, image: media })
       else campaigns.setPortrait(id, media)
@@ -151,7 +152,10 @@ function portraitFor(campaigns: Campaigns, settings: SettingsStore, id: string, 
   const view = campaigns.view(id)
   if (entityId) {
     const e = projectMemory(campaigns.activeEvents(campaigns.get(id), campaigns.path(campaigns.get(id))).map((x) => x.event)).entities.find((x) => x.id === entityId)
-    if (!e) throw new Error('That person is no longer in the Journal.')
+    if (!e) throw new Error('That is no longer in the Journal.')
+    const what = e.summary ? `${e.name}, ${e.summary.replace(/\.$/, '')}` : e.name
+    if (e.kind === 'place') return scenePrompt(style, { what, details: e.facts.slice(-2) })
+    if (e.kind === 'faction') return emblemPrompt(style, { what, details: e.facts.filter((f) => !/\([+−-]\d\)$/.test(f)).slice(-1) })
     return portraitPrompt(style, { kind: e.summary ? e.summary.replace(/\.$/, '') : e.name, details: e.facts.slice(-2) })
   }
   const b = view.state.character.build

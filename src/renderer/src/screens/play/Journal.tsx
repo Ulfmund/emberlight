@@ -12,6 +12,7 @@ import { LoreEditor } from '../LoreEditor'
 import { RenameDialog } from './RenameDialog'
 import { PortraitDialog } from './PortraitDialog'
 import { TravelButton } from './Party'
+import { JourneyMap } from './JourneyMap'
 import { mediaUrl } from '@shared/images'
 
 /**
@@ -20,7 +21,7 @@ import { mediaUrl } from '@shared/images'
  * correction to what the DM knows.
  */
 
-type Section = 'people' | 'places' | 'factions' | 'story' | 'notes' | 'lore' | 'fallen'
+type Section = 'people' | 'places' | 'map' | 'factions' | 'story' | 'notes' | 'lore' | 'fallen'
 
 const ATTITUDE_INFO: Record<Attitude, { label: string; color: string }> = {
   hostile: { label: 'Hostile', color: '#d9574c' },
@@ -53,6 +54,7 @@ export function Journal({ view, open, onClose }: { view: CampaignView; open: boo
   const sections: { id: Section; label: string; icon: string; count?: number }[] = [
     { id: 'people', label: 'People', icon: 'user', count: people.length },
     { id: 'places', label: 'Places', icon: 'map', count: places.length },
+    ...(view.journey?.stops.length ? [{ id: 'map' as const, label: 'Map', icon: 'signpost' }] : []),
     ...(factions.length ? [{ id: 'factions' as const, label: 'Factions', icon: 'party', count: factions.length }] : []),
     { id: 'story', label: 'Story', icon: 'scroll', count: m.scenes.length + m.chapters.length || undefined },
     { id: 'notes', label: 'Pinned', icon: 'pin', count: m.notes.length || undefined },
@@ -113,6 +115,12 @@ export function Journal({ view, open, onClose }: { view: CampaignView; open: boo
                 {section === 'people' && <EntityList view={view} items={people} kind="person" />}
                 {section === 'places' && <EntityList view={view} items={places} kind="place" />}
                 {section === 'factions' && <EntityList view={view} items={factions} kind="faction" />}
+                {section === 'map' && (
+                  <>
+                    <Heading title="Map" text="Everywhere you have been, and the ways between. Tap a place to see what you know of it." />
+                    <JourneyMap view={view} />
+                  </>
+                )}
                 {section === 'story' && <StorySection view={view} />}
                 {section === 'notes' && <NotesSection view={view} />}
                 {section === 'lore' && <LoreSection view={view} />}
@@ -228,15 +236,19 @@ function EntityCard({ entity: e, view }: { entity: Entity; view: CampaignView })
       exit={{ opacity: 0, height: 0 }}
       className={`group relative rounded-xl border bg-ink-850/80 p-4 ${editing ? 'border-gold-400/60' : 'border-gold-500/15 hover:border-gold-500/35'}`}
     >
+      {!editing && e.kind === 'place' && e.image && (
+        <button type="button" onClick={() => setPicturing(true)} className="no-drag mb-3 block w-full cursor-pointer overflow-hidden rounded-lg border border-gold-500/15" title={`A picture of ${e.name}`}>
+          <img src={mediaUrl(e.image)} alt="" className="h-36 w-full object-cover md:h-44" />
+        </button>
+      )}
       {editing ? (
         <EntityEditor entity={e} onDone={() => setEditing(false)} />
       ) : (
         <div className="flex gap-4">
           <button
             type="button"
-            onClick={() => e.kind === 'person' && setPicturing(true)}
-            disabled={e.kind !== 'person'}
-            title={e.kind === 'person' ? `A picture of ${e.name}` : undefined}
+            onClick={() => setPicturing(true)}
+            title={`A picture of ${e.name}`}
             className="no-drag grid h-12 w-12 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-full border-2 font-display text-base font-bold text-ink-950 disabled:cursor-default"
             style={{
               borderColor: color,
@@ -256,7 +268,7 @@ function EntityCard({ entity: e, view }: { entity: Entity; view: CampaignView })
               initials(e.name)
             )}
           </button>
-          {e.kind === 'person' && <PortraitDialog open={picturing} onClose={() => setPicturing(false)} entity={{ id: e.id, name: e.name }} />}
+          <PortraitDialog open={picturing} onClose={() => setPicturing(false)} entity={{ id: e.id, name: e.name }} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 pr-16">
               <span className={`font-display text-lg tracking-wide ${dead ? 'text-parchment-400 line-through decoration-blood-400/60' : 'text-parchment-50'}`}>{e.name}</span>

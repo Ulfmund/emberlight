@@ -57,7 +57,7 @@ Built in milestones. Each one ends with something playable, so the artist can te
 - Ambient audio and dynamic music ([09](09-audio.md)) ✅ 0.16.0 (made on the spot, or from your own tagged tracks)
 - Semantic (embedding) memory search
 - Faction reputation ✅ 0.18.0 (standing from hated to honoured, moved by your deeds; it counts on social checks with their people)
-- Location art; a simple map of visited places
+- Location art; a simple map of visited places ✅ 0.19.0 (wide pictures of places, emblems for factions, and the Journal's map of the way so far)
 - Companions travelling with the player (AI-controlled in combat) ✅ 0.17.0 (up to four, from cards or the story; five fighting roles; healers can save you)
 
 ## v2 — Life sim (if the artist wants it)

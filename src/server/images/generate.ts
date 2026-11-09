@@ -31,9 +31,14 @@ function reach(err: unknown, server: string, url: string): never {
 
 const sniff = (b: Buffer): string => (b[0] === 0x89 && b[1] === 0x50 ? 'image/png' : b[0] === 0xff && b[1] === 0xd8 ? 'image/jpeg' : b.subarray(8, 12).toString('latin1') === 'WEBP' ? 'image/webp' : 'image/png')
 
+/** Square by default; a wide picture (a place) is half as wide again, kept to multiples of 64. */
+export function dimensions(s: Pick<ImageSettings, 'size'>, wide = false): { width: number; height: number } {
+  return wide ? { width: Math.round((s.size * 1.5) / 64) * 64, height: s.size } : { width: s.size, height: s.size }
+}
+
 /** ComfyUI: a plain checkpoint text-to-image graph, if the player hasn't given their own. */
-export function comfyWorkflow(s: ImageSettings, prompt: string, seed: number): Record<string, unknown> {
-  const values: Record<string, string | number> = { prompt, negative: s.negative, seed, width: s.size, height: s.size, steps: s.steps, model: s.model }
+export function comfyWorkflow(s: ImageSettings, prompt: string, seed: number, dims = dimensions(s)): Record<string, unknown> {
+  const values: Record<string, string | number> = { prompt, negative: s.negative, seed, width: dims.width, height: dims.height, steps: s.steps, model: s.model }
   if (s.workflow.trim()) {
     // Each placeholder becomes the value, JSON-escaped. "{{seed}}" on its own becomes the bare value
     // (so numbers stay numbers); inside a longer string it's spliced in.
@@ -53,7 +58,7 @@ export function comfyWorkflow(s: ImageSettings, prompt: string, seed: number): R
   return {
     '3': { class_type: 'KSampler', inputs: { seed, steps: s.steps, cfg: 6.5, sampler_name: 'dpmpp_2m', scheduler: 'karras', denoise: 1, model: ['4', 0], positive: ['6', 0], negative: ['7', 0], latent_image: ['5', 0] } },
     '4': { class_type: 'CheckpointLoaderSimple', inputs: { ckpt_name: s.model.trim() } },
-    '5': { class_type: 'EmptyLatentImage', inputs: { width: s.size, height: s.size, batch_size: 1 } },
+    '5': { class_type: 'EmptyLatentImage', inputs: { width: dims.width, height: dims.height, batch_size: 1 } },
     '6': { class_type: 'CLIPTextEncode', inputs: { text: prompt, clip: ['4', 1] } },
     '7': { class_type: 'CLIPTextEncode', inputs: { text: s.negative, clip: ['4', 1] } },
     '8': { class_type: 'VAEDecode', inputs: { samples: ['3', 0], vae: ['4', 2] } },
@@ -61,7 +66,8 @@ export function comfyWorkflow(s: ImageSettings, prompt: string, seed: number): R
   }
 }
 
-export async function generateImage(s: ImageSettings, key: string | undefined, prompt: string, opts: { signal?: AbortSignal; pollMs?: number; timeoutMs?: number } = {}): Promise<Picture> {
+export async function generateImage(s: ImageSettings, key: string | undefined, prompt: string, opts: { signal?: AbortSignal; pollMs?: number; timeoutMs?: number; wide?: boolean } = {}): Promise<Picture> {
+  const dims = dimensions(s, opts.wide)
   const base = trimUrl(s.baseUrl)
   if (s.backend === 'none' || !base) throw new ImageError('No image generator is set up. Choose one under Connect a Model, Images.')
   const timeout = opts.timeoutMs ?? 300_000
@@ -78,8 +84,8 @@ export async function generateImage(s: ImageSettings, key: string | undefined, p
         body: JSON.stringify({
           prompt,
           negative_prompt: s.negative,
-          width: s.size,
-          height: s.size,
+          width: dims.width,
+          height: dims.height,
           steps: s.steps,
           cfg_scale: 6,
           batch_size: 1,
@@ -100,7 +106,7 @@ export async function generateImage(s: ImageSettings, key: string | undefined, p
   if (s.backend === 'comfyui') {
     const server = 'ComfyUI'
     const seed = Math.floor(Math.random() * 2 ** 31)
-    const workflow = comfyWorkflow(s, prompt, seed)
+    const workflow = comfyWorkflow(s, prompt, seed, dims)
     let id: string
     try {
       const res = await fetch(`${base}/prompt`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal, body: JSON.stringify({ prompt: workflow, client_id: 'emberlight' }) })
@@ -135,7 +141,7 @@ export async function generateImage(s: ImageSettings, key: string | undefined, p
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       signal,
-      body: JSON.stringify({ model: s.model.trim() || 'gpt-image-1', prompt, n: 1, size: '1024x1024' })
+      body: JSON.stringify({ model: s.model.trim() || 'gpt-image-1', prompt, n: 1, size: opts.wide ? '1536x1024' : '1024x1024' })
     })
   } catch (err) {
     reach(err, server, base)

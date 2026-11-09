@@ -91,6 +91,8 @@ Optional. Configured once under *Settings → Images*.
 
 *Built (0.14.0)* (`src/server/images/generate.ts`, `src/shared/images.ts`): an **Images** section on the Connect screen (on the computer only, like API keys): the generator, its address, a model (a checkpoint for SD or ComfyUI, e.g. `gpt-image-1` for an images API), an API key for images APIs (encrypted with the other keys), the **art style** added to every portrait, what to leave out, size and steps, and for ComfyUI an optional workflow of your own in API format with `{{prompt}}`, `{{negative}}`, `{{seed}}`, `{{width}}`, `{{height}}`, `{{steps}}` and `{{model}}` placeholders (otherwise a basic checkpoint text-to-image graph). **Test** paints a sample. Portraits are made from the **picture dialog**: tap your character's portrait (character panel) or a person's circle in the Journal; the prompt (style + what the sheet or the Journal says about them) can be edited first. Pictures live in the save file (a `media` table) and travel with an exported adventure.
 
+*Built (0.19.0):* **places and factions** take pictures too, from their circle in the Journal. A place is painted wide (half as wide again as tall; 1536×1024 from an images API) from a scenery prompt ("landscape painting of …, wide view, no figures"), and shows as a banner on its Journal card, on the map, and under the character panel while you're there. A faction gets an emblem ("heraldic emblem of …, a banner or crest").
+
 ## Image input (show the AI a picture)
 
 Drag an image into the chat or onto an entity:

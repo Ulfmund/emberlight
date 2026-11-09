@@ -60,6 +60,10 @@ The goal is that it **looks and feels like a game**: clear panels, icons for eve
 
 **Dice tray:** an overlay that slides up when a roll is waiting. You click and flick to throw (or shake the phone).
 
+### Map
+
+*Built (0.19.0).* The Journal's **Map** is a traveller's sketch rather than a survey: every place the character has been (from the Scribe's locations on the branch being played), drawn with an icon and colour for its kind (town, village, indoors, road, forest, hills, water, ruin, underground, wild), joined by the ways walked between them (thicker for ways walked more often), with a glowing ring where the character is now. The layout is worked out from the journey itself (places start along the way they were reached, then ways pull like strings and places push apart), so the same journey always draws the same way. Tap a place for its picture, what's known of it, and how often and when you were there. Code: `src/shared/journey.ts`, `src/renderer/src/screens/play/JourneyMap.tsx`.
+
 ## Mobile layout
 
 - The story feed fills the screen. HP / stamina / mana are thin bars pinned at the top.

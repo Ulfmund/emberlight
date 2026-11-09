@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { DEFAULT_IMAGE_SETTINGS, portraitPrompt, type ImageSettings } from '@shared/images'
-import { comfyWorkflow, generateImage } from './generate'
+import { DEFAULT_IMAGE_SETTINGS, emblemPrompt, portraitPrompt, scenePrompt, styleBeyondFaces, type ImageSettings } from '@shared/images'
+import { comfyWorkflow, dimensions, generateImage } from './generate'
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4])
 
@@ -78,6 +78,24 @@ describe('image generators', () => {
     const call = seen.find((s) => s.path === '/v1/images/generations')!
     expect(call.auth).toBe('Bearer sk-test')
     expect(call.body).toMatchObject({ model: 'gpt-image-1', prompt: 'a bard', n: 1 })
+  })
+
+  it('paints places wide, and groups as an emblem', async () => {
+    expect(scenePrompt('oil painting', { what: 'Millbrook Crossing, a ferry landing', details: ['the ferry is gone.'] })).toBe('oil painting, landscape painting of Millbrook Crossing, a ferry landing, the ferry is gone, wide view, no figures')
+    expect(emblemPrompt('', { what: 'the Town Watch', details: [] })).toBe('heraldic emblem of the Town Watch, a banner or crest, centred, plain background')
+    // The default style is for faces: a place keeps the look, not the framing.
+    expect(styleBeyondFaces(DEFAULT_IMAGE_SETTINGS.style)).not.toMatch(/portrait|head and shoulders/i)
+    expect(styleBeyondFaces('painterly fantasy portrait, head and shoulders, oil painting')).toBe('painterly fantasy, oil painting')
+    expect(dimensions({ size: 768 })).toEqual({ width: 768, height: 768 })
+    expect(dimensions({ size: 768 }, true)).toEqual({ width: 1152, height: 768 })
+    expect(dimensions({ size: 1024 }, true)).toEqual({ width: 1536, height: 1024 })
+    seen.length = 0
+    await generateImage(settings({ backend: 'sdwebui' }), undefined, 'a ford', { wide: true })
+    expect(seen.find((s) => s.path === '/sdapi/v1/txt2img')!.body).toMatchObject({ width: 1152, height: 768 })
+    const graph = comfyWorkflow(settings({ backend: 'comfyui', model: 'm' }), 'a ford', 1, dimensions({ size: 768 }, true)) as Record<string, { inputs: Record<string, unknown> }>
+    expect(graph['5'].inputs).toMatchObject({ width: 1152, height: 768 })
+    await generateImage(settings({ backend: 'openai', baseUrl: `${base}/v1` }), 'sk-test', 'a ford', { wide: true })
+    expect(seen.find((s) => s.path === '/v1/images/generations')!.body).toMatchObject({ size: '1536x1024' })
   })
 
   it('says plainly when nothing is set up or the server is down', async () => {

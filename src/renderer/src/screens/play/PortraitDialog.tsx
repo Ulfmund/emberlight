@@ -10,9 +10,9 @@ import { Medallion } from '../../components/Medallion'
 import { playerPortrait } from '../../portraits'
 
 /**
- * A picture of someone (docs/spec/03-characters-and-cards.md#image-input, #image-generation): the
- * player character, or a person from the Journal. Upload one (the DM can put it into words for
- * the story), make one with the image generator, or take it away.
+ * A picture (docs/spec/03-characters-and-cards.md#image-input, #image-generation): of the player
+ * character, or of a person, a place or a group from the Journal. Upload one (the DM can put a
+ * portrait into words for the story), make one with the image generator, or take it away.
  */
 export function PortraitDialog({ open, onClose, entity }: { open: boolean; onClose: () => void; entity?: { id: string; name: string } }) {
   const view = useGame((s) => s.view)
@@ -41,8 +41,10 @@ export function PortraitDialog({ open, onClose, entity }: { open: boolean; onClo
   }, [open, view?.id, entity?.id])
 
   if (!view) return null
-  const person = entity ? view.memory.entities.find((e) => e.id === entity.id) : undefined
-  const current = entity ? (person?.image ? mediaUrl(person.image) : undefined) : playerPortrait(view)
+  const record = entity ? view.memory.entities.find((e) => e.id === entity.id) : undefined
+  const current = entity ? (record?.image ? mediaUrl(record.image) : undefined) : playerPortrait(view)
+  const place = record?.kind === 'place'
+  const group = record?.kind === 'faction'
   const name = entity?.name ?? view.build.name
   const setView = (v: typeof view) => useGame.setState({ view: v })
 
@@ -121,7 +123,13 @@ export function PortraitDialog({ open, onClose, entity }: { open: boolean; onClo
             </div>
 
             <div className="mt-4 flex items-center gap-4">
-              <Medallion name={name} race={entity ? 'human' : view.build.race} size={110} badge={false} image={current} />
+              {place ? (
+                <div className="grid h-[110px] w-[165px] shrink-0 place-items-center overflow-hidden rounded-xl border-2 border-gold-500/40 bg-ink-800">
+                  {current ? <img src={current} alt="" className="h-full w-full object-cover" /> : <Icon name="map" size={34} className="text-gold-400/60" />}
+                </div>
+              ) : (
+                <Medallion name={name} race={entity ? 'human' : view.build.race} size={110} badge={false} image={current} />
+              )}
               <div className="min-w-0 flex-1 space-y-2">
                 <input ref={picker} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={(e) => void upload(e.target.files?.[0]).then(() => (e.target.value = ''))} />
                 <Button variant="secondary" size="sm" icon="upload" disabled={Boolean(working)} onClick={() => picker.current?.click()} className="w-full">
@@ -165,13 +173,13 @@ export function PortraitDialog({ open, onClose, entity }: { open: boolean; onClo
                       </Button>
                     )}
                     <Button variant="primary" size="sm" icon="sparkle" disabled={Boolean(working) || prompt.trim().length < 3} onClick={() => void make()}>
-                      {working === 'make' ? 'Painting… (this can take a minute)' : 'Make a portrait'}
+                      {working === 'make' ? 'Painting… (this can take a minute)' : place ? 'Paint the place' : group ? 'Make their emblem' : 'Make a portrait'}
                     </Button>
                   </div>
                 </>
               ) : (
                 <p className="mt-1 text-sm text-parchment-400">
-                  Set up an image generator (Stable Diffusion, ComfyUI, or an images API) under <span className="text-gold-300">Connect a Model</span>, and portraits can be made from what the story knows.
+                  Set up an image generator (Stable Diffusion, ComfyUI, or an images API) under <span className="text-gold-300">Connect a Model</span>, and pictures can be made from what the story knows.
                 </p>
               )}
             </div>

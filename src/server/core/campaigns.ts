@@ -7,6 +7,7 @@ import {
   charXpForLevel,
   derived,
   initialState,
+  applyEvent,
   project,
   RACES,
   RENOWN_TIERS,
@@ -40,6 +41,7 @@ import {
 import type { CampaignSummary, CampaignView, ChangeLine, MessageView } from '@shared/view'
 import type { CastMember } from '@shared/cards'
 import { projectMemory, sameName, type MemoryEvent } from '@shared/memory'
+import { journeyOf } from '@shared/journey'
 import { normalizeEntry, type LoreEntry } from '@shared/lore'
 import type { World } from '@shared/worlds'
 import { GameDb, newId, type CampaignRow, type EventRow, type LorebookRow, type MessageRow } from '../store/db'
@@ -175,7 +177,8 @@ export class Campaigns {
     const all = this.db.messagesFor(id)
     const path = this.path(c, all)
     const events = this.activeEvents(c, path)
-    const state = project(this.start(c), events.map((e) => e.event), c.settings)
+    // One pass: the state, and the journey that led to it.
+    const { state, journey } = journeyOf(this.start(c), events.map((e) => e.event), (st, ev) => applyEvent(st, ev, c.settings))
 
     const children = new Map<string, MessageRow[]>()
     for (const m of all) {
@@ -242,6 +245,7 @@ export class Campaigns {
       },
       cast: c.cast.map((m) => ({ cardId: m.cardId, role: m.role, name: m.name, hasImage: m.hasImage })),
       memory: projectMemory(events.map((e) => e.event)),
+      journey,
       lorebooks: c.lorebooks.map((lid) => this.db.getLorebook(lid)).filter((b) => b !== null).map((b) => ({ id: b.id, name: b.name, entries: b.entries.length })),
       messages,
       awaitingNarration: last?.role === 'user',

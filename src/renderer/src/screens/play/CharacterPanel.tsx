@@ -11,6 +11,8 @@ import { Bar } from '../../components/Bar'
 import { Icon } from '../../components/Icon'
 import { Tip } from '../../components/Tip'
 import { PartyStrip } from './Party'
+import { samePlace } from '@shared/memory'
+import { mediaUrl } from '@shared/images'
 
 export function formatCoins(copper: number) {
   const g = Math.floor(copper / 100)
@@ -69,6 +71,7 @@ export function CharacterPanel({
   const d = view.derived
   const coins = formatCoins(c.coins)
   const t = timeLabel(view.state.time.minute)
+  const here = view.state.location ? view.memory.entities.find((e) => e.kind === 'place' && e.image && [e.name, ...e.aliases].some((n) => samePlace(n, view.state.location!))) : undefined
 
   return (
     <aside className={`relative z-10 flex shrink-0 flex-col gap-5 overflow-y-auto p-5 ${className}`}>
@@ -226,6 +229,7 @@ export function CharacterPanel({
             {view.state.location}
           </div>
         )}
+        {here?.image && <img src={mediaUrl(here.image)} alt={view.state.location ?? ''} className="mt-1 h-24 w-full rounded-lg border border-gold-500/20 object-cover" />}
       </div>
     </aside>
   )

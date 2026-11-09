@@ -1,4 +1,5 @@
 import type { CampaignSettings, CharacterBuild, CheckResult, GameState, Hunger, SkillId, Weapon } from './rules'
+import type { Journey } from './journey'
 import type { Memory } from './memory'
 
 /** What the interface gets for one campaign. Built by the server from the save file. */
@@ -52,6 +53,8 @@ export type CampaignView = {
   cast: { cardId: string; role: 'player' | 'companion'; name: string; hasImage: boolean }[]
   /** People, places and summaries remembered on this branch of the story. */
   memory: Memory
+  /** Where the character has been, and the ways between (the Journal's map). */
+  journey: Journey
   /** Library lorebooks attached to this story. */
   lorebooks: { id: string; name: string; entries: number }[]
   messages: MessageView[]
