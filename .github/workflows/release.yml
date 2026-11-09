@@ -42,8 +42,26 @@ jobs:
       - name: Type-check
         run: npm run typecheck
 
-      - name: Build installer
-        run: npm run package
+      # Electron and the installer tools are downloaded from GitHub release files, which sometimes
+      # time out (HTTP 504). Keep them between runs so they only need downloading once.
+      - name: Cache Electron downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-builder\Cache
+          key: electron-dl-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: electron-dl-${{ runner.os }}-
+
+      - name: Build installer (retries on download timeouts)
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4; do
+            if npm run package; then exit 0; fi
+            echo "Build attempt $attempt failed; retrying in 30s..."
+            sleep 30
+          done
+          exit 1
 
       - name: Attach installer to the release
         shell: bash
