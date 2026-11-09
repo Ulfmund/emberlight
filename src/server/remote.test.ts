@@ -70,6 +70,11 @@ describe('playing from other devices', () => {
   it('turns away devices without the key', async () => {
     expect((await call(link, '/api/settings')).status).toBe(401)
     expect((await call(link, '/api/campaigns')).status).toBe(401)
+    // The home-screen manifest and icons are public (phones fetch them without the cookie); nothing else is.
+    expect((await call(link, '/manifest.webmanifest')).status).not.toBe(401)
+    expect((await call(link, '/icons/icon-192.png')).status).not.toBe(401)
+    expect((await call(link, '/icons/../api/settings')).status).toBe(401)
+    expect((await call(link, '/icons/x.html')).status).toBe(401)
     const page = await call(link, '/?key=not-the-key')
     expect(page.status).toBe(401)
     expect(page.body).toContain("isn't connected yet")

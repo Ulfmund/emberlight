@@ -66,6 +66,8 @@ The goal is that it **looks and feels like a game**: clear panels, icons for eve
 - A bottom tab bar: **Story · Sheet · Bag · Journal · More**.
 - The quick-action bar scrolls sideways above the input box.
 - Long-press = tooltip. Shake = throw dice (optional, uses device motion).
+
+*Built (0.12.0)*: a web app manifest and home-screen icons, so **Add to Home Screen** gives a full-screen Emberlight app with its own icon (the manifest and icons are the only things a phone can fetch before pairing). **Shake to throw**: two strong jolts within half a second throw the waiting die. It needs the secure link (https) because browsers only give motion sensors to secure pages, and on iPhones a one-time "Let me shake to throw" tap on the dice tray.
 - Connecting: **Play on Phone** on the PC shows a QR code. Scan it, then tap "Add to Home Screen" (see [01](01-architecture.md#platform-decision)).
 
 **Built (0.5.0):**
@@ -91,6 +93,16 @@ Every effect has a toggle, and there's a master **Effects** setting: Off / Subtl
 | Character level-up | Full celebration: light pillar, points-to-spend badge pulsing on the Sheet tab |
 | Buttons | Soft squash on press, glow on hover |
 | Death | Screen desaturates, vignette closes in, death screen fades up |
+
+*Built (0.12.0)*: device settings (Saves tab, **This device**; kept per phone or computer in local storage, `src/renderer/src/prefs.ts`): **Effects** Full / Subtle / Off (default Full, or Subtle when the system asks for less motion; Off stops all animation and the embers, and the dice just land), **Screen jolt on big hits**, **Sound effects** with a volume slider, **Shake to throw dice** (phones) and **Ghost text**. With Full effects:
+
+- **Typing runes:** a faint rune glints where a word was just finished (a space or punctuation typed at the end; on phones, spaces only), one at a time, about 0.4 s.
+- **Floating numbers:** −6 or +12 rises off the health, stamina and mana bars when they change (Subtle too).
+- **Screen jolt** when one turn takes a quarter of your health (and at least 5).
+- **Level-up pillar:** a beam of light with the new level, on top of the toast.
+- Dice: shorter tumble with Subtle; none with Off.
+
+**Sound effects** (`src/renderer/src/sound.ts`) are made on the spot with the Web Audio API, so there are no audio files and each sound varies a little: the dice rattle and land, a chime for a natural 20, a cracked thud for a natural 1, soft tones for success and failure, a hit, a healing shimmer, coins, an item, a level-up fanfare, and a low toll for a death. They play after the browser's first touch or click (browsers require that).
 
 ### About the typing rune effect
 

@@ -4,6 +4,8 @@ import type { Attr, CampaignSettings, CharacterBuild, CheckResult, CombatAction,
 import type { CampaignSummary, CampaignView, MessageView, TurnEvent } from '@shared/view'
 import { api, type CreateOptions } from './api'
 import type { MemoryEvent } from '@shared/memory'
+import { play } from './sound'
+import { useFx } from './fx'
 
 export type Screen = 'title' | 'connect' | 'creator' | 'play' | 'load'
 
@@ -92,7 +94,18 @@ export const useGame = create<State>((set, get) => {
     const a = after.state.character
     if (a.level > b.level) {
       get().toast({ title: `Level ${a.level}!`, text: '+1 attribute point to spend · +2 Renown', tone: 'level', icon: 'star' })
+      useFx.getState().celebrate(a.level)
     }
+    // What the turn did, in sound (and a jolt for a big hit).
+    if (a.status === 'dead' && b.status !== 'dead') play('death')
+    else if (a.level > b.level) play('level')
+    else if (a.hp < b.hp) {
+      play('hit')
+      if (b.hp - a.hp >= Math.max(5, before.derived.maxHp * 0.25)) useFx.getState().bigHit()
+    } else if (a.hp > b.hp) play('heal')
+    const count = (c: typeof a) => c.inventory.reduce((n, i) => n + i.qty, 0)
+    if (a.coins > b.coins) setTimeout(() => play('coin'), 250)
+    else if (count(a) > count(b)) setTimeout(() => play('item'), 250)
     for (const [skill, lvl] of Object.entries(after.derived.skillLevels)) {
       const old = before.derived.skillLevels[skill] ?? lvl
       if (lvl > old) get().toast({ title: `${skill[0].toUpperCase()}${skill.slice(1)} ${lvl}`, text: 'Skill level up', tone: 'good', icon: 'star' })

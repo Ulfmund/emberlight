@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { motion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import { Icon } from './Icon'
+import { useEffectsLevel } from '../prefs'
 
 /**
  * A resource bar (health, stamina, mana, XP). When the value drops, a pale "ghost" of the old
@@ -25,10 +26,14 @@ export function Bar({
   const prev = useRef(value)
   const [ghost, setGhost] = useState(pct)
   const [flash, setFlash] = useState<'hit' | 'heal' | null>(null)
+  const [float, setFloat] = useState<{ id: number; delta: number } | null>(null)
+  const effects = useEffectsLevel()
 
   useEffect(() => {
     const before = prev.current
     prev.current = value
+    // The change, floating up off the bar (labelled bars only: health, stamina, mana).
+    if (value !== before && !thin && effects !== 'off') setFloat({ id: Date.now(), delta: value - before })
     if (value < before) {
       setFlash('hit')
       const t = setTimeout(() => setGhost(pct), 450)
@@ -46,8 +51,29 @@ export function Bar({
     }
   }, [value, pct])
 
+  useEffect(() => {
+    if (!float) return
+    const t = setTimeout(() => setFloat(null), 1100)
+    return () => clearTimeout(t)
+  }, [float])
+
   return (
-    <div className="w-full">
+    <div className="relative w-full">
+      <AnimatePresence>
+        {float && (
+          <motion.span
+            key={float.id}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: [0, 1, 1, 0], y: -18 }}
+            transition={{ duration: 1.05, times: [0, 0.15, 0.7, 1], ease: 'easeOut' }}
+            className={`pointer-events-none absolute right-10 -top-1 font-display text-sm font-bold tabular-nums ${float.delta < 0 ? 'text-blood-400' : 'text-moss-400'}`}
+            style={{ textShadow: '0 1px 0 #0b0809' }}
+          >
+            {float.delta > 0 ? '+' : '−'}
+            {Math.abs(float.delta)}
+          </motion.span>
+        )}
+      </AnimatePresence>
       {!thin && (
         <div className="mb-1 flex items-center justify-between text-xs">
           <span className="flex items-center gap-1.5 text-parchment-300">

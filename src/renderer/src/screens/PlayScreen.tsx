@@ -1,6 +1,6 @@
 import { portraitMap, PortraitContext } from '../portraits'
 import { useEffect, useLayoutEffect, useRef, useState, useMemo } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, useAnimate } from 'motion/react'
 import { useGame } from '../store'
 import { Button } from '../components/Button'
 import { EmberField } from '../components/EmberField'
@@ -16,7 +16,8 @@ import { CombatTracker } from './play/CombatTracker'
 import { Icon } from '../components/Icon'
 import { Tip } from '../components/Tip'
 import { api } from '../api'
-import { usePrefs } from '../prefs'
+import { isTouch, useEffectsLevel, usePrefs } from '../prefs'
+import { LevelUpPillar, useFx } from '../fx'
 
 export function PlayScreen() {
   const { view, busy, act, stop, live } = useGame()
@@ -26,11 +27,20 @@ export function PlayScreen() {
   /** Phones: the character and side panels live in a drawer. */
   const [drawer, setDrawer] = useState(false)
   const portraits = useMemo(() => (view ? portraitMap(view) : {}), [view])
+  // A big hit jolts the screen (Full effects, if screen shake is on).
+  const [shakeScope, shake] = useAnimate()
+  const hitAt = useFx((f) => f.hitAt)
+  const effects = useEffectsLevel()
+  const screenShake = usePrefs((p) => p.screenShake)
+  useEffect(() => {
+    if (!hitAt || effects !== 'full' || !screenShake || !shakeScope.current) return
+    void shake(shakeScope.current, { x: [0, -9, 8, -6, 4, -2, 0] }, { duration: 0.45 })
+  }, [hitAt, effects, screenShake, shake, shakeScope])
   if (!view) return null
   const dead = view.state.character.status === 'dead'
 
   return (
-    <div className="relative flex min-h-0 flex-1">
+    <div ref={shakeScope} className="relative flex min-h-0 flex-1">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgb(255_150_60/0.07),transparent_70%)]" />
       <EmberField density={0.15} className="opacity-40" />
 
@@ -56,6 +66,7 @@ export function PlayScreen() {
       <Journal view={view} open={journal} onClose={() => setJournal(false)} />
       <Inspector campaignId={view.id} open={inspector} onClose={() => setInspector(false)} />
       <Toasts />
+      <LevelUpPillar />
       <DeathScreen view={view} />
     </div>
   )
@@ -90,6 +101,25 @@ function Composer({
   const [ghost, setGhost] = useState('')
   const asking = useRef<AbortController | null>(null)
   const mirror = useRef<HTMLDivElement>(null)
+  // Typing runes (Full effects): a glint where a word was just finished.
+  const effects = useEffectsLevel()
+  const measure = useRef<HTMLDivElement>(null)
+  const [rune, setRune] = useState<{ id: number; x: number; y: number; glyph: string } | null>(null)
+  const RUNE_GLYPHS = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ'
+  const glint = (value: string) => {
+    const box = measure.current
+    if (!box) return
+    box.firstChild!.textContent = value
+    const mark = box.lastChild as HTMLElement
+    const x = mark.offsetLeft
+    const y = mark.offsetTop - (ta.current?.scrollTop ?? 0)
+    setRune({ id: Date.now(), x, y, glyph: RUNE_GLYPHS[Math.floor(Math.random() * RUNE_GLYPHS.length)] })
+  }
+  useEffect(() => {
+    if (!rune) return
+    const t = setTimeout(() => setRune(null), 420)
+    return () => clearTimeout(t)
+  }, [rune])
 
   // The box grows with the text, and with the grey words when there are some.
   useLayoutEffect(() => {
@@ -195,6 +225,26 @@ function Composer({
           className="flex items-end gap-2 rounded-2xl bg-ink-850/90 p-1.5 pl-3 md:gap-3 md:p-2 md:pl-4"
         >
           <div className="relative min-w-0 flex-1">
+            {/* Measures where the last word ends, for the rune. */}
+            <div ref={measure} aria-hidden className="pointer-events-none invisible absolute inset-x-0 top-0 py-2.5 font-story text-[1.12rem] break-words whitespace-pre-wrap">
+              <span />
+              <span>|</span>
+            </div>
+            <AnimatePresence>
+              {rune && (
+                <motion.span
+                  key={rune.id}
+                  aria-hidden
+                  className="pointer-events-none absolute z-10 font-display text-lg text-ember-400"
+                  style={{ left: rune.x - 8, top: rune.y - 2, textShadow: '0 0 10px var(--color-ember-500), 0 0 3px #ffd9a0' }}
+                  initial={{ opacity: 0, y: 2, scale: 0.7 }}
+                  animate={{ opacity: [0, 0.9, 0], y: -10, scale: 1.1 }}
+                  transition={{ duration: 0.4, ease: 'easeOut' }}
+                >
+                  {rune.glyph}
+                </motion.span>
+              )}
+            </AnimatePresence>
             {ghost && (
               <div ref={mirror} aria-hidden className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden py-2.5 font-story text-[1.12rem] break-words whitespace-pre-wrap">
                 <span className="invisible">{text}</span>
@@ -206,7 +256,13 @@ function Composer({
               rows={1}
               value={text}
               disabled={disabled}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) => {
+                const next = e.target.value
+                // A finished word: one more character, a space or punctuation, typed at the end (phones: only spaces).
+                if (effects === 'full' && next.length === text.length + 1 && next.startsWith(text) && e.target.selectionStart === next.length && (/[ ]$/.test(next) || (!isTouch() && /[.,!?;:]$/.test(next))) && /\S/.test(next.slice(-2, -1)))
+                  glint(next.slice(0, -1))
+                setText(next)
+              }}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
               onKeyDown={(e) => {

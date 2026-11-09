@@ -43,15 +43,15 @@ Built in milestones. Each one ends with something playable, so the artist can te
 - DM style settings, DM persona cards ✅ 0.8.0 (event frequency ✅ 0.9.0)
 
 ## Milestone 4 — Polish and reach
-- Full "juice" pass (including the typing runes), effects settings
+- Full "juice" pass (including the typing runes), effects settings ✅ 0.12.0
 - Suggestions + ghost text ✅ 0.11.0
-- Play on Phone (QR pairing, PWA, mobile layout, shake to roll) *(QR pairing on Wi-Fi, tunnel link and mobile layout ✅ 0.5.0; PWA and shake to roll to do)*
+- Play on Phone (QR pairing, PWA, mobile layout, shake to roll) *(QR pairing on Wi-Fi, tunnel link and mobile layout ✅ 0.5.0; home-screen app and shake to roll ✅ 0.12.0)*
 - Image generation (SD WebUI/Forge, ComfyUI, OpenAI-compatible)
 - Image input (vision, or a captioning fallback)
 - Card, lorebook and campaign export; automatic backups ✅ 0.11.0 (backups since 0.1, lorebook export since 0.6.1)
 - Full lorebook feature set (recursion, groups, sticky/cooldown, etc.)
 - Spells
-- UI sound effects
+- UI sound effects ✅ 0.12.0
 
 ## v1.x
 - Ambient audio and dynamic music ([09](09-audio.md))

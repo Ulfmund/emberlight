@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useEffectsLevel } from '../prefs'
 
 type Ember = { x: number; y: number; vx: number; vy: number; r: number; life: number; max: number; flicker: number }
 
@@ -7,6 +8,11 @@ type Ember = { x: number; y: number; vx: number; vy: number; r: number; life: nu
  * blending, paused when the tab is hidden, and static when the OS asks for reduced motion.
  */
 export function EmberField({ density = 1, className = '' }: { density?: number; className?: string }) {
+  const effects = useEffectsLevel()
+  return effects === 'off' ? null : <Embers density={effects === 'subtle' ? density * 0.4 : density} className={className} />
+}
+
+function Embers({ density, className }: { density: number; className: string }) {
   const ref = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {

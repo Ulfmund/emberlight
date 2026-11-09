@@ -4,6 +4,14 @@ import { DIFFICULTY_LABEL, SKILLS, TIER_INFO, type CheckResult } from '@shared/r
 import logo from '../../assets/logo-die.png'
 import { useGame } from '../../store'
 import { TIER_STYLE } from './Story'
+import { play } from '../../sound'
+import { isTouch, useEffectsLevel, usePrefs } from '../../prefs'
+
+type MotionPermission = { requestPermission?: () => Promise<'granted' | 'denied'> }
+/** Shaking needs motion sensors, a secure page (https), and on iPhones a yes from the player. */
+const canShake = () => typeof window !== 'undefined' && 'DeviceMotionEvent' in window && window.isSecureContext && isTouch()
+const needsAsking = () => typeof (window.DeviceMotionEvent as unknown as MotionPermission | undefined)?.requestPermission === 'function'
+let shakeAllowed = false
 
 type Phase = 'ready' | 'rolling' | 'result'
 
@@ -39,6 +47,9 @@ function Throw({ check, onDone }: { check: CheckResult; onDone: () => void }) {
   const done = useRef(false)
   const t = TIER_STYLE[check.tier]
   const info = TIER_INFO[check.tier]
+  const effects = useEffectsLevel()
+  const shakeOn = usePrefs((p) => p.shake)
+  const [shakeReady, setShakeReady] = useState(() => canShake() && (!needsAsking() || shakeAllowed))
 
   const finish = () => {
     if (done.current) return
@@ -49,21 +60,60 @@ function Throw({ check, onDone }: { check: CheckResult; onDone: () => void }) {
   const toss = async () => {
     if (phase !== 'ready') return
     setPhase('rolling')
+    play('roll')
     const flicker = setInterval(() => setFace(1 + Math.floor(Math.random() * 20)), 70)
     const spins = 3 + Math.random() * 2
-    await animate(
-      scope.current,
-      {
-        rotate: [0, 360 * spins * 0.6, 360 * spins],
-        y: [0, -140, 0, -30, 0],
-        x: [0, 40 - Math.random() * 80, 0],
-        scale: [1, 0.8, 1.08, 0.97, 1]
-      },
-      { duration: 1.25, ease: 'easeOut' }
-    )
+    // With effects off the die just lands; otherwise it tumbles.
+    if (effects !== 'off')
+      await animate(
+        scope.current,
+        {
+          rotate: [0, 360 * spins * 0.6, 360 * spins],
+          y: [0, -140, 0, -30, 0],
+          x: [0, 40 - Math.random() * 80, 0],
+          scale: [1, 0.8, 1.08, 0.97, 1]
+        },
+        { duration: effects === 'subtle' ? 0.7 : 1.25, ease: 'easeOut' }
+      )
+    else await new Promise((r) => setTimeout(r, 350))
     clearInterval(flicker)
     setFace(check.kept)
     setPhase('result')
+    play('land')
+    setTimeout(() => play(check.kept === 20 ? 'crit' : check.kept === 1 ? 'fumble' : info.success ? 'success' : 'fail'), 120)
+  }
+
+  // Phones: a good shake throws the die.
+  useEffect(() => {
+    if (phase !== 'ready' || !shakeOn || !shakeReady) return
+    let last = { x: 0, y: 0, z: 0 }
+    let strong = 0
+    let at = 0
+    const onMotion = (e: DeviceMotionEvent) => {
+      const a = e.accelerationIncludingGravity
+      if (!a || a.x === null || a.y === null || a.z === null) return
+      const jolt = Math.abs(a.x - last.x) + Math.abs(a.y - last.y) + Math.abs(a.z - last.z)
+      last = { x: a.x, y: a.y, z: a.z }
+      const now = Date.now()
+      if (jolt > 22) {
+        strong = now - at < 450 ? strong + 1 : 1
+        at = now
+        if (strong >= 2) void toss()
+      }
+    }
+    window.addEventListener('devicemotion', onMotion)
+    return () => window.removeEventListener('devicemotion', onMotion)
+  })
+
+  const askShake = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      const r = await (window.DeviceMotionEvent as unknown as MotionPermission).requestPermission!()
+      shakeAllowed = r === 'granted'
+      setShakeReady(shakeAllowed)
+    } catch {
+      setShakeReady(false)
+    }
   }
 
   // Space or Enter throws; after the result, any key or a short wait continues.
@@ -133,9 +183,16 @@ function Throw({ check, onDone }: { check: CheckResult; onDone: () => void }) {
 
       <div className="mt-6 h-24">
         {phase === 'ready' && (
-          <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.6, repeat: Infinity }} className="font-display tracking-[0.25em] text-gold-200">
-            CLICK TO THROW
-          </motion.div>
+          <>
+            <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.6, repeat: Infinity }} className="font-display tracking-[0.25em] text-gold-200">
+              {isTouch() ? (shakeOn && shakeReady ? 'TAP OR SHAKE TO THROW' : 'TAP TO THROW') : 'CLICK TO THROW'}
+            </motion.div>
+            {shakeOn && !shakeReady && canShake() && needsAsking() && (
+              <button onClick={(e) => void askShake(e)} className="no-drag mt-3 cursor-pointer rounded-full border border-gold-500/30 px-3 py-1 text-xs text-parchment-300">
+                Let me shake to throw
+              </button>
+            )}
+          </>
         )}
         {phase === 'result' && (
           <motion.div initial={{ scale: 1.8, opacity: 0, rotate: -6 }} animate={{ scale: 1, opacity: 1, rotate: -2 }} transition={{ type: 'spring', stiffness: 300, damping: 14, delay: 0.15 }}>

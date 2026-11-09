@@ -11,7 +11,7 @@ There's no text-to-speech. Free TTS voices aren't good enough, so it's left out 
 | **Music** | Explore, travel, town, tension, combat, boss, sorrow | One track at a time, crossfades (3–8 s) |
 | **Ambience** | Forest, wind, crickets, rain, fire crackle, tavern crowd, cave drips, sea | Several at once, each with its own volume |
 | **Stingers** | Victory, level-up, death, discovery | One-shot, ducks music briefly |
-| **UI sounds** (v1) | Dice clatter, page turn, coins, button clicks | Short, quiet |
+| **UI sounds** (v1) | Dice clatter, page turn, coins, button clicks | Short, quiet. *Built (0.12.0)*, synthesized: see [08](08-ui-ux.md#feel-and-animation-juice) |
 
 ## How the scene decides the mix
 

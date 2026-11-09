@@ -300,6 +300,7 @@ const MIME: Record<string, string> = {
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
   '.ico': 'image/x-icon',
+  '.webmanifest': 'application/manifest+json',
   '.mp3': 'audio/mpeg',
   '.ogg': 'audio/ogg'
 }

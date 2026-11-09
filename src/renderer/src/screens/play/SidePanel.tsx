@@ -23,6 +23,7 @@ import { Icon } from '../../components/Icon'
 import { Tip } from '../../components/Tip'
 import { Button } from '../../components/Button'
 import { CraftList } from './Crafting'
+import { DeviceSettings } from '../DeviceSettings'
 import { api } from '../../api'
 
 export type Tab = 'sheet' | 'bag' | 'log' | 'saves'
@@ -389,6 +390,7 @@ function SavesTab({ view }: { view: CampaignView }) {
         <Opt k="acting" label="Acting for you" options={[{ id: 'never', label: 'Never' }, { id: 'light', label: 'Small reactions' }]} />
         <LimitsField value={s.limits} onSave={(limits) => set({ limits })} />
       </section>
+      <DeviceSettings />
     </div>
   )
 }

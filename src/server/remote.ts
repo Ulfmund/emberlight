@@ -97,6 +97,8 @@ export function accessGate(opts: { ports: Ports; remote: () => RemoteSettings; d
     const settings = opts.remote()
     const way = channel(c, opts.ports)
     if (!settings[way]) return c.text('Playing from other devices is switched off.', 403)
+    // The home-screen icon and app manifest hold nothing private, and phones fetch them without the cookie.
+    if (c.req.method === 'GET' && (path === '/manifest.webmanifest' || /^\/icons\/[\w-]+\.png$/.test(path))) return next()
 
     // Pairing: the link or QR code carries the key once; from then on it's a cookie.
     const given = url.searchParams.get('key')
