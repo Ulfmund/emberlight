@@ -122,7 +122,7 @@ function memoryBlock(m?: MemoryText): string {
 }
 
 /** The DM's persona, resolved by the caller (a built-in one, or a character card). */
-export type PersonaText = { name: string; voice: string; ooc: 'follow' | 'argue'; fromCard?: boolean }
+export type PersonaText = { name: string; voice: string; ooc: 'follow' | 'argue'; fromCard?: boolean; habit?: string }
 
 export function narratorSystem(
   state: GameState,
@@ -232,7 +232,7 @@ ${gear}
 ${carrying}${body}${magic}
 ${c.status === 'downed' ? 'STATUS: DOWNED: unconscious and dying.\n' : c.status === 'dead' ? 'STATUS: DEAD.\n' : ''}
 ${loreAt(lore, 'after_char')}WHERE AND WHEN
-Day ${state.time.day} (${dateLabel(state.time.day).toLowerCase()}), ${timeOfDay}${state.location ? `, at ${state.location}` : ''}.${skyLine(state)} ${SEASON_INFO[seasonOf(state.time.day)].dm}${memoryBlock(memory)}${fallenBlock(state, third)}${companionBlock(state, cast, memory?.companions)}${loreBlock(lore)}`
+Day ${state.time.day} (${dateLabel(state.time.day).toLowerCase()}), ${timeOfDay}${state.location ? `, at ${state.location}` : ''}.${skyLine(state)} ${SEASON_INFO[seasonOf(state.time.day)].dm}${memoryBlock(memory)}${fallenBlock(state, third)}${companionBlock(state, cast, memory?.companions)}${loreBlock(lore)}${persona?.habit?.trim() ? `\n\nYOUR VOICE IN EVERY REPLY\n${persona.habit.trim()}` : ''}`
 }
 
 const SKY: Record<Weather, string> = { clear: '', rain: 'It is raining', storm: 'A storm is raging', fog: 'Thick fog lies over everything', snow: 'Snow is falling' }

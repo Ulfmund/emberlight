@@ -2,6 +2,7 @@ import type { Rng } from './character'
 import type { FoeSpec } from './combat'
 import { SETTLED, type CampaignSettings, type EventFrequency, type GameState, type PlaceKind, type Weather } from './state'
 import { seasonOf, type Season } from './calendar'
+import { findPersona } from '../personas'
 
 /**
  * Random events (docs/spec/06-ai-dm.md#5-random-events): the world doesn't wait for the player.
@@ -113,7 +114,9 @@ export function rollWorldEvent(state: GameState, settings: CampaignSettings, ctx
   const hour = Math.floor(state.time.minute / 60)
   const night = hour < 6 || hour >= 20
   const resting = ctx.intent === 'rest'
-  let chance = EVENT_CHANCE[settings.events]
+  // The storyteller's leanings (personas.ts): more or fewer events, and which kinds.
+  const lean = findPersona(settings.persona)?.leanings
+  let chance = EVENT_CHANCE[settings.events] * (lean?.chance ?? 1)
   if (ctx.intent === 'travel') chance *= 2.5
   else if (ctx.intent === 'explore') chance *= 1.3
   if (resting) chance *= settled ? 0.3 : 3
@@ -129,11 +132,12 @@ export function rollWorldEvent(state: GameState, settings: CampaignSettings, ctx
       (!e.seasons || e.seasons.includes(seasonOf(state.time.day))) &&
       (!resting || e.atRest)
   )
-  const total = fits.reduce((n, e) => n + e.weight, 0)
+  const weight = (e: WorldEvent) => e.weight * (lean?.kinds?.[e.kind] ?? 1)
+  const total = fits.reduce((n, e) => n + weight(e), 0)
   if (!total) return null
   let pick = rng() * total
   for (const e of fits) {
-    pick -= e.weight
+    pick -= weight(e)
     if (pick <= 0) return e
   }
   return fits[fits.length - 1]

@@ -428,7 +428,7 @@ function SavesTab({ view }: { view: CampaignView }) {
       </section>
       <section>
         <h3 className="mb-1 text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">DM style</h3>
-        <PersonaPicker value={s.persona} onChange={(persona) => set({ persona })} />
+        <PersonaPicker value={s.persona} onChange={(persona) => set({ persona })} label="Storyteller" />
         <Opt k="rolls" label="Rolls" options={[{ id: 'fewer', label: 'Fewer' }, { id: 'normal', label: 'Normal' }, { id: 'more', label: 'More' }]} />
         <Opt k="pacing" label="Pacing" options={[{ id: 'sandbox', label: 'Sandbox' }, { id: 'guided', label: 'Guided story' }]} />
         <Opt k="perspective" label="Perspective" options={[{ id: 'second', label: 'You (2nd person)' }, { id: 'third', label: 'Third person' }]} />

@@ -83,6 +83,8 @@ The engine applies results as events: damage, HP and stamina costs, loot (rolled
 
 - **Chance each turn:** by **event frequency** (a campaign setting: Calm 3%, Normal 7%, Eventful 14%, Chaos 25%), then ×2.5 when travelling, ×1.3 when exploring, ×3 when **resting in the wild** (×0.3 resting in town), ×0.7 in a settlement, ×1.3 at night in the wild, and +10% after a critical failure. At most 60%. Never in a fight, and never within three turns of the last event or fight.
 - **Kinds:** encounter, weather, wanderer, discovery, omen, complication, opportunity. Only events marked as able to happen while asleep come up on a rest.
+- **The storyteller's leanings** (since 0.26.0) multiply the chance (the Gambler ×1.5, the Hearthkeeper ×0.8, Whalechan ×0.85) and each kind's weight (the Romance Writer brings wanderers ×2 and encounters ×0.6; the Veteran encounters ×1.5; the Mystery Writer discoveries ×1.8). See [03](03-characters-and-cards.md#the-dm-is-a-card-too).
+- **Seasons** (since 0.24.0): snow only in winter, and rain and storms the rest of the year.
 - The chosen event is passed to the narrator as a directive ("RANDOM EVENT: work it into the scene now"). Some ask the narrator for a DM-initiated roll (a pickpocket, a collapsing floor).
 - **Encounters** bring foes. When the campaign's combat mode would track them, the fight is set up straight away; an ambush first rolls a hidden Perception check, so being alert matters. Otherwise the narrator is told to tell any fight in prose.
 - A reroll keeps the turn's event: it rolls the dice again, not the world.
@@ -162,6 +164,7 @@ Under *Campaign → DM Style*, as simple choices with icons:
 | Event frequency | Calm · **Normal** · Eventful · Chaos |
 | Roll frequency | Fewer · **Normal** · More |
 | Perspective | **Second person** ("you") · Third person |
+| Storyteller | **The Chronicler** · ten other built-in storytellers · any character card (see [03](03-characters-and-cards.md#the-dm-is-a-card-too)) |
 | Content limits | Free-text list of things to avoid or fade to black |
 | The peoples' ways | **On** · Off (see [below](#the-peoples-ways)) |
 

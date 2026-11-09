@@ -22,6 +22,25 @@ The DM persona card controls the narrator's voice and attitude. The default is a
 
 *Built (0.8.0)* (`src/shared/personas.ts`): five built-in voices (the Chronicler, the Grim Bard, the Old Soldier, the Hearthkeeper, the Trickster), or any character card from the library. A card DM speaks as that character and, like the Trickster, may meet ((out-of-character)) requests in character instead of simply following them. A persona changes how the story is told, never what the dice decided.
 
+**Storytellers** *(0.26.0)*, RimWorld-style. Each built-in DM is now a storyteller with three parts:
+
+- **A voice**, as before. The new ones also carry a little of a life of their own (a loss, an obsession, a thing they can't help noticing) for the telling to grow from. It is never explained to the player.
+- **A habit**: one line of what to show in every reply, repeated at the very end of the DM's instructions. In a real run the voice alone, told only at the top, was drowned out by the rules after it: four storytellers opened a scene with nearly the same sentence.
+- **Leanings**: how often random events come (× the chance) and which kinds (× their weight); see [06](06-ai-dm.md#5-random-events). A character card has a voice but no leanings.
+
+| Storyteller | Who they are | What they bring |
+|---|---|---|
+| The Chronicler | Fair, vivid, even-handed (the default) | An even mix of everything |
+| Whalechan | DeepSeek Whale-chan, the community's unofficial mascot: a whale-fin maid, warm, a little tsundere, always hungry | Fewer fights; more lucky finds and odd chances; long meals, lazy hours, and words taken exactly as said |
+| The Veteran | A real-world infantry veteran: how fighting really works, supply, comradeship | More fights, won by ground, numbers and nerve; marches, supplies and comrades matter |
+| The Romance Writer | A romance novelist who pairs people off | More people to meet, and sparks between them; fewer fights |
+| The Old Soul | An old scholar of myths in the vein of C. S. Lewis: whimsy, honour, a hopeful old-fashioned worldview | Wonders, odd friendly folk, omens that mean something; fewer pointless fights |
+| The Mystery Writer | Fair-play mysteries: everyone has a secret | More discoveries and complications; clues in plain sight |
+| The Gambler | Trusts only the dice | Many more random events, good and bad |
+| The Grim Bard, the Old Soldier, the Hearthkeeper, the Trickster | The original voices | Omens and foul weather; fights and hard weather; quiet roads and friendly strangers; complications with a catch |
+
+The creator's Adventure step shows them as cards to choose from (*Your storyteller*), with a character card from the library as the other choice; in-game they're under Saves (*Storyteller*), with what each brings below the name. Whalechan comes from the community project [deepseek-whalechan](https://github.com/Neko3000/deepseek-whalechan), which welcomes non-commercial fan works; only her description is used, none of the artwork.
+
 ## Card compatibility
 
 - **Import:** Character Card V2 and V3 (PNG with embedded data, `.json`, and V3 `.charx`). This works with cards from SillyTavern, Chub, etc.

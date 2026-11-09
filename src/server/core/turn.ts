@@ -145,7 +145,7 @@ export class TurnEngine {
       }
     }
     const p = findPersona(id) ?? DEFAULT_PERSONA
-    return { name: p.name, voice: p.voice, ooc: p.ooc }
+    return { name: p.name, voice: p.voice, ooc: p.ooc, habit: p.habit }
   }
 
   /** What the DM was sent for each campaign's latest reply (kept in memory only). */

@@ -43,7 +43,7 @@ import { useGame } from '../store'
 import { api } from '../api'
 import { CardLibrary } from './CardLibrary'
 import { LoreEditor } from './LoreEditor'
-import { LimitsField, PersonaPicker } from './DmStyle'
+import { LimitsField, StorytellerPicker } from './DmStyle'
 import { WORLDS } from '@shared/worlds'
 import type { LorebookSummary } from '@shared/lore'
 import { Button } from '../components/Button'
@@ -946,11 +946,12 @@ function AdventureStep({
         </Row>
       </div>
 
+      <h3 className="mt-8 mb-1 text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">Your storyteller</h3>
+      <p className="mb-3 text-sm text-parchment-400">Who tells the story, and what they bring about. You can change your mind later, under Saves.</p>
+      <StorytellerPicker value={settings.persona} onChange={(persona) => set({ persona })} />
+
       <h3 className="mt-8 mb-3 text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">DM style</h3>
       <div className="panel rounded-2xl px-5">
-        <Row label="Dungeon Master" text="Whose voice tells the story">
-          <PersonaPicker wide value={settings.persona} onChange={(persona) => set({ persona })} />
-        </Row>
         <Row label="Rolls" text="How often the dice come out">
           <Segmented value={settings.rolls} onChange={(rolls) => set({ rolls })} options={[{ id: 'fewer', label: 'Fewer' }, { id: 'normal', label: 'Normal' }, { id: 'more', label: 'More' }]} />
         </Row>
