@@ -1,0 +1,19 @@
+appId: app.emberlight.rp
+productName: Emberlight
+directories:
+  buildResources: resources
+  output: release
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  - resources/**
+win:
+  icon: resources/icon.png
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: Emberlight

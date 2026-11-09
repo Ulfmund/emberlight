@@ -1,0 +1,54 @@
+# Emberlight (working title)
+
+A roleplaying app with an AI Dungeon Master that works with local models (LM Studio, Ollama, Strata, KoboldCpp) and cloud models (Claude, OpenRouter).
+
+The full design is in [docs/spec/](docs/spec/README.md). **Current state: Milestone 0** (skeleton): title screen, model connection, and a streaming story chat with a basic DM prompt. Rules, dice, characters and memory start in Milestone 1.
+
+## Running it (development)
+
+You need [Node.js](https://nodejs.org) 22 or newer.
+
+```bash
+npm install
+npm run dev
+```
+
+This opens the app window. Changes to the interface reload instantly; changes under `src/main` or `src/server` need the app restarted (close it and run `npm run dev` again).
+
+**Claude key for testing:** copy `.env.example` to `.env` and paste your key after `ANTHROPIC_API_KEY=`. `.env` is ignored by git. You can also paste the key on the Connect screen, which stores it encrypted by Windows instead.
+
+## Other commands
+
+| Command | What it does |
+|---|---|
+| `npm run typecheck` | Checks the code for type errors |
+| `npm run build` | Builds the app into `out/` |
+| `npm start` | Runs the built app (like the finished version) |
+| `npm run package` | Builds a Windows installer into `release/` |
+
+## Where things live
+
+```
+src/
+  main/        Electron: the window, starting the local server
+  server/      The local game server (the desktop window and, later, the phone use it)
+    ai/          Model providers (OpenAI-compatible, Ollama, Claude) and DM prompts
+    store/       Settings and encrypted API keys (saved in %APPDATA%/Emberlight)
+  renderer/    The interface (React)
+    src/screens/     Title, Connect, Play
+    src/components/  Buttons, icons, embers, story text…
+    src/assets/      Art (logo die, title backdrop)
+  shared/      Types and presets used by both sides
+art/blender/   Script that renders the logo and title art (re-run to regenerate)
+docs/spec/     The design spec
+```
+
+## Regenerating the art
+
+The logo die and title backdrop are rendered by Blender from a script, in a separate background process (it never touches files you have open):
+
+```bash
+"C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" -b --factory-startup --python art/blender/render_title_art.py -- art/out all
+```
+
+Then copy `art/out/title.jpg` to `src/renderer/src/assets/title.jpg`, and `art/out/icon.png` to `resources/icon.png` (the UI uses a 256px copy at `src/renderer/src/assets/logo-die.png`).

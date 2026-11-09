@@ -1,0 +1,229 @@
+@import 'tailwindcss';
+
+/* ------------------------------------------------------------------------------------------
+   Theme tokens. Everything visual reads from these, so a new theme = new values here.
+   ------------------------------------------------------------------------------------------ */
+@theme {
+  --font-display: 'Cinzel', 'Times New Roman', serif;
+  --font-story: 'Crimson Pro', Georgia, serif;
+  --font-ui: 'Inter Variable', system-ui, sans-serif;
+
+  --color-ink-950: #0b0809;
+  --color-ink-900: #120d10;
+  --color-ink-850: #171115;
+  --color-ink-800: #1d161a;
+  --color-ink-700: #2a2026;
+  --color-ink-600: #3a2d33;
+  --color-ink-500: #5a4750;
+
+  --color-parchment-50: #fbf4e4;
+  --color-parchment-100: #f3e6c8;
+  --color-parchment-200: #e8d5a8;
+  --color-parchment-300: #cdb689;
+  --color-parchment-400: #a89272;
+  --color-parchment-500: #7f6d58;
+
+  --color-gold-200: #fbe5a8;
+  --color-gold-300: #f5d27a;
+  --color-gold-400: #e8b54d;
+  --color-gold-500: #c98f2c;
+  --color-gold-600: #9a6a1f;
+
+  --color-ember-400: #ff9a52;
+  --color-ember-500: #ff7a2f;
+  --color-ember-600: #e0531b;
+
+  --color-blood-400: #d9574c;
+  --color-blood-500: #b3322a;
+  --color-moss-400: #8fbf73;
+  --color-arcane-400: #9fb3ff;
+
+  --animate-word-in: word-in 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-rune-pulse: rune-pulse 1.6s ease-in-out infinite;
+  --animate-shimmer: shimmer 6s linear infinite;
+  --animate-ken-burns: ken-burns 38s ease-in-out infinite alternate;
+
+  @keyframes word-in {
+    from {
+      opacity: 0;
+      filter: blur(3px);
+      transform: translateY(2px);
+    }
+    to {
+      opacity: 1;
+      filter: blur(0);
+      transform: none;
+    }
+  }
+  @keyframes rune-pulse {
+    0%,
+    100% {
+      opacity: 0.25;
+      transform: translateY(0) scale(0.9);
+    }
+    50% {
+      opacity: 1;
+      transform: translateY(-2px) scale(1.05);
+    }
+  }
+  @keyframes shimmer {
+    from {
+      background-position: 200% 50%;
+    }
+    to {
+      background-position: -200% 50%;
+    }
+  }
+  @keyframes ken-burns {
+    from {
+      transform: scale(1.04) translate(0, 0);
+    }
+    to {
+      transform: scale(1.12) translate(-1.5%, -1%);
+    }
+  }
+}
+
+/* ------------------------------------------------------------------------------------------ */
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-ink-950);
+  color: var(--color-parchment-100);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+
+input,
+textarea,
+select,
+.selectable {
+  user-select: text;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-gold-400) 45%, transparent);
+  color: var(--color-parchment-50);
+}
+
+/* Thin, warm scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-600) transparent;
+}
+
+/* Window dragging for the custom title bar (desktop app only) */
+.drag {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Gold title lettering with a slow moving sheen */
+.gold-text {
+  background: linear-gradient(
+    100deg,
+    var(--color-gold-600) 0%,
+    var(--color-gold-300) 30%,
+    var(--color-gold-200) 40%,
+    var(--color-gold-400) 55%,
+    var(--color-gold-600) 100%
+  );
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: var(--animate-shimmer);
+}
+
+/* A panel that looks like dark tooled leather with a thin gilt edge */
+.panel {
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgb(255 190 110 / 0.06), transparent 60%),
+    linear-gradient(180deg, var(--color-ink-850), var(--color-ink-900));
+  border: 1px solid color-mix(in oklab, var(--color-gold-500) 28%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 230 180 / 0.06),
+    0 20px 60px -20px rgb(0 0 0 / 0.8);
+}
+
+.gilt-rule {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-gold-500), transparent);
+  opacity: 0.5;
+}
+
+/* Story text */
+.story {
+  font-family: var(--font-story);
+  font-size: 1.22rem;
+  line-height: 1.65;
+  color: var(--color-parchment-100);
+}
+.story em {
+  color: var(--color-parchment-50);
+}
+.story strong {
+  color: var(--color-gold-200);
+  font-weight: 600;
+}
+
+/* Form fields */
+.input {
+  width: 100%;
+  border-radius: 0.6rem;
+  border: 1px solid color-mix(in oklab, var(--color-gold-500) 25%, transparent);
+  background: color-mix(in oklab, var(--color-ink-950) 85%, transparent);
+  padding: 0.65rem 0.85rem;
+  color: var(--color-parchment-50);
+  font-size: 0.95rem;
+  outline: none;
+  transition:
+    border-color 160ms,
+    box-shadow 160ms;
+}
+.input::placeholder {
+  color: var(--color-parchment-500);
+}
+.input:focus {
+  border-color: var(--color-gold-400);
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--color-gold-400) 18%, transparent),
+    0 0 24px -6px rgb(255 150 50 / 0.45);
+}
+.input:disabled {
+  opacity: 0.5;
+}
+select.input {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23e8b54d' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M8 10l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2.25rem;
+}
+select.input option {
+  background: var(--color-ink-900);
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid var(--color-gold-400);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gold-text,
+  .animate-word-in,
+  .animate-ken-burns,
+  .animate-rune-pulse {
+    animation: none !important;
+  }
+}

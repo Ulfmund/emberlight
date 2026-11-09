@@ -1,0 +1,123 @@
+import type { ChatMessage, ContextReport, ModelInfo, StreamEvent } from '@shared/types'
+
+export type ChatOptions = {
+  system: string
+  messages: ChatMessage[]
+  signal: AbortSignal
+}
+
+/**
+ * Every model server is wrapped in one of these. Adding a new kind of server means
+ * writing one new file that implements this interface; nothing else changes.
+ */
+export interface Provider {
+  listModels(signal?: AbortSignal): Promise<ModelInfo[]>
+  /** Best-effort look at the model's context size. Never throws. */
+  inspectContext(model: string, signal?: AbortSignal): Promise<ContextReport>
+  chat(model: string, opts: ChatOptions): AsyncIterable<StreamEvent>
+}
+
+/** A short, readable error for the UI, from whatever fetch/HTTP failure happened. */
+export function friendlyError(err: unknown, serverName: string): string {
+  const e = err as { name?: string; message?: string; cause?: { code?: string } }
+  if (e?.name === 'AbortError') return 'Stopped.'
+  const code = e?.cause?.code
+  if (code === 'ECONNREFUSED' || code === 'ENOTFOUND' || code === 'ECONNRESET') {
+    return `Couldn't reach ${serverName}. Is it running, and is the address right?`
+  }
+  if (e?.name === 'TimeoutError') return `${serverName} took too long to answer.`
+  return e?.message || String(err)
+}
+
+export async function readHttpError(res: Response): Promise<string> {
+  let detail = ''
+  try {
+    const body = await res.text()
+    try {
+      const j = JSON.parse(body)
+      detail = j?.error?.message ?? j?.error ?? j?.message ?? body
+    } catch {
+      detail = body
+    }
+  } catch {
+    /* ignore */
+  }
+  if (res.status === 401 || res.status === 403) return `The server rejected the API key (${res.status}).`
+  if (res.status === 404) return `Not found (404). Check the address and model name. ${detail}`.trim()
+  return `Server error ${res.status}${detail ? `: ${String(detail).slice(0, 300)}` : ''}`
+}
+
+/** Reads a fetch body line by line (for SSE and NDJSON streams). */
+export async function* readLines(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+  try {
+    for (;;) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      let nl: number
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl).replace(/\r$/, '')
+        buf = buf.slice(nl + 1)
+        yield line
+      }
+    }
+    buf += decoder.decode()
+    if (buf) yield buf
+  } finally {
+    reader.releaseLock()
+  }
+}
+
+/**
+ * Many local reasoning models (Qwen, DeepSeek…) put their thinking inside
+ * <think>…</think> in the normal text. This splits it out so the UI can hide it.
+ * Tags can arrive split across chunks, so partial tags are held back.
+ */
+export class ThinkTagSplitter {
+  private inThink = false
+  private pending = ''
+
+  push(chunk: string): StreamEvent[] {
+    let s = this.pending + chunk
+    this.pending = ''
+    const out: StreamEvent[] = []
+    while (s.length) {
+      const tag = this.inThink ? '</think>' : '<think>'
+      const i = s.indexOf(tag)
+      if (i >= 0) {
+        if (i > 0) out.push({ type: this.inThink ? 'thinking' : 'text', text: s.slice(0, i) })
+        this.inThink = !this.inThink
+        s = s.slice(i + tag.length)
+        continue
+      }
+      // Hold back a trailing piece that could be the start of a tag.
+      let keep = 0
+      for (let k = Math.min(tag.length - 1, s.length); k > 0; k--) {
+        if (tag.startsWith(s.slice(-k))) {
+          keep = k
+          break
+        }
+      }
+      const emit = s.slice(0, s.length - keep)
+      if (emit) out.push({ type: this.inThink ? 'thinking' : 'text', text: emit })
+      this.pending = s.slice(s.length - keep)
+      break
+    }
+    return out
+  }
+
+  flush(): StreamEvent[] {
+    const rest = this.pending
+    this.pending = ''
+    return rest ? [{ type: this.inThink ? 'thinking' : 'text', text: rest }] : []
+  }
+}
+
+export async function getJson<T>(url: string, init: RequestInit = {}, timeoutMs = 4000): Promise<T> {
+  const res = await fetch(url, { ...init, signal: init.signal ?? AbortSignal.timeout(timeoutMs) })
+  if (!res.ok) throw new Error(await readHttpError(res))
+  return (await res.json()) as T
+}

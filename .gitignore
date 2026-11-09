@@ -1,0 +1,24 @@
+# Secrets — never commit these
+.env
+.env.*
+!.env.example
+
+# Dependencies and build output
+node_modules/
+dist/
+out/
+release/
+
+# Local app data (campaigns, saves, generated images) when running in dev
+data/
+*.sqlite
+*.sqlite-journal
+
+# OS / editor clutter
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Blender render output (copies live in resources/ and src/renderer/src/assets/)
+art/out/
