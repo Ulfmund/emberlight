@@ -154,6 +154,11 @@ CREATE TABLE IF NOT EXISTS media (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS media_campaign ON media(campaign_id);
+CREATE TABLE IF NOT EXISTS embeddings (
+  key TEXT PRIMARY KEY,
+  vec BLOB NOT NULL,
+  created_at INTEGER NOT NULL
+);
 `
 
 export const newId = (prefix: string) =>
@@ -329,6 +334,30 @@ export class GameDb {
   getMedia(id: string): { mime: string; data: Uint8Array; campaignId: string | null; kind: MediaKind } | null {
     const r = this.db.prepare('SELECT mime, data, campaign_id, kind FROM media WHERE id = ?').get(id) as { mime: string; data: Uint8Array; campaign_id: string | null; kind: MediaKind } | undefined
     return r ? { mime: r.mime, data: r.data, campaignId: r.campaign_id, kind: r.kind } : null
+  }
+
+  /** Embeddings already made, by key (a hash of the model and the text). */
+  getEmbeddings(keys: string[]): Map<string, Float32Array> {
+    const out = new Map<string, Float32Array>()
+    for (let i = 0; i < keys.length; i += 400) {
+      const part = [...new Set(keys.slice(i, i + 400))]
+      if (!part.length) continue
+      const rows = this.db.prepare(`SELECT key, vec FROM embeddings WHERE key IN (${part.map(() => '?').join(',')})`).all(...part) as { key: string; vec: Uint8Array }[]
+      for (const r of rows) {
+        // A fresh, aligned copy of the bytes.
+        const bytes = new Uint8Array(r.vec)
+        out.set(r.key, new Float32Array(bytes.buffer, 0, Math.floor(bytes.length / 4)))
+      }
+    }
+    return out
+  }
+
+  putEmbeddings(rows: { key: string; vec: Float32Array }[]) {
+    const put = this.db.prepare('INSERT OR REPLACE INTO embeddings (key, vec, created_at) VALUES (?, ?, ?)')
+    const now = Date.now()
+    this.transaction(() => {
+      for (const r of rows) put.run(r.key, new Uint8Array(r.vec.buffer, r.vec.byteOffset, r.vec.byteLength), now)
+    })
   }
 
   mediaFor(campaignId: string): { id: string; kind: MediaKind; mime: string; data: Uint8Array }[] {

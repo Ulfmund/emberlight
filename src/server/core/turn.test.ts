@@ -14,6 +14,7 @@ import { LoreLibrary } from '../lore/library'
 import { findWorld } from '@shared/worlds'
 import { applyRename } from './rename'
 import { normalizeEntry } from '@shared/lore'
+import { Embedder } from '../ai/embeddings'
 
 /** A scripted stand-in for a model: the test decides what the Referee, Narrator and Scribe say. */
 class FakeProvider implements Provider {
@@ -833,6 +834,48 @@ describe('turn engine', () => {
     expect(roll.breakdown).toContainEqual({ label: 'Standing with the Town Watch', value: 2 })
     expect(fake.lastSystem).toContain('WHAT GROUPS THINK OF THE CHARACTER')
     expect(fake.lastSystem).toContain('- the Town Watch: trusted (+2). Why: caught the cutpurse for them (+2).')
+  })
+
+  it('with an embedding model, the DM is reminded of lore by meaning, and a broken one stops nothing', async () => {
+    db.saveLorebook({
+      id: 'lb_north',
+      name: 'The North',
+      description: '',
+      global: true,
+      entries: [
+        normalizeEntry({ id: 'grey', keys: ['greycoats'], content: 'The greycoats are the wolf packs of the north; they hunt in silence.' }),
+        normalizeEntry({ id: 'ember', keys: ['ember festival'], content: 'The ember festival lights every hearth at midwinter.' }),
+        normalizeEntry({ id: 'salt', keys: ['salt tax'], content: 'Salt is taxed at the river ford.' }),
+        normalizeEntry({ id: 'glass', keys: ['glass tower'], content: 'The tower library burned twice.' }),
+        normalizeEntry({ id: 'gods', keys: ['old gods'], content: 'The old gods sleep.' }),
+        normalizeEntry({ id: 'bridge', keys: ['kings bridge'], content: 'The kings bridge is closed at dusk.' })
+      ]
+    })
+    // A pretend embedding model: a text's vector counts its words about a few topics.
+    const topics = [/wol(f|ves)|howl|pack/gi, /\binn\b|hearth|ale/gi, /river|ford|salt/gi, /tower|library/gi]
+    const fetcher = (async (_url: string, init: RequestInit) => {
+      const input = (JSON.parse(String(init.body)) as { input: string[] }).input
+      return Response.json({ data: input.map((t, index) => ({ index, embedding: topics.map((re) => (t.match(re)?.length ?? 0) + 0.01) })) })
+    }) as unknown as typeof fetch
+    const config = () => ({ embeddings: { enabled: true, baseUrl: '', model: 'fake-embed' }, connection: { presetId: 'lmstudio', kind: 'openai' as const, baseUrl: 'x', model: 'fake', contextSize: 0 } })
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    fake.referee = { intent: 'other', checks: [] }
+    await run(engine.act(id, 'A howl rises from the pines; wolves are hunting.', signal))
+    // No keyword, no lore.
+    expect(fake.lastSystem).not.toContain('The greycoats are')
+    engine.embedder = new Embedder(db, config, async () => undefined, fetcher)
+    await run(engine.act(id, 'Another howl, closer now. The wolves are near.', signal))
+    expect(fake.lastSystem).toContain('The greycoats are the wolf packs of the north')
+    expect(fake.lastSystem).not.toContain('The ember festival')
+    // An embedding server that's down: the story goes on, on names and keywords.
+    engine.embedder = new Embedder(db, config, async () => undefined, (async () => {
+      throw new Error('connection refused')
+    }) as unknown as typeof fetch)
+    await run(engine.act(id, 'I wait for the dawn by the fire.', signal))
+    const last = campaigns.view(id).messages.at(-1)!
+    expect(last.error).toBeUndefined()
+    expect(last.content).toMatch(/rain keeps falling/)
   })
 
   it('the player can ask someone along, say what they do in a fight, and part ways', async () => {

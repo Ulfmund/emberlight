@@ -362,7 +362,7 @@ export function mentions(text: string, e: Entity): boolean {
  * The people and places worth reminding the DM of: anyone mentioned in the recent story,
  * the current place, then whoever was seen most recently, up to `max`.
  */
-export function relevantEntities(m: Memory, recent: string, location: string | null, max: number, exclude: string[] = []): Entity[] {
+export function relevantEntities(m: Memory, recent: string, location: string | null, max: number, exclude: string[] = [], recalled: string[] = []): Entity[] {
   const skip = (e: Entity) => exclude.some((x) => sameName(x, e.name))
   const live = m.entities.filter((e) => !skip(e))
   const picked: Entity[] = []
@@ -372,6 +372,11 @@ export function relevantEntities(m: Memory, recent: string, location: string | n
   const byRecent = [...live].sort((a, b) => b.lastSeen - a.lastSeen)
   if (location) for (const e of live) if (e.kind === 'place' && [e.name, ...e.aliases].some((n) => samePlace(n, location))) add(e)
   for (const e of byRecent) if (mentions(recent, e)) add(e)
+  // Those that bear on the scene by meaning (memory by meaning, when there's an embedding model).
+  for (const id of recalled) {
+    const e = live.find((x) => x.id === id)
+    if (e) add(e)
+  }
   // The groups the people in the scene belong to.
   for (const e of [...picked]) {
     const f = e.kind === 'person' && e.faction ? findEntity(m, 'faction', e.faction) : undefined
@@ -400,25 +405,31 @@ const dayRange = (s: Summary) => (s.fromDay === s.toDay ? `day ${s.fromDay}` : `
 
 /**
  * The story-so-far block. `covered(s)` says whether a summary's messages are still shown to
- * the model word for word (then it's left out). Newest summaries win when space is short.
+ * the model word for word (then it's left out). Newest summaries win when space is short, after
+ * any that `keep` names (recalled by meaning: an old chapter that bears on the scene now).
  */
-export function storySoFar(m: Memory, budgetChars: number, covered: (s: Summary) => boolean): string {
+export function storySoFar(m: Memory, budgetChars: number, covered: (s: Summary) => boolean, keep: ReadonlySet<string> = new Set()): string {
   if (budgetChars <= 0) return ''
   const lastChapterTo = m.chapters.at(-1)?.to
   const chapterIdx = (s: Summary) => m.scenes.findIndex((x) => x.to === s.to)
   const cut = lastChapterTo ? chapterIdx(m.chapters.at(-1)!) : -1
   const scenes = m.scenes.slice(cut + 1).filter((s) => !covered(s))
   const chapters = m.chapters.filter((s) => !covered(s))
-  const parts: string[] = []
+  const line = (s: Summary) => `${s.level === 'chapter' ? 'Chapter' : 'Scene'}, ${dayRange(s)}: ${s.title}. ${s.text}`
+  const chosen = new Set<Summary>()
   let used = 0
-  const take = (line: string) => {
-    if (used + line.length > budgetChars) return false
-    parts.unshift(line)
-    used += line.length
+  const take = (s: Summary) => {
+    if (chosen.has(s)) return true
+    const len = line(s).length
+    if (used + len > budgetChars) return false
+    chosen.add(s)
+    used += len
     return true
   }
-  for (const s of [...scenes].reverse()) if (!take(`Scene, ${dayRange(s)}: ${s.title}. ${s.text}`)) break
-  for (const s of [...chapters].reverse()) if (!take(`Chapter, ${dayRange(s)}: ${s.title}. ${s.text}`)) break
+  for (const s of [...chapters, ...scenes]) if (keep.has(s.to)) take(s)
+  for (const s of [...scenes].reverse()) if (!take(s)) break
+  for (const s of [...chapters].reverse()) if (!take(s)) break
+  const parts = [...chapters, ...scenes].filter((s) => chosen.has(s)).map(line)
   if (m.arc && chapters.length && used + m.arc.length < budgetChars) parts.unshift(`Overall: ${m.arc}`)
   return parts.join('\n')
 }

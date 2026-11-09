@@ -144,6 +144,18 @@ Each turn, `core/memory/assemble.ts` builds the prompt to fit the model's **actu
 
 ---
 
+## Memory by meaning
+
+*Built (0.20.0).* Optional. With an **embedding model** (a small model that turns text into a list of numbers, so texts that mean the same land close together), the DM is reminded of what bears on the scene even when nothing in it says the name: a howl in the pines brings back the hunter who tracks the wolf pack, the night the pack circled the camp, and the lore about the greycoats.
+
+- **Where embeddings come from:** an OpenAI-compatible `/v1/embeddings` endpoint. Empty address: the story model's own server when it's a local one (LM Studio, Ollama, llama.cpp, KoboldCpp). Claude has no embedding models, so with Claude an address must be given (a local LM Studio or Ollama works alongside Claude), or memory by meaning stays off and names and keywords decide, as before. Set up under *Connect a Model → Memory by meaning*, on the computer only (it holds a server address), with a **Test** that compares two sentences that mean the same and one that doesn't.
+- **Each turn:** the last three messages are compared with everyone and everywhere in the Journal, the chapter and scene summaries, and the lore entries no keyword woke. Each text is embedded once per model and kept in the save file (`embeddings` table), so a turn only asks for what's new (a fresh campaign's first turn takes a few seconds; after that, milliseconds).
+- **What counts:** a score is measured in spreads above the average over everything compared, not as a fixed number, because models score on different scales (nomic-embed-text calls unrelated sentences 0.5; others 0.1). It must stand at least 1.3 spreads out, and nothing is recalled with fewer than six things to compare. Tuned on nomic-embed-text: true matches stood 1.4 to 3.7 spreads out, the rest 0.9 or less.
+- **What it changes:** up to 4 people, places or factions are put in the DM's memory list after anyone named in the scene and before those merely seen lately; up to 3 older chapters or scenes are kept in the story so far even when only the newest would fit; up to 2 short lore entries (under 1,500 characters, placed in the scene) join the world notes. Names and keywords still come first.
+- **Never in the way:** if the embedding server is slow (8 seconds) or down, the turn goes on without it.
+
+Code: `src/shared/embeddings.ts`, `src/server/ai/embeddings.ts`, `src/server/ai/recall.ts`.
+
 ## Journal (what the player sees)
 
 A **📖 Journal** tab with sub-tabs, all editable:

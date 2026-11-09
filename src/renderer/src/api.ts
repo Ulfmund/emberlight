@@ -5,6 +5,7 @@ import type { CardDetail, CardSummary } from '@shared/cards'
 import type { MemoryEvent } from '@shared/memory'
 import type { Lorebook, LorebookSummary } from '@shared/lore'
 import type { ImageSettings } from '@shared/images'
+import type { EmbeddingSettings } from '@shared/embeddings'
 
 export type CreateOptions = { playerCard?: string; companions?: string[]; useGreeting?: boolean; lorebooks?: string[]; world?: string }
 
@@ -84,6 +85,9 @@ export const api = {
   generateImage: (id: string, prompt: string, entity?: string, signal?: AbortSignal) =>
     fetch(`/api/campaigns/${encodeURIComponent(id)}/images/generate`, { method: 'POST', signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, entity }) }).then((r) => json<{ media: string; view: CampaignView }>(r)),
   imageSettings: () => fetch('/api/images/settings').then((r) => json<ImageSettings & { hasKey: boolean }>(r)),
+  embeddingSettings: () => fetch('/api/embeddings/settings').then((r) => json<EmbeddingSettings & { hasKey: boolean; ready: boolean }>(r)),
+  saveEmbeddingSettings: (s: EmbeddingSettings) => put('/api/embeddings/settings', s).then((r) => json<EmbeddingSettings & { hasKey: boolean; ready: boolean }>(r)),
+  testEmbeddings: () => post('/api/embeddings/settings/test', {}).then((r) => json<{ dims: number; alike: number; unlike: number }>(r)),
   saveImageSettings: (s: ImageSettings) => put('/api/images/settings', s).then((r) => json<ImageSettings & { hasKey: boolean }>(r)),
   /** A test picture from the generator, as an object URL. */
   testImages: async () => {

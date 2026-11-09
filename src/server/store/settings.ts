@@ -3,6 +3,7 @@ import { join, dirname } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { Connection } from '@shared/types'
 import { normalizeImageSettings, type ImageSettings } from '@shared/images'
+import { normalizeEmbeddingSettings, type EmbeddingSettings } from '@shared/embeddings'
 
 /** Playing from other devices: a phone on the same Wi-Fi, or through a tunnel link. */
 export type RemoteSettings = {
@@ -13,7 +14,7 @@ export type RemoteSettings = {
 }
 
 /** App settings, saved as JSON in the app's user-data folder. */
-type SettingsFile = { version: 1; connection: Connection | null; remote: RemoteSettings; images: ImageSettings }
+type SettingsFile = { version: 1; connection: Connection | null; remote: RemoteSettings; images: ImageSettings; embeddings: EmbeddingSettings }
 
 export const newRemoteKey = () => randomBytes(24).toString('base64url')
 
@@ -48,7 +49,8 @@ export class SettingsStore {
         wifi: r.wifi === true,
         link: r.link === true
       },
-      images: normalizeImageSettings(raw.images)
+      images: normalizeImageSettings(raw.images),
+      embeddings: normalizeEmbeddingSettings(raw.embeddings)
     }
   }
 
@@ -84,6 +86,15 @@ export class SettingsStore {
 
   setImages(s: ImageSettings) {
     this.data.images = s
+    this.save()
+  }
+
+  get embeddings(): EmbeddingSettings {
+    return this.data.embeddings
+  }
+
+  setEmbeddings(s: EmbeddingSettings) {
+    this.data.embeddings = s
     this.save()
   }
 }

@@ -63,6 +63,7 @@ function forbiddenRemotely(path: string): boolean {
     path.startsWith('/api/keys') ||
     path.startsWith('/api/remote') ||
     path.startsWith('/api/images/settings') ||
+    path.startsWith('/api/embeddings/settings') ||
     path.startsWith('/api/update/') // checking, downloading and installing
   )
 }

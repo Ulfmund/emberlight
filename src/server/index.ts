@@ -16,6 +16,8 @@ import { TurnEngine } from './core/turn'
 import { registerGameRoutes } from './routes/game'
 import { registerMediaRoutes } from './routes/media'
 import { registerAudioRoutes } from './routes/audio'
+import { registerEmbeddingRoutes } from './routes/embeddings'
+import { Embedder } from './ai/embeddings'
 import { AudioLibrary } from './audio/library'
 import { registerCardRoutes } from './routes/cards'
 import { CardLibrary } from './cards/library'
@@ -223,12 +225,16 @@ export async function startServer(opts: ServerOptions): Promise<{ port: number; 
   const db = new GameDb(opts.dataDir)
   const campaigns = new Campaigns(db)
   const turns = new TurnEngine(campaigns, () => settings.connection, (id) => secrets.get(id))
+  // Memory by meaning, when an embedding model is set up.
+  const embedder = new Embedder(db, () => ({ embeddings: settings.embeddings, connection: settings.connection }), (id) => secrets.get(id))
+  turns.embedder = embedder
   const library = new CardLibrary(db)
   registerCardRoutes(app, library)
   registerLoreRoutes(app, new LoreLibrary(db))
   registerGameRoutes(app, campaigns, turns, library)
   registerMediaRoutes(app, campaigns, turns, settings, secrets)
   registerAudioRoutes(app, new AudioLibrary(opts.dataDir))
+  registerEmbeddingRoutes(app, settings, secrets, embedder)
 
   // ---- The UI itself (production) ------------------------------------------------------
   if (opts.staticDir) {

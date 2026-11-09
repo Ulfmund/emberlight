@@ -39,6 +39,10 @@ import { fillMacros, storyName } from '@shared/cards'
 import { estimateTokens, promptBlocks, type PromptReport } from '@shared/inspect'
 import { entityLine, projectMemory, relevantEntities, sameName, storySoFar, type Summary } from '@shared/memory'
 import { factionBrief, factionStanding, withReputation } from '@shared/factions'
+import type { LoreEntry } from '@shared/lore'
+import type { Memory } from '@shared/memory'
+import type { Embedder } from '../ai/embeddings'
+import { NOTHING_RECALLED, recallByMeaning, type Recalled } from '../ai/recall'
 import { summarizeChapter, summarizeScene, updateArc } from '../ai/jobs/summarizer'
 import { createProvider, type Provider } from '../ai/providers'
 import { runCombatReferee, runReferee } from '../ai/jobs/referee'
@@ -99,6 +103,24 @@ export class TurnEngine {
     private makeProvider: typeof createProvider = createProvider,
     private rng: () => number = Math.random
   ) {}
+
+  /** Memory by meaning (set when an embedding model may be used). */
+  embedder?: Embedder
+
+  /**
+   * What bears on the scene by meaning, not only by name. Quick (embeddings are kept), and never
+   * holds up the story: if the embedding server is slow or down, names and keywords decide.
+   */
+  private async recall(path: MessageRow[], memory: Memory, lore: LoreEntry[], signal: AbortSignal): Promise<Recalled> {
+    if (!this.embedder?.ready()) return NOTHING_RECALLED
+    const recent = path.slice(-3).map((m) => m.content).join('\n')
+    try {
+      return await recallByMeaning(this.embedder, recent, memory, lore, AbortSignal.any([signal, AbortSignal.timeout(8000)]))
+    } catch (err) {
+      console.warn(`Memory by meaning skipped this turn: ${(err as Error).message}`)
+      return NOTHING_RECALLED
+    }
+  }
 
   /** Background memory work per campaign (summaries), so turns never wait for it. */
   private jobs = new Map<string, Promise<void>>()
@@ -541,7 +563,10 @@ export class TurnEngine {
     const named = memory.entities.filter((e) => e.kind === 'person' && [e.name, ...e.aliases].some((n) => n.trim().length > 2 && recentText.includes(n.toLowerCase()))).map((e) => e.name)
     const present = [after.character.build.name, ...c.cast.map((m) => m.name), ...named]
     const picked = selectLoreDetailed(loreEntries, history.map((m) => m.content), { budgetChars: tier.lore, rng: this.rng, firedAgo, messages: path.length, present, bookBudgets: this.campaigns.loreBudgets(c) })
-    const lore = picked.entries.filter((e) => e.position !== 'depth')
+    const recalled = await this.recall(path, memory, loreEntries, signal)
+    // Lore that fits the scene by meaning though no keyword woke it (a short entry or two).
+    const meant = loreEntries.filter((e) => recalled.lore.includes(e.id) && !picked.entries.includes(e) && (!e.position || e.position === 'scene') && e.content.length <= 1500)
+    const lore = [...picked.entries.filter((e) => e.position !== 'depth'), ...meant]
     // Entries placed in the story itself, a number of messages back (in the player's message there).
     for (const e of picked.entries.filter((x) => x.position === 'depth')) {
       let at = Math.max(0, history.length - 1 - e.depth)
@@ -550,7 +575,7 @@ export class TurnEngine {
     }
     const me = after.character.build.name
     const party = after.party ?? []
-    const people = relevantEntities(memory, path.slice(-6).map((m) => m.content).join('\n'), after.location, tier.people, [me, ...party.map((a) => a.name)])
+    const people = relevantEntities(memory, path.slice(-6).map((m) => m.content).join('\n'), after.location, tier.people, [me, ...party.map((a) => a.name)], recalled.entities)
       .map((e) => entityLine(e, tier.facts))
       .join('\n')
     // Companions met in the story are described from their record (card companions by their card).
@@ -570,10 +595,11 @@ export class TurnEngine {
     const factions = factionStanding(memory)
     const build = (story: string) => narratorSystem(after, c.settings, names, c.cast, lore, { story, people, notes: pinned, companions, factions }, persona)
     const storyBudget = Math.round(ctx.contextChars * tier.storyShare)
-    let system = build(storySoFar(memory, storyBudget, () => false))
+    const keep = new Set(recalled.summaries)
+    let system = build(storySoFar(memory, storyBudget, () => false, keep))
     let messages = fitHistory(history, budget(system))
     const shownFrom = path.length - messages.length
-    system = build(storySoFar(memory, storyBudget, (s) => (index.get(s.from) ?? -1) >= shownFrom))
+    system = build(storySoFar(memory, storyBudget, (s) => (index.get(s.from) ?? -1) >= shownFrom, keep))
     messages = fitHistory(history, budget(system))
 
     const dm = this.campaigns.db.addMessage({

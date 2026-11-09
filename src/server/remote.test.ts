@@ -104,6 +104,11 @@ describe('playing from other devices', () => {
     expect((await call(link, '/api/images/settings', { method: 'PUT', headers: h, body: { backend: 'openai', baseUrl: 'https://evil.example', model: '', style: '', negative: '', size: 768, steps: 28, workflow: '' } })).status).toBe(403)
     expect((await call(link, '/api/images/settings/test', { method: 'POST', headers: h })).status).toBe(403)
     expect((await call(link, '/api/keys/images', { method: 'PUT', headers: h, body: { key: 'sk-evil' } })).status).toBe(403)
+    // So are memory by meaning's (an address and a key).
+    expect((await call(link, '/api/embeddings/settings', { headers: h })).status).toBe(403)
+    expect((await call(link, '/api/embeddings/settings', { method: 'PUT', headers: h, body: { enabled: true, baseUrl: 'https://evil.example/v1', model: 'x' } })).status).toBe(403)
+    expect((await call(link, '/api/embeddings/settings/test', { method: 'POST', headers: h })).status).toBe(403)
+    expect((await call(link, '/api/keys/embeddings', { method: 'PUT', headers: h, body: { key: 'sk-evil' } })).status).toBe(403)
   })
 
   it("can change the model, but can't send the saved key to a new address", async () => {
