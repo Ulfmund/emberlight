@@ -21,23 +21,23 @@ const RecordSchema = z.object({
     .enum(['person', 'place', 'faction', 'quest', 'item'])
     .describe('person: a named character, not the player character. place: a named place. faction: a named group. quest: a task or aim the character has taken on or been asked to do. item: a notable named object (an heirloom, a relic, a letter, a key), not everyday gear'),
   name: z.string().describe('As the story gives it. A person with no name yet: how the story refers to them ("the barmaid"). A quest: a short title ("Find the missing ferry")'),
-  otherNames: z.array(z.string()).default([]).describe('Other names or descriptions used. If someone recorded in KNOWN under a description now gives their real name, put the real name in name and the old description here'),
-  what: z.string().default('').describe('One short line: who or what they are; for a quest, what has to be done. Empty if already known and unchanged'),
-  newFacts: z.array(z.string()).default([]).describe('At most 2 short, lasting facts the story states (for a quest: progress made). Usually empty'),
+  otherNames: z.array(z.string()).describe('Other names or descriptions used. If someone recorded in KNOWN under a description now gives their real name, put the real name in name and the old description here').default([]),
+  what: z.string().describe('One short line: who or what they are; for a quest, what has to be done. Empty if already known and unchanged').default(''),
+  newFacts: z.array(z.string()).describe('At most 2 short, lasting facts the story states (for a quest: progress made). Usually empty').default([]),
   status: z
     .enum(['alive', 'dead', 'missing', 'unknown', 'active', 'done', 'failed'])
-    .default('unknown')
-    .describe('People: alive, dead or missing (missing only if the story says so), else unknown. Quests: active, done or failed. Everything else: unknown'),
-  attitude: z.enum(['hostile', 'unfriendly', 'neutral', 'friendly', 'devoted', 'unknown']).default('unknown').describe('People only: how they now feel about the player character'),
-  relation: z.enum(RELATIONS).default('none').describe("People only: how they're tied to the player character: child, parent, sibling, spouse, lover, friend, ally, companion, employer, rival, enemy, or none"),
-  partOf: z.string().default('').describe('People: the named group they belong to ("the Town Watch"). Quests: who asked it of the character. Items: who has it now ("the player" for the player character). Otherwise empty'),
-  ties: z.array(z.string()).default([]).describe('People only: their ties to other named characters the story states, each as "how: name" ("granddaughter of: Old Tam", "owes money to: Sergeant Pell"). Not ties to the player character'),
+    .describe('People: alive, dead or missing (missing only if the story says so), else unknown. Quests: active, done or failed. Everything else: unknown')
+    .default('unknown'),
+  attitude: z.enum(['hostile', 'unfriendly', 'neutral', 'friendly', 'devoted', 'unknown']).describe('People only: how they now feel about the player character').default('unknown'),
+  relation: z.enum(RELATIONS).describe("People only: how they're tied to the player character: child, parent, sibling, spouse, lover, friend, ally, companion, employer, rival, enemy, or none").default('none'),
+  partOf: z.string().describe('People: the named group they belong to ("the Town Watch"). Quests: who asked it of the character. Items: who has it now ("the player" for the player character). Otherwise empty').default(''),
+  ties: z.array(z.string()).describe('People only: their ties to other named characters the story states, each as "how: name" ("granddaughter of: Old Tam", "owes money to: Sergeant Pell"). Not ties to the player character').default([]),
   standingChange: z
     .number()
     .int()
-    .default(0)
-    .describe("Factions only: -2 to 2, how the character's own deeds in this exchange changed what the group thinks of them. +1 a favour, +2 a great service, -1 a slight or an insult, -2 violence against them or a betrayal. Usually 0"),
-  why: z.string().default('').describe('Factions only: if standingChange is not 0, a few words why ("helped the watch catch a thief")')
+    .describe("Factions only: -2 to 2, how the character's own deeds in this exchange changed what the group thinks of them. +1 a favour, +2 a great service, -1 a slight or an insult, -2 violence against them or a betrayal. Usually 0")
+    .default(0),
+  why: z.string().describe('Factions only: if standingChange is not 0, a few words why ("helped the watch catch a thief")').default('')
 })
 
 export const ScribeSchema = z.object({
@@ -56,19 +56,19 @@ export const ScribeSchema = z.object({
   placeKind: z
     .enum([...PLACE_KINDS, 'unknown'] as [string, ...string[]])
     .describe('What sort of place the character is in now: town, village, indoors (inside a building), road, forest, hills (hills or mountains), water (river, lake, coast, at sea), ruin, underground (caves, mines, dungeons), wild (open country); unknown if unclear'),
-  weather: z.enum(['clear', 'rain', 'storm', 'fog', 'snow', 'unchanged']).default('unchanged').describe('The weather now, if this exchange shows or changes it (clear skies, rain, a storm, fog, snow); unchanged if it says nothing about it, or the character is indoors'),
+  weather: z.enum(['clear', 'rain', 'storm', 'fog', 'snow', 'unchanged']).describe('The weather now, if this exchange shows or changes it (clear skies, rain, a storm, fog, snow); unchanged if it says nothing about it, or the character is indoors').default('unchanged'),
   ate: z.enum(['none', 'snack', 'meal', 'feast']).describe('Did the character eat food that is not from their own pack? snack = a bite or a drink; meal = a proper meal; feast = a big hot meal or banquet'),
   itemsUsed: z
     .array(ItemQty)
     .describe("Things from the character's own pack used up for their effect: eaten, drunk, a bandage or salve applied. Use the names from Carrying. Not things given away, sold or lost (those go in itemsLost)"),
   itemsEquipped: z.array(z.string()).describe('Things from the pack the character put on, wielded or took in hand in this exchange. Usually empty'),
-  spellsLearned: z.array(z.string()).default([]).describe('Spells the character clearly learns in this exchange (from a teacher, a tome, a revelation), by name. Usually empty'),
-  companionsJoined: z.array(z.string()).default([]).describe('People who now travel with the player character: they clearly agreed to come along in this exchange. By name. Usually empty'),
+  spellsLearned: z.array(z.string()).describe('Spells the character clearly learns in this exchange (from a teacher, a tome, a revelation), by name. Usually empty').default([]),
+  companionsJoined: z.array(z.string()).describe('People who now travel with the player character: they clearly agreed to come along in this exchange. By name. Usually empty').default([]),
   companionsLeft: z
     .array(z.string())
-    .default([])
-    .describe('Companions (from TRAVELLING WITH) who go their own way in this exchange: they leave, stay behind, or are taken. Not someone who dies (record them as dead). Usually empty'),
-  records: z.array(RecordSchema).default([]).describe('Everyone and everything named that matters in this exchange: people, places, groups, quests and notable items. At most 6')
+    .describe('Companions (from TRAVELLING WITH) who go their own way in this exchange: they leave, stay behind, or are taken. Not someone who dies (record them as dead). Usually empty')
+    .default([]),
+  records: z.array(RecordSchema).describe('Everyone and everything named that matters in this exchange: people, places, groups, quests and notable items. At most 6').default([])
 })
 export type ScribeOutput = z.infer<typeof ScribeSchema>
 /** What the Scribe may leave out (the defaults fill it in). */

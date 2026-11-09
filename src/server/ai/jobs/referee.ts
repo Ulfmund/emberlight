@@ -42,7 +42,7 @@ const CheckSchema = z.object({
   withStrangers: z.boolean().describe('Social checks only: true if talking to strangers, officials or authority'),
   risk: z.enum(SEVERITIES).describe('How badly the character can be hurt if this fails'),
   riskSource: z.enum(HARM_SOURCES).describe('Who or what would hurt them: sentient = people/intelligent foes'),
-  faction: z.string().default('').describe('Social checks only: the named group (from FACTIONS) the person being dealt with belongs to; otherwise empty')
+  faction: z.string().describe('Social checks only: the named group (from FACTIONS) the person being dealt with belongs to; otherwise empty').default('')
 })
 
 const FoeSchema = z.object({
@@ -53,7 +53,7 @@ const FoeSchema = z.object({
 })
 
 export const RefereeSchema = z.object({
-  intent: z.enum(['combat', 'social', 'explore', 'travel', 'rest', 'gather', 'craft', 'other']).default('other').describe('What kind of thing the character is doing'),
+  intent: z.enum(['combat', 'social', 'explore', 'travel', 'rest', 'gather', 'craft', 'other']).describe('What kind of thing the character is doing').default('other'),
   checks: z.array(CheckSchema).describe('Zero, one or two checks. Empty when nothing is uncertain.'),
   fight: z
     .object({
@@ -69,7 +69,7 @@ export const RefereeSchema = z.object({
       what: z.string().describe('What they gather or make, in a few words ("iron ore", "fish", "healing draught", "arrows"); empty if none')
     })
     .default({ kind: 'none', what: '' }),
-  spell: z.string().default('').describe('If the character casts a spell, its name as they say it ("Mend", "a firebolt"); otherwise empty')
+  spell: z.string().describe('If the character casts a spell, its name as they say it ("Mend", "a firebolt"); otherwise empty').default('')
 })
 export type RefereeOutput = z.infer<typeof RefereeSchema>
 
@@ -167,7 +167,7 @@ export const CombatRefereeSchema = z.object({
   action: z.enum(['attack', 'power_attack', 'cast', 'defend', 'flee', 'use_item', 'talk', 'surrender', 'other']),
   target: z.string().describe('For attacks: the id of the foe attacked (e.g. "f2"); otherwise empty'),
   item: z.string().describe('For use_item: the name of the item from the pack; otherwise empty'),
-  spell: z.string().default('').describe('For cast: the name of the spell, if they say which; otherwise empty'),
+  spell: z.string().describe('For cast: the name of the spell, if they say which; otherwise empty').default(''),
   checks: z.array(CheckSchema).describe('For talk or other only: at most one check (risk none: the foes are the danger). Empty otherwise')
 })
 
