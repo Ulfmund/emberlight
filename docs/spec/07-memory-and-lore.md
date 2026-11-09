@@ -131,6 +131,8 @@ Each turn, `core/memory/assemble.ts` builds the prompt to fit the model's **actu
 
 **Context inspector** (Advanced): shows exactly what went into the last prompt, block by block, with token counts. It's essential for debugging "why did the DM forget X?".
 
+*Built (0.7.0):* **What the DM saw** on the latest DM reply. A bar shows how full the context was, then each block of the instructions (split at their headings) and the story sent word for word, with rough token counts (about 3.5 characters a token) and the full text. It's kept in memory for each adventure's latest reply, so it's empty right after Emberlight starts until the next turn or Rewrite.
+
 ---
 
 ## Journal (what the player sees)

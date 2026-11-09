@@ -17,6 +17,7 @@ import type { TurnEvent } from '@shared/view'
 import type { Campaigns } from '../core/campaigns'
 import type { TurnEngine } from '../core/turn'
 import type { CardLibrary } from '../cards/library'
+import { applyRename, previewRename } from '../core/rename'
 import { MAX_COMPANIONS, type CastMember } from '@shared/cards'
 import { MAX_FACTS, type MemoryEvent } from '@shared/memory'
 import { findWorld } from '@shared/worlds'
@@ -187,6 +188,12 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
     )
   })
 
+  /** The context inspector: what the DM was sent for its latest reply. */
+  app.get('/api/campaigns/:id/prompt', (c) => {
+    const r = turns.lastPrompt(c.req.param('id'))
+    return r ? c.json(r) : c.json({ error: 'Nothing sent yet since Emberlight started. Play a turn (or press Rewrite) and look again.' }, 404)
+  })
+
   // ---- story navigation ------------------------------------------------------------------
 
   app.post('/api/campaigns/:id/swipe', async (c) => {
@@ -224,6 +231,32 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
     if (!b) return c.json({ error: 'Invalid lorebooks.' }, 400)
     const r = guard(() => {
       campaigns.setLorebooks(c.req.param('id'), b.ids)
+      return campaigns.view(c.req.param('id'))
+    })
+    return r.ok ? c.json(r.value) : c.json({ error: r.error }, 400)
+  })
+
+  // ---- renaming (retcon or in-story) --------------------------------------------------------
+
+  const RenameBody = z.object({ from: z.string().min(1).max(80), to: z.string().min(1).max(80) })
+  app.post('/api/campaigns/:id/rename/preview', async (c) => {
+    const b = await body(c, RenameBody)
+    if (!b) return c.json({ error: 'Type the new name first.' }, 400)
+    const r = guard(() => previewRename(campaigns, c.req.param('id'), b.from, b.to))
+    return r.ok ? c.json(r.value) : c.json({ error: r.error }, 400)
+  })
+  app.post('/api/campaigns/:id/rename', async (c) => {
+    const b = await body(
+      c,
+      RenameBody.extend({
+        mode: z.enum(['retcon', 'story']),
+        target: z.discriminatedUnion('kind', [z.object({ kind: z.literal('player') }), z.object({ kind: z.literal('entity'), id: z.string().max(200) })]),
+        skip: z.array(z.string().max(80)).max(5000).optional()
+      })
+    )
+    if (!b) return c.json({ error: 'That rename could not be read.' }, 400)
+    const r = guard(() => {
+      applyRename(campaigns, c.req.param('id'), b)
       return campaigns.view(c.req.param('id'))
     })
     return r.ok ? c.json(r.value) : c.json({ error: r.error }, 400)

@@ -10,12 +10,14 @@ import { Story } from './play/Story'
 import { DiceTray } from './play/DiceTray'
 import { DeathScreen, Toasts } from './play/Overlays'
 import { Journal } from './play/Journal'
+import { Inspector } from './play/Inspector'
 import { MobileDrawer, MobileStatus } from './play/Mobile'
 
 export function PlayScreen() {
   const { view, busy, act, stop, live } = useGame()
   const [tab, setTab] = useState<Tab>('sheet')
   const [journal, setJournal] = useState(false)
+  const [inspector, setInspector] = useState(false)
   /** Phones: the character and side panels live in a drawer. */
   const [drawer, setDrawer] = useState(false)
   const portraits = useMemo(() => (view ? portraitMap(view) : {}), [view])
@@ -34,7 +36,7 @@ export function PlayScreen() {
       <main className="relative flex min-w-0 flex-1 flex-col">
         <MobileStatus view={view} onOpen={() => setDrawer(true)} onJournal={() => setJournal(true)} />
         <PortraitContext.Provider value={portraits}>
-          <Story view={view} />
+          <Story view={view} onInspect={() => setInspector(true)} />
         </PortraitContext.Provider>
         <Composer disabled={dead} busy={busy} holding={live.hold} onSend={(t) => void act(t)} onStop={stop} />
         <DiceTray />
@@ -46,6 +48,7 @@ export function PlayScreen() {
 
       <MobileDrawer view={view} open={drawer} onClose={() => setDrawer(false)} tab={tab} setTab={setTab} onJournal={() => { setDrawer(false); setJournal(true) }} />
       <Journal view={view} open={journal} onClose={() => setJournal(false)} />
+      <Inspector campaignId={view.id} open={inspector} onClose={() => setInspector(false)} />
       <Toasts />
       <DeathScreen view={view} />
     </div>

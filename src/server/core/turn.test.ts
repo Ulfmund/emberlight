@@ -364,4 +364,19 @@ describe('turn engine', () => {
     await run(engine.regenerate(id, signal))
     expect(fake.lastSystem).not.toContain('THE CINDER MARCHES')
   })
+  it('reports what the DM was sent, block by block', async () => {
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    expect(engine.lastPrompt(id)).toBeUndefined()
+    await run(engine.narrateHead(id, signal))
+    campaigns.journal(id, { type: 'note', id: 'n', text: 'The moon is red.' })
+    await run(engine.act(id, 'I look up.', signal))
+    const r = engine.lastPrompt(id)!
+    expect(r.messageId).toBe(campaigns.view(id).messages.at(-1)!.id)
+    expect(r.blocks.map((b) => b.title)).toEqual(expect.arrayContaining(['The DM’s role', 'How to run the game', 'Asking for a roll', 'The player character', 'Where and when', 'Pinned notes']))
+    expect(r.blocks.find((b) => b.title === 'Pinned notes')!.text).toBe('- The moon is red.')
+    // Everything the model got is accounted for: the instructions and every message sent.
+    expect(r.history.messages).toEqual(fake.lastMessages.map((m) => ({ role: m.role, text: m.content })))
+    expect(r.blocks.map((b) => b.text).join('\n').length).toBeGreaterThan(fake.lastSystem.length * 0.9)
+    expect(r.totalTokens).toBeLessThan(r.contextTokens)
+  })
 })

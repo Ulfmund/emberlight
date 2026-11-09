@@ -137,6 +137,18 @@ Each sets starting skill levels, gear, coin and **+5 affinity** to 2–3 skills.
 
 More backgrounds are just more table rows.
 
+**Each people has its own callings** (0.7.0, `RACE_BACKGROUNDS` in `src/shared/rules/tables.ts`), because their cultures differ:
+
+| People | Callings |
+|---|---|
+| Human | Farmhand, Apprentice Smith, Temple Acolyte, Street Thief, Hunter, Hedge Witch, Sellsword, Fisher, Road Peddler |
+| Dwarf | Tunnel Delver, Apprentice Smith, Rune-Carver's Apprentice, Clan Brewer, Hold Shieldbearer, Keeper of Names |
+| Elf | Grove Warden, Loremaster's Ward, Moonsinger, Grove Healer, Bladedancer, Bowyer |
+| Halfling | Farmhand, Hearth Cook, Road Peddler, Street Thief, Fisher, Lane Warden |
+| Orc | Clan Raider, Beast-Tamer, Bone-Caller, Pit Fighter, Scrap-Smith, Hunter |
+
+Changing race in the creator switches to the new people's first calling if the old one isn't theirs. Characters made before 0.7.0 keep the calling they have.
+
 ---
 
 ## Checks

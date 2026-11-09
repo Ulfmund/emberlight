@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  validateBuild as validate,
   attrCaps,
   charLevelFromXp,
   charXpForLevel,
@@ -16,7 +17,7 @@ import {
 } from './character'
 import { checkBreakdown, deathRollEvents, defeatEvents, resolveCheck, tierFor, type CheckRequest } from './checks'
 import { applyEvent, DEFAULT_SETTINGS, derived, initialState, project, type GameState } from './state'
-import { ATTRS, BANNED_NAMES } from './index'
+import { ATTRS, BACKGROUND_IDS, BACKGROUNDS, BANNED_NAMES, RACE_BACKGROUNDS, RACE_IDS } from './index'
 import { generateName } from './names'
 
 /** Deterministic random numbers for tests. */
@@ -244,5 +245,30 @@ describe('names', () => {
       const n = generateName(rng, 'elf', i % 2 ? 'male' : 'female', false)
       expect(banned.has(n.toLowerCase())).toBe(false)
     }
+  })
+})
+
+describe('callings by people', () => {
+  it('gives every people at least six callings that exist', () => {
+    for (const r of RACE_IDS) {
+      expect(RACE_BACKGROUNDS[r].length).toBeGreaterThanOrEqual(6)
+      for (const b of RACE_BACKGROUNDS[r]) expect(BACKGROUND_IDS).toContain(b)
+    }
+    // Every calling belongs to someone.
+    for (const b of BACKGROUND_IDS) expect(RACE_IDS.some((r) => RACE_BACKGROUNDS[r].includes(b))).toBe(true)
+    // Callings must be valid to start with: skills within the starting limit.
+    for (const b of BACKGROUND_IDS) for (const lvl of Object.values(BACKGROUNDS[b].skills)) expect(1 + (lvl as number)).toBeLessThanOrEqual(10)
+  })
+
+  it("rolls random adventurers from their own people's callings, and refuses others", () => {
+    let seed = 7
+    const rng = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    for (let i = 0; i < 300; i++) {
+      const b = randomBuild(rng, 'realistic', 'Test')
+      expect(RACE_BACKGROUNDS[b.race]).toContain(b.background)
+      expect(validate(b, 'realistic')).toEqual([])
+    }
+    const elf = randomBuild(rng, 'realistic', 'Test', { race: 'elf' })
+    expect(validate({ ...elf, background: 'farmhand', skills: {} }, 'realistic')).toContain("Elves don't have the calling Farmhand. Pick another.")
   })
 })

@@ -111,14 +111,30 @@ export const normName = (s: string) =>
 const keyTokens = (s: string) => normName(s).split(/[\s-]+/).filter((t) => t.length > 1 && !TITLES.has(t))
 
 /**
+ * A description rather than a name: it starts with "the/a/an" ("the ferryman"), or has several
+ * telling words and one is in lower case ("grey-bearded man"). One word on its own is a name.
+ */
+const isDescription = (s: string) => {
+  const t = s.trim()
+  if (/^(the|a|an)\s/i.test(t)) return true
+  const words = t
+    .replace(/['’]s\b/g, '')
+    .split(/[\s-]+/)
+    .filter((w) => w.length > 1 && !TITLES.has(w.toLowerCase()))
+  return words.length > 1 && words.some((w) => /^\p{Ll}/u.test(w))
+}
+
+/**
  * Whether two names mean the same one: equal, or every telling word of the shorter is in
- * the longer ("Tam" and "Old Tam", "Mira" and "Mira Ashdown").
+ * the longer ("Tam" and "Old Tam", "Mira" and "Mira Ashdown"). Descriptions must match
+ * exactly: "the ferryman" is not "the ferryman's girl".
  */
 export function sameName(a: string, b: string): boolean {
   const na = normName(a)
   const nb = normName(b)
   if (!na || !nb) return false
-  if (na === nb) return true
+  if (na.replace(/^(the|a|an) /, '') === nb.replace(/^(the|a|an) /, '')) return true
+  if (isDescription(a) || isDescription(b)) return false
   const ta = keyTokens(a)
   const tb = keyTokens(b)
   if (!ta.length || !tb.length) return false

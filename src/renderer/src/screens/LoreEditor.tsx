@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { LOGIC_LABEL, normalizeEntry, newEntryId, selectLore, type LoreEntry, type Lorebook, type LorebookSummary, type SecondaryLogic } from '@shared/lore'
 import { api } from '../api'
@@ -68,7 +69,8 @@ export function LoreEditor({
     setSelected(b.id)
   }
 
-  return (
+  // Drawn at the top of the page: inside a blurred panel, 'fixed' would mean 'fixed to the panel'.
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -162,7 +164,8 @@ export function LoreEditor({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }
 

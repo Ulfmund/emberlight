@@ -6,7 +6,7 @@ import {
   ATTR_INFO,
   ATTR_START,
   ATTRS,
-  BACKGROUND_IDS,
+  RACE_BACKGROUNDS,
   BACKGROUNDS,
   DEFAULT_SETTINGS,
   GROUP_INFO,
@@ -88,7 +88,9 @@ const PERSONALITY: string[] = [
 const rng = () => Math.random()
 
 /** Keeps a build legal after a choice changes its caps or budget. */
-function normalize(b: CharacterBuild, sexMode: SexMode): CharacterBuild {
+function normalize(b0: CharacterBuild, sexMode: SexMode): CharacterBuild {
+  // A new race may not have the old calling: switch to its first one.
+  const b = RACE_BACKGROUNDS[b0.race].includes(b0.background) ? b0 : { ...b0, background: RACE_BACKGROUNDS[b0.race][0] }
   const humanBonus = b.race === 'human' ? (b.humanBonus.length === 2 ? b.humanBonus : (['STR', 'AGI'] as Attr[])) : []
   const caps = attrCapBreakdown({ ...b, humanBonus }, sexMode)
   const attributes = { ...b.attributes }
@@ -497,9 +499,9 @@ function OriginStep({ build, update, settings, setSettings }: { build: Character
 function CallingStep({ build, update }: { build: CharacterBuild; update: (p: Partial<CharacterBuild>) => void }) {
   return (
     <>
-      <StepTitle title="Calling" text="What you did before the adventure. It sets your first skills, your gear and what you have a gift for." />
+      <StepTitle title="Calling" text={`What you did before the adventure, among the ${RACES[build.race].plural.toLowerCase()}. It sets your first skills, your gear and what you have a gift for.`} />
       <div className="grid gap-3 md:grid-cols-2">
-        {BACKGROUND_IDS.map((id) => {
+        {RACE_BACKGROUNDS[build.race].map((id) => {
           const bg = BACKGROUNDS[id]
           return (
             <Card key={id} active={build.background === id} onClick={() => update({ background: id })}>

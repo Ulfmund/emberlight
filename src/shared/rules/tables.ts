@@ -68,6 +68,7 @@ export type SkillMods = Partial<Record<SkillId, number>>
 export const RACES = {
   human: {
     label: 'Human',
+    plural: 'Humans',
     blurb: 'Short-lived, stubborn and everywhere. Good at whatever they set their mind to.',
     attrs: {},
     trait: { name: 'Adaptable', text: '+1 to two attribute caps of your choice, and +10% skill XP.' },
@@ -77,6 +78,7 @@ export const RACES = {
   },
   dwarf: {
     label: 'Dwarf',
+    plural: 'Dwarves',
     blurb: 'Broad, hardy folk of the deep halls. Patient craftsmen, poor sorcerers.',
     attrs: { STR: 2, AGI: -2, END: 3, ARC: -3, WIT: 1, PRE: -1 },
     trait: { name: 'Stoneborn', text: 'Sees in dim light. +5 to Mining and Smithing caps.' },
@@ -86,6 +88,7 @@ export const RACES = {
   },
   elf: {
     label: 'Elf',
+    plural: 'Elves',
     blurb: 'Long-lived and aloof, with old magic in the blood. Graceful, but frail.',
     attrs: { STR: -2, AGI: 2, END: -2, INT: 1, ARC: 2, WIT: 1, PRE: -2 },
     trait: { name: 'Old Blood', text: '+5 to Spellcasting and Enchanting caps.' },
@@ -95,6 +98,7 @@ export const RACES = {
   },
   halfling: {
     label: 'Halfling',
+    plural: 'Halflings',
     blurb: 'Small, quick and unreasonably lucky. Easy to underestimate.',
     attrs: { STR: -3, AGI: 3, ARC: -1, PRE: 1 },
     trait: { name: 'Small & Lucky', text: 'Once per day, a natural 1 is rerolled automatically.' },
@@ -104,6 +108,7 @@ export const RACES = {
   },
   orc: {
     label: 'Orc',
+    plural: 'Orcs',
     blurb: 'Big, fierce and hard to kill. Not much welcomed in polite company.',
     attrs: { STR: 3, END: 2, INT: -2, ARC: -1, PRE: -2 },
     trait: { name: 'Relentless', text: 'Once per day, drop to 1 HP instead of going down.' },
@@ -115,6 +120,7 @@ export const RACES = {
   string,
   {
     label: string
+    plural: string
     blurb: string
     attrs: AttrMods
     trait: { name: string; text: string }
@@ -293,6 +299,166 @@ export const BACKGROUNDS = {
     skills: { fishing: 5, cooking: 3, athletics: 2 },
     kit: [{ name: 'Fishing rod', icon: 'rod' }, { name: 'Net', icon: 'net' }],
     coins: 50
+  },
+  peddler: {
+    label: 'Road Peddler',
+    blurb: 'Town to town with a pack of odds and ends. You can sell anything to anyone, once.',
+    affinities: { bartering: 5, persuasion: 5, deception: 5 },
+    skills: { bartering: 5, persuasion: 3, deception: 2 },
+    kit: [{ name: "Peddler's pack", icon: 'bag' }, { name: 'Trinkets', qty: 6, icon: 'amulet' }],
+    coins: 90
+  },
+
+  // ---- Dwarves: deep halls, clan and craft --------------------------------------------
+  delver: {
+    label: 'Tunnel Delver',
+    blurb: 'You worked the deep seams where the lamps gutter. You hear a bad ceiling before it falls.',
+    affinities: { mining: 5, athletics: 5, perception: 5 },
+    skills: { mining: 5, athletics: 3, perception: 2 },
+    kit: [{ name: 'Pick', icon: 'pick' }, { name: 'Miner\'s lantern', icon: 'candle' }],
+    coins: 60
+  },
+  runecarver: {
+    label: "Rune-Carver's Apprentice",
+    blurb: 'You cut the old marks into stone and steel. Most of them only hum. Some do more.',
+    affinities: { enchanting: 5, crafting: 5, lore: 5 },
+    skills: { enchanting: 4, crafting: 3, lore: 3 },
+    kit: [{ name: 'Chisel set', icon: 'hammer' }, { name: 'Rune stones', qty: 3, icon: 'crystal' }],
+    coins: 70
+  },
+  brewer: {
+    label: 'Clan Brewer',
+    blurb: 'Every hold runs on ale and grudges. You kept the first flowing and heard all of the second.',
+    affinities: { cooking: 5, alchemy: 5, bartering: 5 },
+    skills: { cooking: 4, alchemy: 3, bartering: 3 },
+    kit: [{ name: 'Small cask of ale', icon: 'drop' }, { name: 'Travel rations', qty: 3, icon: 'bread' }],
+    coins: 70
+  },
+  shieldbearer: {
+    label: 'Hold Shieldbearer',
+    blurb: 'You stood in the gate line. You know how to hold a wall of shields, and when not to.',
+    affinities: { defense: 5, melee: 5, intimidation: 5 },
+    skills: { defense: 5, melee: 3, intimidation: 2 },
+    kit: [{ name: 'Axe', icon: 'pick' }, { name: 'Round shield', icon: 'armor' }],
+    coins: 80
+  },
+  namekeeper: {
+    label: 'Keeper of Names',
+    blurb: 'You tended the ancestor halls and learned every line of the clan books by heart.',
+    affinities: { lore: 5, medicine: 5, persuasion: 5 },
+    skills: { lore: 4, medicine: 3, persuasion: 3 },
+    kit: [{ name: 'Book of names', icon: 'scroll' }, { name: 'Bandages', qty: 3, icon: 'bandage' }],
+    coins: 60
+  },
+
+  // ---- Elves: old forests and older magic ---------------------------------------------
+  grovewarden: {
+    label: 'Grove Warden',
+    blurb: 'You walked the borders of the old woods and turned back those who meant them harm.',
+    affinities: { ranged: 5, survival: 5, perception: 5 },
+    skills: { ranged: 4, survival: 3, perception: 3 },
+    kit: [{ name: 'Longbow', icon: 'bow' }, { name: 'Arrows', qty: 20, icon: 'arrow' }, { name: 'Green cloak', icon: 'armor' }],
+    coins: 50
+  },
+  loreward: {
+    label: "Loremaster's Ward",
+    blurb: 'Raised among scrolls older than kingdoms. You read the old tongues and a few spells besides.',
+    affinities: { lore: 5, spellcasting: 5, enchanting: 5 },
+    skills: { lore: 5, spellcasting: 3, enchanting: 2 },
+    kit: [{ name: 'Book of the old tongues', icon: 'scroll' }, { name: 'Ink and quills', icon: 'quill' }],
+    coins: 60
+  },
+  moonsinger: {
+    label: 'Moonsinger',
+    blurb: 'You sang the long songs at the moon feasts. A good song moves people; a true one moves more.',
+    affinities: { persuasion: 5, lore: 5, spellcasting: 5 },
+    skills: { persuasion: 4, lore: 3, spellcasting: 3 },
+    kit: [{ name: 'Silver harp', icon: 'star' }, { name: 'Moon-cloth', icon: 'moon' }],
+    coins: 70
+  },
+  grovehealer: {
+    label: 'Grove Healer',
+    blurb: 'You know which leaf closes a wound and which one closes an eye for good.',
+    affinities: { herbalism: 5, medicine: 5, alchemy: 5 },
+    skills: { herbalism: 4, medicine: 4, alchemy: 2 },
+    kit: [{ name: 'Herb pouch', icon: 'herb' }, { name: 'Bandages', qty: 4, icon: 'bandage' }],
+    coins: 50
+  },
+  bladedancer: {
+    label: 'Bladedancer',
+    blurb: 'Years of forms under the trees. You fight like water: never where the blow lands.',
+    affinities: { melee: 5, athletics: 5, defense: 5 },
+    skills: { melee: 4, athletics: 3, defense: 3 },
+    kit: [{ name: 'Curved blade', icon: 'sword' }, { name: 'Dancer\'s wraps', icon: 'armor' }],
+    coins: 60
+  },
+  bowyer: {
+    label: 'Bowyer',
+    blurb: 'You shaped bows from living yew and fletched arrows with your own hands.',
+    affinities: { fletching: 5, woodcutting: 5, ranged: 5 },
+    skills: { fletching: 5, woodcutting: 3, ranged: 2 },
+    kit: [{ name: 'Shortbow', icon: 'bow' }, { name: 'Arrows', qty: 20, icon: 'arrow' }, { name: 'Hatchet', icon: 'pick' }],
+    coins: 60
+  },
+
+  // ---- Halflings: hearth, field and road ----------------------------------------------
+  hearthcook: {
+    label: 'Hearth Cook',
+    blurb: 'Six meals a day for a family of twenty. You can make a feast from a pocket of turnips.',
+    affinities: { cooking: 5, bartering: 5, herbalism: 5 },
+    skills: { cooking: 5, bartering: 3, herbalism: 2 },
+    kit: [{ name: 'Cooking pot', icon: 'flask' }, { name: 'Spice pouch', icon: 'herb' }, { name: 'Travel rations', qty: 3, icon: 'bread' }],
+    coins: 60
+  },
+  lanewarden: {
+    label: 'Lane Warden',
+    blurb: 'You kept watch on the hedgerows and lanes. Nobody notices a halfling in a hedge.',
+    affinities: { stealth: 5, ranged: 5, perception: 5 },
+    skills: { stealth: 4, ranged: 3, perception: 3 },
+    kit: [{ name: 'Sling', icon: 'bow' }, { name: 'Sling stones', qty: 20, icon: 'coin' }, { name: 'Lantern', icon: 'candle' }],
+    coins: 50
+  },
+
+  // ---- Orcs: clans, hard country, and harder neighbours -------------------------------
+  raider: {
+    label: 'Clan Raider',
+    blurb: 'You rode with the war-band. You know the weight of a cleaver and the look in a man\'s eye before he runs.',
+    affinities: { melee: 5, intimidation: 5, athletics: 5 },
+    skills: { melee: 5, intimidation: 3, athletics: 2 },
+    kit: [{ name: 'Cleaver', icon: 'sword' }, { name: 'Hide armour', icon: 'armor' }],
+    coins: 40
+  },
+  beasttamer: {
+    label: 'Beast-Tamer',
+    blurb: 'You raised the clan\'s wolves from pups. Animals trust you; people are another matter.',
+    affinities: { hunting: 5, survival: 5, intimidation: 5 },
+    skills: { hunting: 4, survival: 4, intimidation: 2 },
+    kit: [{ name: 'Rope', icon: 'chain' }, { name: 'Dried meat', qty: 4, icon: 'bread' }, { name: 'Skinning knife', icon: 'dagger' }],
+    coins: 40
+  },
+  bonecaller: {
+    label: 'Bone-Caller',
+    blurb: 'You learned the spirit-talk from the clan\'s old shaman, and the cures that go with it.',
+    affinities: { spellcasting: 5, herbalism: 5, medicine: 5 },
+    skills: { spellcasting: 4, herbalism: 3, medicine: 3 },
+    kit: [{ name: 'Bone charms', icon: 'amulet' }, { name: 'Herb pouch', icon: 'herb' }],
+    coins: 40
+  },
+  pitfighter: {
+    label: 'Pit Fighter',
+    blurb: 'Humans paid to watch you bleed. You learned to take a beating and give a worse one.',
+    affinities: { melee: 5, defense: 5, athletics: 5 },
+    skills: { melee: 4, defense: 4, athletics: 2 },
+    kit: [{ name: 'Cudgel', icon: 'hammer' }, { name: 'Knuckle wraps', icon: 'bandage' }],
+    coins: 70
+  },
+  scrapsmith: {
+    label: 'Scrap-Smith',
+    blurb: 'Your clan had no mines, only what others threw away. You make good iron out of bad.',
+    affinities: { smithing: 5, crafting: 5, mining: 5 },
+    skills: { smithing: 4, crafting: 4, mining: 2 },
+    kit: [{ name: "Smith's hammer", icon: 'hammer' }, { name: 'Bag of scrap iron', icon: 'bag' }],
+    coins: 50
   }
 } as const satisfies Record<
   string,
@@ -300,6 +466,16 @@ export const BACKGROUNDS = {
 >
 export type BackgroundId = keyof typeof BACKGROUNDS
 export const BACKGROUND_IDS = Object.keys(BACKGROUNDS) as BackgroundId[]
+
+/** Which callings each people has (docs/spec/04-rules-system.md#backgrounds). Their cultures differ, so do their trades. */
+export const RACE_BACKGROUNDS: Record<RaceId, BackgroundId[]> = {
+  human: ['farmhand', 'smith', 'acolyte', 'thief', 'hunter', 'hedgewitch', 'sellsword', 'fisher', 'peddler'],
+  dwarf: ['delver', 'smith', 'runecarver', 'brewer', 'shieldbearer', 'namekeeper'],
+  elf: ['grovewarden', 'loreward', 'moonsinger', 'grovehealer', 'bladedancer', 'bowyer'],
+  halfling: ['farmhand', 'hearthcook', 'peddler', 'thief', 'fisher', 'lanewarden'],
+  orc: ['raider', 'beasttamer', 'bonecaller', 'pitfighter', 'scrapsmith', 'hunter']
+}
+export const backgroundsFor = (race: RaceId): BackgroundId[] => RACE_BACKGROUNDS[race]
 
 // ---- Point-buy & creation -------------------------------------------------------------
 

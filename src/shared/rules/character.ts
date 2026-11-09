@@ -6,6 +6,7 @@ import {
   ATTR_START,
   ATTRS,
   BACKGROUNDS,
+  RACE_BACKGROUNDS,
   BASE_ATTR_CAP,
   LEVEL_MAX,
   RACES,
@@ -131,6 +132,7 @@ export function validateBuild(b: CharacterBuild, sexMode: SexMode): string[] {
   const errors: string[] = []
   if (!b.name.trim()) errors.push('Give your character a name.')
   if (b.race === 'human' && new Set(b.humanBonus).size !== 2) errors.push('Pick two attributes for Adaptable.')
+  if (!RACE_BACKGROUNDS[b.race].includes(b.background)) errors.push(`${RACES[b.race].plural} don't have the calling ${BACKGROUNDS[b.background].label}. Pick another.`)
   const caps = attrCaps(b, sexMode)
   for (const a of ATTRS) {
     if (b.attributes[a] < ATTR_START) errors.push(`${a} can't go below ${ATTR_START}.`)
@@ -193,7 +195,8 @@ export function randomBuild(rng: Rng, sexMode: SexMode, name: string, fixed: Par
   const race = fixed.race ?? pick(rng, Object.keys(RACES) as RaceId[])
   const sex = fixed.sex ?? pick(rng, ['male', 'female'] as SexId[])
   const age = fixed.age ?? pick(rng, ['young', 'adult', 'adult', 'adult', 'middle', 'elder'] as AgeId[])
-  const background = fixed.background ?? pick(rng, Object.keys(BACKGROUNDS) as BackgroundId[])
+  // Each people has its own callings.
+  const background = fixed.background && RACE_BACKGROUNDS[race].includes(fixed.background) ? fixed.background : pick(rng, RACE_BACKGROUNDS[race])
   const bg = BACKGROUNDS[background]
 
   // Attributes the background relies on get priority.

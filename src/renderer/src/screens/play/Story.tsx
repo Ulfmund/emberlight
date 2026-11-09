@@ -22,7 +22,7 @@ export const TIER_STYLE: Record<Tier, { color: string; glow?: string }> = {
 /** Hides a half-written [[ROLL: …]] tag while text streams. */
 const stripTag = (s: string) => s.replace(/\[\[[\s\S]*$/, '').trimEnd()
 
-export function Story({ view }: { view: CampaignView }) {
+export function Story({ view, onInspect }: { view: CampaignView; onInspect?: () => void }) {
   const { live, busy, regenerate, swipe, rewind, answer, reroll } = useGame()
   const scroller = useRef<HTMLDivElement>(null)
   const stick = useRef(true)
@@ -91,6 +91,11 @@ export function Story({ view }: { view: CampaignView }) {
                   {isLastDm && !busy && !dead && (
                     <Button variant="ghost" size="sm" icon="reroll" onClick={() => void regenerate()} title="Write this response again (the dice stay the same)">
                       Rewrite
+                    </Button>
+                  )}
+                  {isLastDm && !busy && onInspect && (
+                    <Button variant="ghost" size="sm" icon="eye" onClick={onInspect} title="See everything the DM was sent for this reply">
+                      <span className="hidden sm:inline">What the DM saw</span>
                     </Button>
                   )}
                   {!isLastDm && canUndo && !busy && (

@@ -44,6 +44,12 @@ export const api = {
   createCampaign: (build: CharacterBuild, settings: CampaignSettings, opts: CreateOptions = {}) =>
     post('/api/campaigns', { build, settings, ...opts }).then((r) => json<{ id: string }>(r)),
 
+  // ---- renaming
+  renamePreview: (id: string, from: string, to: string) =>
+    post(`/api/campaigns/${id}/rename/preview`, { from, to }).then((r) => json<{ messages: { id: string; role: 'user' | 'assistant'; before: string; after: string; count: number }[]; memory: number; total: number }>(r)),
+  rename: (id: string, body: { from: string; to: string; mode: 'retcon' | 'story'; target: { kind: 'player' } | { kind: 'entity'; id: string }; skip?: string[] }) =>
+    post(`/api/campaigns/${id}/rename`, body).then((r) => json<CampaignView>(r)),
+
   // ---- lorebooks
   lorebooks: () => fetch('/api/lorebooks').then((r) => json<LorebookSummary[]>(r)),
   lorebook: (id: string) => fetch(`/api/lorebooks/${encodeURIComponent(id)}`).then((r) => json<Lorebook>(r)),

@@ -8,6 +8,7 @@ import { Button } from '../../components/Button'
 import { Icon } from '../../components/Icon'
 import { speakerColor } from '../../components/StoryText'
 import { LoreEditor } from '../LoreEditor'
+import { RenameDialog } from './RenameDialog'
 
 /**
  * The Journal (docs/spec/07-memory-and-lore.md#journal-what-the-player-sees): everything the
@@ -295,7 +296,9 @@ function Label({ children }: { children: React.ReactNode }) {
 
 function EntityEditor({ entity: e, onDone }: { entity: Entity; onDone: () => void }) {
   const { save, error } = useSave()
-  const [name, setName] = useState(e.name)
+  // Renaming goes through its own choice (retcon or in-story), so the name isn't edited here.
+  const name = e.name
+  const [renaming, setRenaming] = useState(false)
   const [aliases, setAliases] = useState(e.aliases.join(', '))
   const [summary, setSummary] = useState(e.summary)
   const [facts, setFacts] = useState(e.facts.join('\n'))
@@ -327,7 +330,13 @@ function EntityEditor({ entity: e, onDone }: { entity: Entity; onDone: () => voi
       <div className="grid gap-3 md:grid-cols-2">
         <label className="block">
           <Label>Name</Label>
-          <input value={name} onChange={(x) => setName(x.target.value)} maxLength={80} className="input py-2 font-display tracking-wide" />
+          <span className="flex gap-2">
+            <input value={name} readOnly className="input min-w-0 flex-1 py-2 font-display tracking-wide opacity-80" />
+            <Button size="sm" variant="secondary" icon="quill" onClick={() => setRenaming(true)}>
+              Rename…
+            </Button>
+          </span>
+          <RenameDialog open={renaming} onClose={() => setRenaming(false)} onRenamed={onDone} from={e.name} target={{ kind: 'entity', id: e.id }} />
         </label>
         <label className="block">
           <Label>Also called</Label>

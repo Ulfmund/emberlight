@@ -14,6 +14,11 @@ describe('names', () => {
     expect(sameName('Mira Ashdown', 'Mira Fen')).toBe(false)
     expect(sameName('The Butcher', 'The Baker')).toBe(false)
     expect(sameName('Old', 'Old Tam')).toBe(false)
+    // Descriptions only match exactly.
+    expect(sameName('the ferryman', "the ferryman's girl")).toBe(false)
+    expect(sameName('the ferryman', 'The ferryman')).toBe(true)
+    expect(sameName('Grey-bearded man', 'grey-bearded man')).toBe(true)
+    expect(sameName('Grey-bearded man', 'man')).toBe(false)
   })
 
   it('spots mentions by name, alias or a telling word', () => {

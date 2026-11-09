@@ -13,6 +13,7 @@ import {
 import type { ChatMessage, Connection } from '@shared/types'
 import type { MessageView, TurnEvent } from '@shared/view'
 import { normalizeEntry, selectLore } from '@shared/lore'
+import { estimateTokens, promptBlocks, type PromptReport } from '@shared/inspect'
 import { entityLine, projectMemory, relevantEntities, storySoFar, type Summary } from '@shared/memory'
 import { summarizeChapter, summarizeScene, updateArc } from '../ai/jobs/summarizer'
 import { createProvider, type Provider } from '../ai/providers'
@@ -60,6 +61,12 @@ export class TurnEngine {
   /** Resolves when background memory work for a campaign is done (for tests and shutdown). */
   settled(id: string): Promise<void> {
     return this.jobs.get(id) ?? Promise.resolve()
+  }
+
+  /** What the DM was sent for each campaign's latest reply (kept in memory only). */
+  private prompts = new Map<string, PromptReport>()
+  lastPrompt(id: string): PromptReport | undefined {
+    return this.prompts.get(id)
   }
 
   private async ctx(): Promise<Ctx> {
@@ -291,6 +298,20 @@ export class TurnEngine {
     })
     this.campaigns.db.setHead(id, dm.id)
     yield { type: 'narration_start', messageId: dm.id }
+    {
+      const blocks = promptBlocks(system)
+      const sent = messages.map((m) => ({ role: m.role as 'user' | 'assistant', text: m.content }))
+      const historyTokens = sent.reduce((n, m) => n + estimateTokens(m.text), 0)
+      this.prompts.set(id, {
+        messageId: dm.id,
+        at: Date.now(),
+        model: ctx.model,
+        contextTokens: Math.round(ctx.contextChars / 3),
+        blocks,
+        history: { sent: messages.length, total: path.length, tokens: historyTokens, messages: sent },
+        totalTokens: blocks.reduce((n, b) => n + b.tokens, 0) + historyTokens
+      })
+    }
 
     const filter = new NameFilter(id, [c.build.name, ...c.cast.map((m) => m.name)])
     let text = ''

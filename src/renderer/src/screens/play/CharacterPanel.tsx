@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
+import { RenameDialog } from './RenameDialog'
 import { AGES, BACKGROUNDS, CONDITIONS, RACES, SEXES } from '@shared/rules'
 import type { CampaignView } from '@shared/view'
 import { Medallion } from '../../components/Medallion'
@@ -39,6 +41,7 @@ export function CharacterPanel({
   onOpenJournal: () => void
   className?: string
 }) {
+  const [renaming, setRenaming] = useState(false)
   const c = view.state.character
   const b = view.build
   const d = view.derived
@@ -49,7 +52,13 @@ export function CharacterPanel({
     <aside className={`relative z-10 flex shrink-0 flex-col gap-5 overflow-y-auto p-5 ${className}`}>
       <div className="flex flex-col items-center text-center">
         <Medallion name={b.name} race={b.race} size={92} dead={c.status === 'dead'} image={playerPortrait(view)} />
-        <div className="mt-3 font-display text-lg tracking-wide text-gold-200">{b.name}</div>
+        <div className="group mt-3 flex items-center justify-center gap-1.5">
+          <span className="font-display text-lg tracking-wide text-gold-200">{b.name}</span>
+          <button onClick={() => setRenaming(true)} className="no-drag cursor-pointer rounded p-1 text-parchment-500 opacity-0 transition group-hover:opacity-100 touch:opacity-100 hover:text-gold-200" title="Rename your character" aria-label="Rename your character">
+            <Icon name="quill" size={14} />
+          </button>
+        </div>
+        <RenameDialog open={renaming} onClose={() => setRenaming(false)} from={b.name} target={{ kind: 'player' }} />
         <div className="text-xs text-parchment-400">
           {RACES[b.race].label} · {SEXES[view.settings.sexModifiers][b.sex].label} · {AGES[b.age].label}
         </div>

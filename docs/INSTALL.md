@@ -52,6 +52,10 @@ During an adventure, **Journal → Lore** adds or removes lorebooks; changes app
 
 The DM keeps a record of the people and places you meet (what they're like, what they owe you, how they feel about you) and, in long adventures, writes summaries of older events. So even on a small local model it remembers what happened long after those messages stop fitting.
 
+To see exactly what the DM was given for its last reply, click **What the DM saw** under it.
+
+To rename your character, click the pencil next to their name (in the Journal, **Edit**, then **Rename…** for anyone else). Choose whether they were *always* called that (the name is replaced everywhere, and you can check each change) or have *taken* a new name in the story.
+
 Open the **Journal** (left panel) to see all of it: **People**, **Places** and the **Story** so far. If the DM got something wrong, click **Edit** on it and fix it; the DM goes by the Journal. Under **Pinned**, write anything the DM must never forget or contradict ("Mira is secretly the baron's daughter"). Pinned notes and corrections stay even if you rewind. On the **Connect** screen, under **Advanced**, you can set the model's context size; for Claude, a lower number costs less per turn.
 
 ### Character cards (from SillyTavern, Chub…)

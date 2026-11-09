@@ -31,7 +31,7 @@ export function TitleScreen() {
   const [phone, setPhone] = useState(false)
 
   return (
-    <div className="relative flex-1 overflow-hidden">
+    <div className="relative flex-1 overflow-x-hidden overflow-y-auto">
       {/* Backdrop: the rendered die scene, slowly drifting */}
       <img
         src={titleArt}
@@ -43,7 +43,7 @@ export function TitleScreen() {
       <div className="absolute inset-0 bg-gradient-to-t from-ink-950/90 via-transparent to-ink-950/40" />
       <EmberField density={0.9} />
 
-      <div className="relative z-10 flex h-full flex-col justify-center px-[7vw]">
+      <div className="relative z-10 flex min-h-full flex-col justify-center px-[7vw] py-10 md:py-0">
         <motion.div initial="hidden" animate="show" className="max-w-xl">
           <motion.div custom={0} variants={rise} className="mb-6 flex items-center gap-4">
             <motion.img
@@ -104,7 +104,7 @@ export function TitleScreen() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.1, duration: 1 }}
-          className="absolute bottom-8 left-[7vw] flex items-center gap-2.5 rounded-full border border-gold-500/20 bg-ink-950/60 px-4 py-2 text-sm backdrop-blur"
+          className="mt-8 flex items-center gap-2.5 self-start rounded-full border border-gold-500/20 bg-ink-950/60 px-4 py-2 text-sm backdrop-blur md:absolute md:bottom-8 md:left-[7vw] md:mt-0"
         >
           <span
             className={`h-2 w-2 rounded-full ${connected ? 'bg-moss-400 shadow-[0_0_10px_var(--color-moss-400)]' : 'bg-ink-500'}`}

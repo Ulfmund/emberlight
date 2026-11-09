@@ -53,6 +53,8 @@ When a **name** changes, the app asks which kind of change it is:
 - **Retcon** ("they were always called this"): the name is updated everywhere: entity registry, lorebook, summaries, and past messages (find-and-replace, with a preview of each change before applying).
 - **In-story rename** ("they've taken a new name"): the old name is kept as an alias and the change is recorded as a story event the DM knows about.
 
+*Built (0.7.0)* (`src/server/core/rename.ts`): rename your character from the pencil by their name, or anyone in the Journal with **Rename…**. A retcon replaces the name as a whole word, matching capitals exactly ("Rook" leaves the bird alone), and a lone first name too. It covers every message (each one can be unticked in the preview), the Journal (records, summaries, story so far, pinned notes), your character's description, and the adventure's title if it was the default one. An in-story rename keeps the past as it was: for your character it adds a pinned note telling the DM, and for a Journal record it keeps the old name as another name and adds a fact. Lorebooks aren't rewritten (they're shared between adventures).
+
 Other edits (appearance, personality) update the character's entity record, so the DM uses the new details from that point on. An optional "retcon" flag rewrites their description in the summaries too.
 
 ## When a character dies
