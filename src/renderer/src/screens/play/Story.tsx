@@ -8,6 +8,7 @@ import { StoryText, PlayerText } from '../../components/StoryText'
 import { Button } from '../../components/Button'
 import { Icon } from '../../components/Icon'
 import { Tip } from '../../components/Tip'
+import { useSync } from '../../sync'
 
 export const TIER_STYLE: Record<Tier, { color: string; glow?: string }> = {
   crit_success: { color: '#f5d27a', glow: '0 0 24px rgb(245 210 122 / 0.6)' },
@@ -25,6 +26,9 @@ const stripTag = (s: string) => s.replace(/\[\[[\s\S]*$/, '').trimEnd()
 
 export function Story({ view, onInspect }: { view: CampaignView; onInspect?: () => void }) {
   const { live, busy, regenerate, swipe, rewind, answer, reroll } = useGame()
+  const elsewhere = useGame((s) => s.elsewhere)
+  // The same adventure may be open on another screen: keep this one in step with it.
+  useSync(view.id)
   const scroller = useRef<HTMLDivElement>(null)
   const stick = useRef(true)
 
@@ -96,7 +100,7 @@ export function Story({ view, onInspect }: { view: CampaignView; onInspect?: () 
                   )}
                   {isLastDm && !busy && onInspect && (
                     <Button variant="ghost" size="sm" icon="eye" onClick={onInspect} title="See everything the DM was sent for this reply">
-                      <span className="hidden sm:inline">What the DM saw</span>
+                      <span className="hidden sm:inline">DM Context</span>
                     </Button>
                   )}
                   {!isLastDm && canUndo && !busy && (
@@ -136,6 +140,7 @@ export function Story({ view, onInspect }: { view: CampaignView; onInspect?: () 
               />
             </motion.div>
           )}
+          {!busy && elsewhere && <p className="animate-pulse text-sm text-gold-300 italic">The DM is answering a turn from your other screen…</p>}
           {!busy && live.notice && <p className="text-sm text-gold-300 italic">{live.notice}</p>}
           {!busy && live.error && !msgs.some((m) => m.error) && <ErrorLine text={live.error} />}
         </div>

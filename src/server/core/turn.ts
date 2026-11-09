@@ -169,13 +169,31 @@ export class TurnEngine {
 
   // ---- public actions ------------------------------------------------------------------
 
+  /** Adventures with a turn being played right now: one at a time, whichever screen asked. */
+  private playing = new Set<string>()
+  answering(id: string): boolean {
+    return this.playing.has(id)
+  }
+  private async *oneAtATime(id: string, turn: () => AsyncGenerator<TurnEvent>): AsyncGenerator<TurnEvent> {
+    if (this.playing.has(id)) return yield { type: 'error', message: 'The DM is already answering a turn from another screen. This one will catch up in a moment.' }
+    this.playing.add(id)
+    try {
+      yield* turn()
+    } finally {
+      this.playing.delete(id)
+    }
+  }
+
   /** The player acts (free text; or a move picked on the tracker, or "Make" in the Bag). */
   async *act(id: string, text: string, signal: AbortSignal, picked: { combat?: CombatAction; work?: Work; spell?: string; image?: string; skip?: SkipPlan } = {}): AsyncGenerator<TurnEvent> {
-    yield* this.playTurn(id, { text, kind: 'action', ...picked }, signal)
+    yield* this.oneAtATime(id, () => this.playTurn(id, { text, kind: 'action', ...picked }, signal))
   }
 
   /** The player answers a roll the DM asked for. */
   async *answer(id: string, dmMessageId: string, signal: AbortSignal): AsyncGenerator<TurnEvent> {
+    yield* this.oneAtATime(id, () => this.answerRoll(id, dmMessageId, signal))
+  }
+  private async *answerRoll(id: string, dmMessageId: string, signal: AbortSignal): AsyncGenerator<TurnEvent> {
     const dm = this.campaigns.db.getMessage(dmMessageId)
     const req = dm?.meta.requestCheck
     if (!dm || !req) return yield { type: 'error', message: 'That roll is no longer waiting.' }
@@ -199,6 +217,9 @@ export class TurnEngine {
 
   /** Narrate the newest player message (the opening scene, or after rewinding to a player turn). */
   async *narrateHead(id: string, signal: AbortSignal): AsyncGenerator<TurnEvent> {
+    yield* this.oneAtATime(id, () => this.narrateNewest(id, signal))
+  }
+  private async *narrateNewest(id: string, signal: AbortSignal): AsyncGenerator<TurnEvent> {
     const c = this.campaigns.get(id)
     const path = this.campaigns.path(c)
     const last = path[path.length - 1]
@@ -208,6 +229,9 @@ export class TurnEngine {
 
   /** Write the DM's last response again (a new "swipe"; the old one is kept). */
   async *regenerate(id: string, signal: AbortSignal): AsyncGenerator<TurnEvent> {
+    yield* this.oneAtATime(id, () => this.rewrite(id, signal))
+  }
+  private async *rewrite(id: string, signal: AbortSignal): AsyncGenerator<TurnEvent> {
     const c = this.campaigns.get(id)
     const path = this.campaigns.path(c)
     const last = path[path.length - 1]
@@ -219,6 +243,9 @@ export class TurnEngine {
 
   /** Free reroll of the latest turn's dice. The old result is kept in the log, marked replaced. */
   async *reroll(id: string, checkId: string, signal: AbortSignal): AsyncGenerator<TurnEvent> {
+    yield* this.oneAtATime(id, () => this.rerollDice(id, checkId, signal))
+  }
+  private async *rerollDice(id: string, checkId: string, signal: AbortSignal): AsyncGenerator<TurnEvent> {
     const c = this.campaigns.get(id)
     if (c.settings.ironman) return yield { type: 'error', message: 'Rerolls are off in Ironman mode.' }
     const path = this.campaigns.path(c)

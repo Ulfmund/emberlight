@@ -239,8 +239,8 @@ function Composer({
               className="absolute inset-x-3 bottom-full mb-2 space-y-1.5 rounded-2xl border border-gold-500/25 bg-ink-900/95 p-2 shadow-[0_-10px_40px_-12px_rgb(0_0_0/0.9)] backdrop-blur md:inset-x-6"
             >
               <div className="flex items-center justify-between px-1.5 pt-0.5 text-[0.68rem] font-semibold tracking-[0.16em] text-gold-400 uppercase">
-                Ideas
-                <button onClick={() => setIdeas((x) => ({ ...x, open: false }))} className="no-drag cursor-pointer p-1 text-parchment-500 hover:text-gold-200" aria-label="Close ideas">
+                What could I do?
+                <button onClick={() => setIdeas((x) => ({ ...x, open: false }))} className="no-drag cursor-pointer p-1 text-parchment-500 hover:text-gold-200" aria-label="Close">
                   <Icon name="x" size={14} />
                 </button>
               </div>
@@ -350,11 +350,11 @@ function Composer({
           )}
           <input ref={picker} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={(e) => void attach(e.target.files?.[0]).then(() => (e.target.value = ''))} />
           {!disabled && (
-            <Tip content="Ideas: three things you could do now">
+            <Tip content="What could I do?">
               <button
                 onClick={() => void askIdeas()}
                 disabled={busy && !holding}
-                aria-label="Ideas"
+                aria-label="What could I do?"
                 aria-expanded={ideas.open}
                 className={`no-drag mb-1 grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-xl border transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${ideas.open ? 'border-gold-400/60 bg-gold-500/15 text-gold-200' : 'border-gold-500/20 text-gold-300 hover:border-gold-400/50 hover:bg-white/5'}`}
               >
@@ -390,9 +390,9 @@ function Composer({
               </span>
             </>
           )}
-          <Tip content={ghostOn ? 'Ghost text is on: when you pause, the DM suggests how your sentence might go on. Each suggestion is a small request to your model.' : 'Ghost text: when you pause typing, show a suggestion for how the sentence might go on. Each one is a small request to your model.'}>
+          <Tip content="Suggests the rest of your sentence when you pause typing. Each suggestion is a small request to your model.">
             <button onClick={() => setPrefs({ ghost: !ghostOn })} className="no-drag ml-auto cursor-pointer hover:text-gold-200">
-              Ghost text: {ghostOn ? 'on' : 'off'}
+              Autocomplete: {ghostOn ? 'on' : 'off'}
             </button>
           </Tip>
         </div>

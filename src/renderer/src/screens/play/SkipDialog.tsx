@@ -63,7 +63,7 @@ export function SkipDialog({ view, open, onClose, onSkip }: { view: CampaignView
         <motion.div className="fixed inset-0 z-50 grid place-items-center bg-ink-950/80 backdrop-blur-sm md:p-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
           <motion.div
             role="dialog"
-            aria-label="Let time pass"
+            aria-label="Timeskip"
             initial={{ y: 16, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 16, opacity: 0 }}
@@ -72,13 +72,13 @@ export function SkipDialog({ view, open, onClose, onSkip }: { view: CampaignView
           >
             <div className="flex items-center gap-3 border-b border-gold-500/15 px-5 py-4">
               <Icon name="hourglass" size={20} className="text-gold-300" />
-              <h3 className="flex-1 font-display text-xl tracking-wider text-gold-300">Let time pass</h3>
+              <h3 className="flex-1 font-display text-xl tracking-wider text-gold-300">Timeskip</h3>
               <button onClick={onClose} className="no-drag cursor-pointer rounded-md p-1.5 text-parchment-400 hover:text-gold-200" aria-label="Close">
                 <Icon name="x" size={18} />
               </button>
             </div>
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
-              <p className="text-sm text-parchment-400">Skip ahead: the DM tells the time that goes by in a few paragraphs, and the story picks up after it. {name} grows older, and comes out of it rested and healed.</p>
+              <p className="text-sm text-parchment-400">The DM sums up the time in a few paragraphs, then the story picks up. {name} ages, and comes out of it rested and healed.</p>
               <div>
                 <div className="mb-2 text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">How long</div>
                 <div className="flex flex-wrap gap-1.5">
@@ -96,13 +96,13 @@ export function SkipDialog({ view, open, onClose, onSkip }: { view: CampaignView
                 </div>
               </div>
               <label className="block">
-                <span className="mb-2 block text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">What {name} does with it</span>
+                <span className="mb-2 block text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">What {name} does</span>
                 <textarea
                   value={doing}
                   onChange={(e) => setDoing(e.target.value)}
                   rows={3}
                   maxLength={300}
-                  placeholder="e.g. I settle in Millbrook and work at the forge. (Leave it empty and the DM decides.)"
+                  placeholder="e.g. I settle in Millbrook and work at the forge. Leave empty to let the DM decide."
                   className="input resize-y py-2 text-sm"
                 />
               </label>
@@ -115,11 +115,11 @@ export function SkipDialog({ view, open, onClose, onSkip }: { view: CampaignView
               {partner && days >= 360 && (
                 <label className="flex items-center gap-2 text-sm text-parchment-300">
                   <input type="checkbox" checked={family} onChange={(e) => setFamily(e.target.checked)} className="accent-[var(--color-gold-400)]" />
-                  Raise a family with {partner.name} (children may be born)
+                  Raise a family with {partner.name}
                 </label>
               )}
               <div>
-                <div className="mb-2 text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">Practise (up to two skills)</div>
+                <div className="mb-2 text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">Practise (up to 2 skills)</div>
                 <div className="flex flex-wrap gap-2">
                   {[0, 1].map((i) => (
                     <span key={i} className="w-48">
@@ -141,7 +141,7 @@ export function SkipDialog({ view, open, onClose, onSkip }: { view: CampaignView
                 </div>
               </div>
               <div className="rounded-xl border border-gold-500/15 bg-ink-850/70 p-3 text-sm text-parchment-300">
-                <div className="mb-1 text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">Afterwards</div>
+                <div className="mb-1 text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">After</div>
                 <div>
                   {name} will be {ageLabel(preview.after)} · {dateLabel(preview.after.time.day)}
                 </div>
@@ -162,7 +162,7 @@ export function SkipDialog({ view, open, onClose, onSkip }: { view: CampaignView
                 Cancel
               </Button>
               <Button variant="primary" icon="hourglass" onClick={submit}>
-                Let {span} pass
+                Skip {span}
               </Button>
             </div>
           </motion.div>

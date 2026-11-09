@@ -35,12 +35,12 @@ export function Inspector({ campaignId, open, onClose }: { campaignId: string; o
     <AnimatePresence>
       {open && (
         <motion.div className="absolute inset-0 z-40 grid place-items-center bg-ink-950/75 backdrop-blur-sm md:p-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-          <motion.div role="dialog" aria-label="What the DM saw" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 10, opacity: 0 }} className="panel relative flex h-full w-full max-w-3xl flex-col overflow-hidden md:h-[min(86vh,50rem)] md:rounded-2xl">
+          <motion.div role="dialog" aria-label="DM Context" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 10, opacity: 0 }} className="panel relative flex h-full w-full max-w-3xl flex-col overflow-hidden md:h-[min(86vh,50rem)] md:rounded-2xl">
             <div className="flex items-start gap-3 border-b border-gold-500/15 px-5 py-4">
               <Icon name="eye" size={22} className="mt-1 shrink-0 text-gold-300" />
               <div className="min-w-0 flex-1">
-                <h2 className="font-display text-xl tracking-wider text-gold-300">What the DM Saw</h2>
-                <p className="text-xs text-parchment-400">Everything sent to the model for its latest reply. If something isn't in here, the DM didn't know it.</p>
+                <h2 className="font-display text-xl tracking-wider text-gold-300">DM Context</h2>
+                <p className="text-xs text-parchment-400">Everything the DM was sent for its last reply.</p>
               </div>
               <button onClick={onClose} className="no-drag cursor-pointer rounded-lg p-2 text-parchment-400 hover:bg-white/5 hover:text-gold-200" aria-label="Close">
                 <Icon name="x" size={20} />

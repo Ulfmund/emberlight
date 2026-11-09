@@ -82,7 +82,7 @@ export function LifeSection({ view }: { view: CampaignView }) {
                 <span className="shrink-0 text-xs text-parchment-500">{home.kind === 'room' ? 'rented' : 'yours'}</span>
               </div>
               <p className="mt-1 text-xs text-parchment-400">
-                {atHome(st) ? "You're home: a night's sleep here mends you fully, and nothing disturbs it." : `A night's sleep at home mends you fully.`} Living costs {coinText(livingPerDay(st))} a day.
+                {atHome(st) ? "You're home. Sleeping here heals you fully." : 'Sleeping at home heals you fully.'} Living costs {coinText(livingPerDay(st))} a day.
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <Button size="sm" variant="ghost" disabled={!free} onClick={() => void change({ leaveHome: true })}>
@@ -91,7 +91,7 @@ export function LifeSection({ view }: { view: CampaignView }) {
               </div>
             </>
           ) : (
-            <p className="text-xs text-parchment-400">No home of your own: inns and the road cost {coinText(livingPerDay(st))} a day while you work.</p>
+            <p className="text-xs text-parchment-400">No home. Inns cost {coinText(livingPerDay(st))} a day while you work.</p>
           )}
           {settled ? (
             <div className="mt-2 flex flex-wrap gap-1.5">
@@ -133,7 +133,7 @@ export function LifeSection({ view }: { view: CampaignView }) {
                   </Button>
                 ))}
                 <Button size="sm" variant="ghost" disabled={!free} onClick={() => void change({ quitJob: true })}>
-                  Leave it
+                  Quit
                 </Button>
               </div>
             </>
@@ -145,7 +145,7 @@ export function LifeSection({ view }: { view: CampaignView }) {
                 void change({ job: { title, skill, board } }).then((ok) => ok && (setTaking(false), setTitle('')))
               }}
             >
-              <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={60} placeholder="What work? e.g. smith's hand, caravan guard" className="input py-1.5 text-sm" aria-label="What work" autoFocus />
+              <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={60} placeholder="Job, e.g. smith's hand or caravan guard" className="input py-1.5 text-sm" aria-label="What work" autoFocus />
               <div className="flex flex-wrap items-center gap-2">
                 <span className="w-44">
                   <select value={skill} onChange={(e) => setSkill(e.target.value as SkillId)} className="input py-1.5 text-sm" aria-label="The skill it uses">
@@ -163,7 +163,7 @@ export function LifeSection({ view }: { view: CampaignView }) {
               </div>
               <div className="flex gap-2">
                 <Button size="sm" variant="primary" type="submit" disabled={!free || !title.trim()}>
-                  Take it up
+                  Start
                 </Button>
                 <Button size="sm" variant="ghost" type="button" onClick={() => setTaking(false)}>
                   Cancel
@@ -172,10 +172,10 @@ export function LifeSection({ view }: { view: CampaignView }) {
             </form>
           ) : (
             <>
-              <p className="text-xs text-parchment-400">No work yet. Take up work where you are: it pays by the day, more as its skill grows, and it's where the time goes when you let it pass.</p>
+              <p className="text-xs text-parchment-400">No job yet. A job pays daily, more as its skill improves.</p>
               <div className="mt-2">
                 <Button size="sm" variant="secondary" icon="hammer" disabled={!free || !place} onClick={() => setTaking(true)}>
-                  Take up work here…
+                  Get a job
                 </Button>
               </div>
             </>

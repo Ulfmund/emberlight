@@ -39,7 +39,7 @@ describe('the DeepSeek preset', () => {
     const dir = mkdtempSync(join(tmpdir(), 'emberlight-deepseek-'))
     writeFileSync(join(dir, 'settings.json'), JSON.stringify({ version: 1, connection: { presetId: 'custom', kind: 'openai', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', contextSize: 0 } }))
     writeFileSync(join(dir, 'secrets.json'), JSON.stringify({ version: 1, keys: { custom: Buffer.from('sk-test-deepseek').toString('base64') } }))
-    const port = 41795
+    const port = 41799
     const server = await startServer({ dataDir: dir, cipher, port })
     try {
       const s = JSON.parse((await call(port, '/api/settings')).body)

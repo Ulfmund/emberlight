@@ -104,6 +104,27 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
   }
 
   /** Streams a turn's events to the interface as Server-Sent Events. */
+  /**
+   * A screen sends the head of the story it shows. If the story has moved on since (another
+   * screen played, rewound or switched versions), it's out of date: it mustn't act or rewind
+   * blind, and gets the latest instead.
+   */
+  const staleFrom = (c: { req: { header: (n: string) => string | undefined } }, id: string) => {
+    const seen = c.req.header('x-emberlight-head')
+    if (seen === undefined) return false
+    try {
+      return (campaigns.get(id).head_id ?? '') !== seen
+    } catch {
+      return false
+    }
+  }
+  const STALE = 'The story moved on from another screen. Here it is as it stands now.'
+  const catchUp = (id: string) =>
+    (async function* () {
+      yield { type: 'error', message: STALE } as TurnEvent
+      yield { type: 'view', view: campaigns.view(id) } as TurnEvent
+    })()
+
   const stream = (c: Parameters<typeof streamSSE>[0], make: (signal: AbortSignal) => AsyncGenerator<TurnEvent>) =>
     streamSSE(c, async (s) => {
       const controller = new AbortController()
@@ -162,8 +183,14 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
   })
 
   app.get('/api/campaigns/:id', (c) => {
-    const r = guard(() => campaigns.view(c.req.param('id')))
+    const r = guard(() => ({ ...campaigns.view(c.req.param('id')), answering: turns.answering(c.req.param('id')) }))
     return r.ok ? c.json(r.value) : c.json({ error: r.error }, 404)
+  })
+
+  /** What an open screen checks every few seconds to stay in step with the others (sync.ts). */
+  app.get('/api/campaigns/:id/stamp', (c) => {
+    const id = c.req.param('id')
+    return c.json({ stamp: campaigns.db.stamp(id), answering: turns.answering(id) })
   })
 
   app.delete('/api/campaigns/:id', (c) => {
@@ -248,7 +275,9 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
     try {
       return c.json({ suggestions: await turns.suggest(c.req.param('id'), c.req.raw.signal) })
     } catch (err) {
-      return c.json({ error: `No ideas this time (${(err as Error).message}).` }, 502)
+      // A model's muddled answer is no news to the player; anything else (no model connected) is.
+      const why = (err as Error).message
+      return c.json({ error: /JSON|schema|format|pars/i.test(why) ? 'No ideas came this time. Try again.' : `No ideas this time: ${why.replace(/\.$/, '')}.` }, 502)
     }
   })
 
@@ -292,6 +321,7 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
       })
     )
     const id = c.req.param('id')
+    if (staleFrom(c, id)) return stream(c, () => catchUp(id))
     return stream(c, (signal) =>
       b ? turns.act(id, b.text, signal, { combat: b.combat, work: b.work, spell: b.spell, image: b.image, skip: b.skip }) : (async function* () { yield { type: 'error', message: 'Write something first.' } as TurnEvent })()
     )
@@ -300,17 +330,19 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
   app.post('/api/campaigns/:id/answer', async (c) => {
     const b = await body(c, z.object({ messageId: z.string() }))
     const id = c.req.param('id')
+    if (staleFrom(c, id)) return stream(c, () => catchUp(id))
     return stream(c, (signal) =>
       b ? turns.answer(id, b.messageId, signal) : (async function* () { yield { type: 'error', message: 'Missing roll.' } as TurnEvent })()
     )
   })
 
-  app.post('/api/campaigns/:id/narrate', (c) => stream(c, (signal) => turns.narrateHead(c.req.param('id'), signal)))
-  app.post('/api/campaigns/:id/regenerate', (c) => stream(c, (signal) => turns.regenerate(c.req.param('id'), signal)))
+  app.post('/api/campaigns/:id/narrate', (c) => (staleFrom(c, c.req.param('id')) ? stream(c, () => catchUp(c.req.param('id'))) : stream(c, (signal) => turns.narrateHead(c.req.param('id'), signal))))
+  app.post('/api/campaigns/:id/regenerate', (c) => (staleFrom(c, c.req.param('id')) ? stream(c, () => catchUp(c.req.param('id'))) : stream(c, (signal) => turns.regenerate(c.req.param('id'), signal))))
 
   app.post('/api/campaigns/:id/reroll', async (c) => {
     const b = await body(c, z.object({ checkId: z.string() }))
     const id = c.req.param('id')
+    if (staleFrom(c, id)) return stream(c, () => catchUp(id))
     return stream(c, (signal) =>
       b ? turns.reroll(id, b.checkId, signal) : (async function* () { yield { type: 'error', message: 'Missing roll.' } as TurnEvent })()
     )
@@ -327,6 +359,7 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
   app.post('/api/campaigns/:id/swipe', async (c) => {
     const b = await body(c, z.object({ messageId: z.string() }))
     if (!b) return c.json({ error: 'Missing message.' }, 400)
+    if (staleFrom(c, c.req.param('id'))) return c.json({ error: STALE, stale: true }, 409)
     const r = guard(() => {
       campaigns.selectSwipe(c.req.param('id'), b.messageId)
       return campaigns.view(c.req.param('id'))
@@ -337,6 +370,7 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
   app.post('/api/campaigns/:id/rewind', async (c) => {
     const b = await body(c, z.object({ messageId: z.string() }))
     if (!b) return c.json({ error: 'Missing message.' }, 400)
+    if (staleFrom(c, c.req.param('id'))) return c.json({ error: STALE, stale: true }, 409)
     const r = guard(() => {
       campaigns.rewind(c.req.param('id'), b.messageId)
       return campaigns.view(c.req.param('id'))

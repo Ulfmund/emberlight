@@ -54,7 +54,7 @@ export function FamilySection({ view }: { view: CampaignView }) {
             {spouse.status === 'dead' && <span className="text-parchment-500"> (died; you are widowed)</span>}
           </div>
         ) : (
-          <p className="text-xs text-parchment-400">Not married. Someone from the Journal who thinks well of you could be, if the story has brought you together.</p>
+          <p className="text-xs text-parchment-400">Not married.</p>
         )}
         {!living && candidates.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
@@ -106,7 +106,7 @@ export function FamilySection({ view }: { view: CampaignView }) {
                 </select>
               </span>
               <Button size="sm" variant="primary" type="submit" disabled={!free || !name.trim()}>
-                Welcome them
+                Add
               </Button>
               <Button size="sm" variant="ghost" type="button" onClick={() => setNaming(false)}>
                 Cancel
@@ -114,10 +114,10 @@ export function FamilySection({ view }: { view: CampaignView }) {
             </form>
           ) : (
             <Button size="sm" variant="ghost" icon="plus" disabled={!free} onClick={() => setNaming(true)}>
-              A child is born…
+              Add child
             </Button>
           ))}
-        {living && <p className="text-xs text-parchment-500">When you let time pass, you can spend it raising a family. A grown child can take up the tale if you fall.</p>}
+        {living && <p className="text-xs text-parchment-500">A Timeskip can be spent raising a family. A grown child can take over if you die.</p>}
       </div>
     </section>
   )

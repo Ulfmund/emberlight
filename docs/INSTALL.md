@@ -62,7 +62,7 @@ On the **Adventure** step (and later under **Saves**), pick the **Dungeon Master
 
 The DM keeps a record of the people and places you meet (what they're like, what they owe you, how they feel about you) and, in long adventures, writes summaries of older events. So even on a small local model it remembers what happened long after those messages stop fitting.
 
-To see exactly what the DM was given for its last reply, click **What the DM saw** under it.
+To see exactly what the DM was given for its last reply, click **DM Context** under it.
 
 To rename your character, click the pencil next to their name (in the Journal, **Edit**, then **Rename…** for anyone else). Choose whether they were *always* called that (the name is replaced everywhere, and you can check each change) or have *taken* a new name in the story.
 

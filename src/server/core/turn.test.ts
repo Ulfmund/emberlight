@@ -1025,4 +1025,28 @@ describe('turn engine', () => {
     expect(v.state.time.day).toBe(day + 11 * 360)
     expect(ageYears(v.state)).toBe(16)
   })
+
+  it('plays one turn at a time: a second screen asking at once is turned away, and nothing forks', async () => {
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    fake.referee = { intent: 'other', checks: [] }
+    // The PC sends a turn; while the DM is still answering it, the phone opens the story and asks too.
+    const pc = engine.act(id, 'I look around the crossing.', signal)
+    const first = await pc.next()
+    expect(first.value).toMatchObject({ type: 'player' })
+    expect(engine.answering(id)).toBe(true)
+    const phone = await run(engine.narrateHead(id, signal))
+    expect(phone).toEqual([{ type: 'error', message: expect.stringMatching(/already answering a turn from another screen/) }])
+    const again = await run(engine.act(id, 'I shout.', signal))
+    expect(again.find((e) => e.type === 'error')).toBeTruthy()
+    for await (const _ of pc) void _
+    expect(engine.answering(id)).toBe(false)
+    // One reply to the PC's turn, no second version written beside it.
+    const v = campaigns.view(id)
+    const replies = v.messages.filter((m) => m.role === 'assistant')
+    expect(replies).toHaveLength(2)
+    expect(replies.at(-1)!.swipe?.count ?? 1).toBe(1)
+    expect(v.messages.filter((m) => m.role === 'user').map((m) => m.content)).toContain('I look around the crossing.')
+    expect(v.messages.some((m) => m.content === 'I shout.')).toBe(false)
+  })
 })

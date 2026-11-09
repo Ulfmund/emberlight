@@ -64,7 +64,7 @@ export function CharacterPanel({
   view: CampaignView
   onOpenSheet: () => void
   onOpenJournal: () => void
-  /** Opens "Let time pass" (a long time-skip). */
+  /** Opens the Timeskip dialog (a long time-skip). */
   onSkip?: () => void
   canSkip?: boolean
   className?: string
@@ -232,11 +232,11 @@ export function CharacterPanel({
           <button
             onClick={onSkip}
             disabled={!canSkip}
-            title={canSkip ? 'Skip ahead: a week, a season, years' : 'Not now: in a fight, or while the DM is answering'}
+            title={canSkip ? 'Skip ahead a week, a season or years' : 'Not during a fight, or while the DM is answering'}
             className="no-drag -mt-1 ml-6 flex cursor-pointer items-center gap-1.5 text-xs text-gold-300 hover:text-gold-200 disabled:cursor-not-allowed disabled:opacity-40 touch:py-1.5 touch:text-sm"
           >
             <Icon name="hourglass" size={13} />
-            Let time pass…
+            Timeskip
           </button>
         )}
         {view.state.location && (

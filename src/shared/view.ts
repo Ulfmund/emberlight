@@ -63,6 +63,12 @@ export type CampaignView = {
   messages: MessageView[]
   /** The newest message is the player's and the DM hasn't answered yet. */
   awaitingNarration: boolean
+  /** The message the story ends at now (a screen sends it back, so a stale screen can't move the story). */
+  headId: string | null
+  /** Changes whenever anything in the adventure does (db.stamp): other screens compare it to catch up. */
+  stamp: string
+  /** The DM is answering a turn right now, sent from some screen (only on a plain fetch of the view). */
+  answering?: boolean
   saves: { id: string; name: string; messageId: string; createdAt: number }[]
 }
 

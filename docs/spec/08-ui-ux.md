@@ -80,6 +80,17 @@ The goal is that it **looks and feels like a game**: clear panels, icons for eve
 - **Link for a tunnel** (Advanced): a loopback-only listener (port 41750) for a tunnel the player runs (Cloudflare Tunnel, Tailscale Serve).
 - **Security** (`src/server/remote.ts`): anything arriving on those listeners, or carrying proxy headers on the main port, is remote. It needs the 192-bit key: `?key=…` once, then an HttpOnly, SameSite=Lax cookie (Secure over HTTPS). Remote requests must be same-origin, can never use `/api/keys`, `/api/update/*` or `/api/remote`, and may only point a preset at its own addresses, so the saved API key can't be sent anywhere new. "Disconnect all phones" makes a new key.
 
+## One adventure, several screens
+
+*Built (1.0.1).* A paired phone plays through the PC's own server, so the PC and the phone share one copy of every adventure. Before 1.0.1 each screen only showed what it last loaded, and opening the story on a second screen while the first was waiting for the DM asked the DM again, writing a second reply beside the first. Now:
+
+- **One turn at a time.** The server plays one turn per adventure at once, whichever screen sent it. Another screen asking meanwhile is told the DM is already answering.
+- **Catching up.** Every view carries a stamp that changes whenever anything in the adventure does. An open screen checks it every 3 seconds (only while it's visible, and at once when it wakes) and reloads the story if it changed. While the DM answers a turn from the other screen, the story says so.
+- **No moves from a stale screen.** Every change a screen sends carries the head of the story it shows. Acting, answering a roll, rewriting, rerolling, rewinding or switching versions from a screen that hasn't caught up is refused, and the screen is shown the story as it stands.
+- Opening an adventure that's waiting for the DM only asks the DM if no screen already has.
+
+Code: `src/renderer/src/sync.ts`, `stamp` in `src/server/store/db.ts`, the turn lock in `src/server/core/turn.ts`.
+
 ## Feel and animation ("juice")
 
 Every effect has a toggle, and there's a master **Effects** setting: Off / Subtle / Full. The OS "reduce motion" setting is respected. Effects only animate cheap properties (position, scale, opacity) or draw on a separate canvas layer, so they never slow down typing or scrolling.
@@ -98,7 +109,7 @@ Every effect has a toggle, and there's a master **Effects** setting: Off / Subtl
 | Buttons | Soft squash on press, glow on hover |
 | Death | Screen desaturates, vignette closes in, death screen fades up |
 
-*Built (0.12.0)*: device settings (Saves tab, **This device**; kept per phone or computer in local storage, `src/renderer/src/prefs.ts`): **Effects** Full / Subtle / Off (default Full, or Subtle when the system asks for less motion; Off stops all animation and the embers, and the dice just land), **Screen jolt on big hits**, **Sound effects** with a volume slider, **Shake to throw dice** (phones) and **Ghost text**. With Full effects:
+*Built (0.12.0)*: device settings (Saves tab, **This device**; kept per phone or computer in local storage, `src/renderer/src/prefs.ts`): **Effects** Full / Subtle / Off (default Full, or Subtle when the system asks for less motion; Off stops all animation and the embers, and the dice just land), **Screen jolt on big hits**, **Sound effects** with a volume slider, **Shake to throw dice** (phones) and **Autocomplete** (ghost text). With Full effects:
 
 - **Typing runes:** a faint rune glints where a word was just finished (a space or punctuation typed at the end; on phones, spaces only), one at a time, about 0.4 s.
 - **Floating numbers:** −6 or +12 rises off the health, stamina and mana bars when they change (Subtle too).

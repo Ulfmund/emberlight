@@ -15,8 +15,15 @@ async function json<T>(res: Response): Promise<T> {
   return body as T
 }
 
-const post = (url: string, body?: unknown) =>
-  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body ?? {}) })
+/**
+ * The head of the story on this screen, sent with every change: the server refuses to move a
+ * story the screen hasn't caught up with (sync.ts).
+ */
+let shownHead: string | null | undefined
+export const showingHead = (head: string | null | undefined) => (shownHead = head)
+const headers = (): Record<string, string> => ({ 'Content-Type': 'application/json', ...(shownHead !== undefined ? { 'X-Emberlight-Head': shownHead ?? '' } : {}) })
+
+const post = (url: string, body?: unknown) => fetch(url, { method: 'POST', headers: headers(), body: JSON.stringify(body ?? {}) })
 const put = (url: string, body: unknown) =>
   fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
 
@@ -43,6 +50,7 @@ export const api = {
   // ---- campaigns
   campaigns: () => fetch('/api/campaigns').then((r) => json<CampaignSummary[]>(r)),
   campaign: (id: string) => fetch(`/api/campaigns/${id}`).then((r) => json<CampaignView>(r)),
+  stamp: (id: string) => fetch(`/api/campaigns/${id}/stamp`).then((r) => json<{ stamp: string; answering: boolean }>(r)),
   createCampaign: (build: CharacterBuild, settings: CampaignSettings, opts: CreateOptions = {}) =>
     post('/api/campaigns', { build, settings, ...opts }).then((r) => json<{ id: string }>(r)),
 
@@ -138,7 +146,7 @@ export const api = {
     try {
       res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers(),
         body: JSON.stringify(body ?? {}),
         signal
       })

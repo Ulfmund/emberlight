@@ -117,7 +117,7 @@ Every update is an event with `source: "ai"`, shown in the change log with undo.
 ### 8. Suggestions
 
 - **💡 Suggest** button: three options in different flavors (e.g. *bold action*, *careful action*, *something to say*). Clicking one puts it in the input box to edit or send.
-- **Ghost text** (optional): while typing, a pause shows a greyed-out continuation. **Tab** (desktop) or a tap (mobile) accepts it. It's on by default only if the model is fast enough (from the capability profile).
+- **Autocomplete** (ghost text; optional): while typing, a pause shows a greyed-out continuation. **Tab** (desktop) or a tap (mobile) accepts it. It's on by default only if the model is fast enough (from the capability profile).
 
 *Built (0.11.0)* (`src/server/ai/jobs/suggest.ts`): the **Ideas** button (a lightbulb beside Act) asks for one bold action, one careful one and one thing to say, written in the player's voice from the last few messages, the character's gear and any fight. Picking one puts it in the box to edit. **Ghost text** is off by default, because every pause is a small request to the model: a switch under the box turns it on for that device. After 0.9 seconds without typing (at least four characters, cursor at the end), the model continues the sentence (at most twelve words); echoes of what's typed are trimmed. Tab or a tap on "add the grey words" accepts it; Escape or more typing clears it.
 
@@ -166,7 +166,7 @@ Under *Campaign → DM Style*, as simple choices with icons:
 | Perspective | **Second person** ("you") · Third person |
 | Storyteller | **The Chronicler** · ten other built-in storytellers · any character card (see [03](03-characters-and-cards.md#the-dm-is-a-card-too)) |
 | Content limits | Free-text list of things to avoid or fade to black |
-| The peoples' ways | **On** · Off (see [below](#the-peoples-ways)) |
+| Cultures | **On** · Off (see [below](#the-peoples-ways)) |
 
 *Built (0.8.0):* all of these except event frequency (it arrives with random events), in the creator's Adventure step and in-game under Saves. Roll frequency is told to the Referee; the rest to the narrator.
 
@@ -178,7 +178,7 @@ Under *Campaign → DM Style*, as simple choices with icons:
 - **Dwarves** keep strict roles too, and guard their women closely: a dwarf woman is rarely seen outside the hold. Inside, the women work as hard as the men, as record-keepers, cooks, mystics, weavers and leatherworkers. The work is divided rather than shared.
 - **Elves** are haughty, condescending and (mostly rightly) sure they are better than everyone else. There are few of them, and they never waste elven lives. To them, insulting the other peoples is a necessity. They send their women to fight the other peoples, knowing that losing to a woman is a double humiliation for a human or a dwarf. The DM plays all this straight: the player may find it funny, but the elves never do.
 
-These ways apply to the player character too: a dwarf woman on the road is a rare and remarked-on sight. The customs about men and women follow the [sex setting](04-rules-system.md#attribute-caps): with it **Off** they're left out, and the rest stays. Halflings and orcs have no notes yet, so the DM makes up its own. A campaign can switch the whole block off (*The peoples' ways*, in the creator's Adventure step and in-game under Saves). Code: `src/shared/cultures.ts`.
+These ways apply to the player character too: a dwarf woman on the road is a rare and remarked-on sight. The customs about men and women follow the [sex setting](04-rules-system.md#attribute-caps): with it **Off** they're left out, and the rest stays. Halflings and orcs have no notes yet, so the DM makes up its own. A campaign can switch the whole block off (*Cultures*, in the creator's Adventure step and in-game under Saves). Code: `src/shared/cultures.ts`.
 
 ## No favoritism
 

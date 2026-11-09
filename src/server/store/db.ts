@@ -245,6 +245,18 @@ export class GameDb {
     return (this.db.prepare('SELECT * FROM campaigns ORDER BY updated_at DESC').all() as Record<string, unknown>[]).map(toCampaign)
   }
 
+  /**
+   * Changes whenever anything in an adventure does: the story's head, its settings, a new
+   * message, an event recorded or set aside. Other screens compare it to stay in step.
+   */
+  stamp(campaignId: string): string {
+    const c = this.db.prepare('SELECT head_id, updated_at FROM campaigns WHERE id = ?').get(campaignId) as { head_id: string | null; updated_at: number } | undefined
+    if (!c) return ''
+    const e = this.db.prepare('SELECT MAX(id) AS last, COALESCE(SUM(superseded), 0) AS gone FROM events WHERE campaign_id = ?').get(campaignId) as { last: number | null; gone: number }
+    const m = this.db.prepare('SELECT COUNT(*) AS n FROM messages WHERE campaign_id = ?').get(campaignId) as { n: number }
+    return [c.head_id ?? '', c.updated_at, e.last ?? 0, e.gone, m.n].join('.')
+  }
+
   setHead(id: string, headId: string | null) {
     this.db.prepare('UPDATE campaigns SET head_id = ?, updated_at = ? WHERE id = ?').run(headId, Date.now(), id)
   }

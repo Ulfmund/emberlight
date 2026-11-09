@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { SettingsView } from '@shared/types'
 import type { Attr, CampaignSettings, CharacterBuild, CheckResult, CombatAction, RaceId, SkipPlan, Work } from '@shared/rules'
 import type { CampaignSummary, CampaignView, MessageView, TurnEvent } from '@shared/view'
-import { api, type CreateOptions } from './api'
+import { api, showingHead, type CreateOptions } from './api'
 import type { MemoryEvent } from '@shared/memory'
 import { play } from './sound'
 import { stinger } from './audio/mixer'
@@ -37,6 +37,8 @@ type State = {
   campaigns: CampaignSummary[]
   view: CampaignView | null
   busy: boolean
+  /** The DM is answering a turn sent from another screen (sync.ts). */
+  elsewhere: boolean
   live: Live
   abort: AbortController | null
   toasts: Toast[]
@@ -50,6 +52,8 @@ type State = {
   setSettings(s: SettingsView): void
   loadCampaigns(): Promise<void>
   open(id: string): Promise<void>
+  /** Catch up with the adventure as it stands on the server (another screen moved it on). */
+  refresh(): Promise<void>
   create(build: CharacterBuild, settings: CampaignSettings, opts?: CreateOptions): Promise<void>
   remove(id: string): Promise<void>
   /** After a death: open the creator for whoever takes up the tale. */
@@ -133,6 +137,12 @@ export const useGame = create<State>((set, get) => {
     announce(before, view)
   }
 
+  /** Another screen moved the story on: say so, and show it as it stands. */
+  const caughtUp = (err: unknown) => {
+    get().toast({ title: 'The story moved on', text: (err as Error).message, tone: 'info', icon: 'rewind' })
+    void get().refresh()
+  }
+
   /** Runs one streamed turn endpoint and folds its events into the view. */
   const run = async (path: string, body: unknown) => {
     const view = get().view
@@ -202,6 +212,7 @@ export const useGame = create<State>((set, get) => {
     campaigns: [],
     view: null,
     busy: false,
+    elsewhere: false,
     live: idleLive,
     abort: null,
     toasts: [],
@@ -230,8 +241,16 @@ export const useGame = create<State>((set, get) => {
 
     open: async (id) => {
       const view = await api.campaign(id)
-      set({ view, screen: 'play', live: idleLive })
-      if (view.awaitingNarration) void get().narrateHead()
+      set({ view, screen: 'play', live: idleLive, elsewhere: Boolean(view.answering) })
+      // Waiting for the DM, and no screen is asking it: ask now. (If another screen is, it'll catch up.)
+      if (view.awaitingNarration && !view.answering) void get().narrateHead()
+    },
+
+    refresh: async () => {
+      const v = get().view
+      if (!v || get().busy) return
+      const view = await api.campaign(v.id)
+      if (!get().busy && get().view?.id === v.id) setView(view)
     },
 
     create: async (build, settings, opts) => {
@@ -272,12 +291,21 @@ export const useGame = create<State>((set, get) => {
     swipe: async (messageId) => {
       const v = get().view
       if (!v || get().busy) return
-      set({ view: await api.swipe(v.id, messageId), live: idleLive })
+      try {
+        set({ view: await api.swipe(v.id, messageId), live: idleLive })
+      } catch (err) {
+        caughtUp(err)
+      }
     },
     rewind: async (messageId) => {
       const v = get().view
       if (!v || get().busy) return
-      const view = await api.rewind(v.id, messageId)
+      let view: CampaignView
+      try {
+        view = await api.rewind(v.id, messageId)
+      } catch (err) {
+        return caughtUp(err)
+      }
       set({ view, live: idleLive })
       if (view.awaitingNarration) void get().narrateHead()
     },
@@ -349,3 +377,7 @@ function lastUserIndex(msgs: MessageView[]) {
   for (let i = msgs.length - 1; i >= 0; i--) if (msgs[i].role === 'user') return i
   return -1
 }
+
+// Every change this screen sends carries the head of the story it shows (api.ts), so a screen
+// that hasn't caught up with another one can't move the story blind.
+useGame.subscribe((s) => showingHead(s.view ? s.view.headId : undefined))

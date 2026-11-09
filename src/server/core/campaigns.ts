@@ -270,6 +270,8 @@ export class Campaigns {
       lorebooks: c.lorebooks.map((lid) => this.db.getLorebook(lid)).filter((b) => b !== null).map((b) => ({ id: b.id, name: b.name, entries: b.entries.length })),
       messages,
       awaitingNarration: last?.role === 'user',
+      headId: c.head_id,
+      stamp: this.db.stamp(id),
       saves: this.db.savesFor(id).map((s) => ({ id: s.id, name: s.name, messageId: s.message_id, createdAt: s.created_at }))
     }
   }

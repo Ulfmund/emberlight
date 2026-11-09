@@ -73,7 +73,7 @@ export function DeviceSettings() {
       </div>
       <AudioLibrary open={library} onClose={() => setLibrary(false)} />
       {isTouch() && row('Shake to throw dice', onOff(p.shake, (v) => p.set({ shake: v })), 'Needs the secure link (https); on an iPhone, allow it once when the dice come up.')}
-      {row('Ghost text', onOff(p.ghost, (v) => p.set({ ghost: v })), 'Suggests how your sentence might go on when you pause typing. Each suggestion is a small request to your model.')}
+      {row('Autocomplete', onOff(p.ghost, (v) => p.set({ ghost: v })), 'Suggests the rest of your sentence when you pause typing. Each suggestion is a small request to your model.')}
     </section>
   )
 }
