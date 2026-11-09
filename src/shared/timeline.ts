@@ -114,12 +114,14 @@ export class TimelineLog {
     if (ev.type !== 'entity') return void applyMemoryEvent(this.memory, ev, this.counter)
     // A record's state before and after, to tell what's new.
     const prior = findEntity(this.memory, ev.kind, ev.name, ev.aliases ?? [])
-    const was = prior ? { status: prior.status, standing: prior.standing } : null
+    const was = prior ? { status: prior.status, standing: prior.standing, relation: prior.relation } : null
     applyMemoryEvent(this.memory, ev, this.counter)
     const now = findEntity(this.memory, ev.kind, ev.name, ev.aliases ?? [])
     if (!now) return
+    if (now.kind === 'person' && now.relation === 'spouse' && was?.relation !== 'spouse') this.add(at, `Married ${now.name}`, 'heart', 'good')
     if (!was) {
-      if (now.kind === 'person') this.add(at, `${now.name}${now.summary ? `, ${now.summary.replace(/\.$/, '')}` : ''}, came into the story`, 'user')
+      if (now.kind === 'person' && ev.born !== undefined) this.add({ ...at, time: { day: ev.born, minute: 8 * 60 } }, `${now.name} was born`, 'heart', 'good')
+      else if (now.kind === 'person') this.add(at, `${now.name}${now.summary ? `, ${now.summary.replace(/\.$/, '')},` : ''} came into the story`, 'user')
       else if (now.kind === 'quest') this.add(at, `Took on: ${now.name}${now.giver ? ` (for ${now.giver})` : ''}`, 'star')
       else if (now.kind === 'item' && now.holder === 'you') this.add(at, `Came by ${now.name}`, 'amulet', 'good')
     } else if (was.status !== now.status) {

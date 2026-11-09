@@ -287,6 +287,20 @@ Code: `src/shared/rules/skips.ts`.
 
 Code: `src/shared/rules/life.ts`.
 
+### Family
+
+*Built (0.29.0).* A family lives in the story's memory, so the Journal shows it and can correct it: a spouse is a person tied to the character as their spouse, and children are people tied to them as children, with the day they were born. The Sheet's *Family* section:
+
+- **Marry** someone from the Journal who is alive, not already family, and doesn't think badly of the character (hostile or unfriendly won't do). The story should have brought them together; the game doesn't ask how. One living spouse at a time; a widow or widower can marry again.
+- **A child is born…**: a name and daughter or son, with a spouse (or a lover) as the other parent. At most eight.
+- **Raising a family** in *Let time pass* (with a living spouse, for a year or more): each year has a 40% chance of a child, named from the character's people with the family name. A woman bears no children past forty-five (in her people's years). The DM is told who was born and weaves it into the montage.
+- **Growing up:** children age with the calendar, at their people's pace (a baby, a small child, a child, a youth, grown at 16 human years; an elf at 80).
+- **The DM** gets a FAMILY block: who the character married (and if they were widowed), and each child with their age.
+- **The timeline** marks weddings and births (on the day they happened).
+- **Heirs:** a child born in the story takes up the tale when they've come of age: if they're 5 when the character dies, the story moves 11 years on and they begin at 16 (at most 20 years on). A child the story only mentioned, with no birth day, comes ten years later, as before.
+
+Code: `src/shared/family.ts`.
+
 ---
 
 ## Combat

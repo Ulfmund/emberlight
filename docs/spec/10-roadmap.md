@@ -68,7 +68,7 @@ Built in milestones. Each one ends with something playable, so the artist can te
 - **Storytellers**, RimWorld-style ✅ 0.26.0: Whalechan, the Veteran, the Romance Writer, the Old Soul, the Mystery Writer and the Gambler join the original five; each has a voice, a habit, and leanings that shape which random events come ([03](03-characters-and-cards.md#the-dm-is-a-card-too))
 - **Long time-skips** ("five years pass…") ✅ 0.27.0: from the Sheet or out of character; the engine ages, mends and trains the character, and the DM tells the years as a montage ([04](04-rules-system.md#time-skips))
 - **Homes and work** ✅ 0.28.0: rent or buy a home (a night there mends fully), take up work that pays by its skill, and spend days, weeks or years at it ([04](04-rules-system.md#homes-and-work))
-- Family and legacy: marriage, children growing up, heirs and inheritance *(playing the next generation after a death ✅ 0.10.0)*
+- **Family** ✅ 0.29.0: marry someone from the story, children born (by choice, or over years raising a family) who grow up with the calendar, and a grown child takes up the tale ([04](04-rules-system.md#family)) *(playing the next generation after a death ✅ 0.10.0)*
 
 ## Not planned
 - Multiplayer

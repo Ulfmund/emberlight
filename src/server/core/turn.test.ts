@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULT_SETTINGS, skipText, type CharacterBuild } from '@shared/rules'
+import { ageYears, DEFAULT_SETTINGS, skipText, type CharacterBuild } from '@shared/rules'
 import type { StreamEvent } from '@shared/types'
 import type { TurnEvent } from '@shared/view'
 import { GameDb } from '../store/db'
@@ -635,7 +635,7 @@ describe('turn engine', () => {
     // Her savings and her bow came down to her daughter; ten years have passed.
     expect(v.state.character.coins).toBe(50 + coins)
     expect(v.state.character.inventory.some((i) => i.name === "Brenna's shortbow")).toBe(true)
-    expect(v.state.time.day).toBe(1 + 3650)
+    expect(v.state.time.day).toBe(1 + 10 * 360)
     // The world remembers the dead; the daughter is the player now, not a Journal entry.
     expect(v.memory.entities.find((e) => e.name === 'Wenna')).toBeUndefined()
     expect(v.memory.entities.find((e) => e.name === 'Brenna Rook')).toMatchObject({ status: 'dead', relation: 'parent' })
@@ -988,5 +988,41 @@ describe('turn engine', () => {
     campaigns.life(id, { quitJob: true })
     expect(campaigns.view(id).state).toMatchObject({ home: null, job: null })
     expect(() => campaigns.life(id, { quitJob: true })).toThrow(/no work to leave/)
+  })
+
+  it('marries, has children over years raising a family, and a child born in the story comes of age to take up the tale', async () => {
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    fake.referee = { intent: 'other', checks: [] }
+    fake.scribe = { ...blankScribe(), records: [{ kind: 'person', name: 'Corin Vale', what: 'a travelling tinker', attitude: 'friendly' }, { kind: 'person', name: 'Sergeant Pell', what: 'the watch sergeant', attitude: 'hostile' }] }
+    await run(engine.act(id, 'I share a fire with the tinker.', signal))
+    fake.scribe = blankScribe()
+    expect(() => campaigns.family(id, { marry: 'Sergeant Pell' })).toThrow(/doesn't think well enough of you/)
+    expect(() => campaigns.family(id, { child: { name: 'Ada Rook', sex: 'female' } })).toThrow(/two parents/)
+    campaigns.family(id, { marry: 'Corin Vale' })
+    expect(() => campaigns.family(id, { marry: 'Corin Vale' })).toThrow(/already married/)
+    campaigns.family(id, { child: { name: 'Ada Rook', sex: 'female' } })
+    let v = campaigns.view(id)
+    expect(v.memory.entities.find((e) => e.name === 'Ada Rook')).toMatchObject({ relation: 'child', born: v.state.time.day })
+    expect(v.timeline.map((e) => e.text)).toEqual(expect.arrayContaining(['Married Corin Vale', 'Ada Rook was born']))
+
+    // Five years raising a family: the dice bring a child or two, and the DM is told of them.
+    setRolls(0.1)
+    const plan = { days: 5 * 360, doing: 'We settle down.', practise: [], family: true }
+    await run(engine.act(id, skipText(plan), signal, { skip: plan }))
+    expect(lastNotes()).toMatch(/Born to them in that time: .+ \(a (daughter|son), now \d\)/)
+    expect(fake.lastSystem).toMatch(/FAMILY\nMarried to Corin Vale\.\nChildren: Ada Rook \(5, a small child\); /)
+    setRolls()
+
+    // She falls; Ada, five, takes up the tale when she has come of age: eleven years on, at sixteen.
+    v = campaigns.view(id)
+    const player = v.messages.at(-2)!
+    db.addEvents(id, player.id, 'grp_fall', 'engine', [{ type: 'status', status: 'dead', reason: 'Fever' }])
+    const ada = campaigns.view(id).memory.entities.find((e) => e.name === 'Ada Rook')!
+    const day = campaigns.view(id).state.time.day
+    campaigns.successor(id, { ...build, name: 'Ada Rook', age: 'young' }, ada.id)
+    v = campaigns.view(id)
+    expect(v.state.time.day).toBe(day + 11 * 360)
+    expect(ageYears(v.state)).toBe(16)
   })
 })

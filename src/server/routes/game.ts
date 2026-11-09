@@ -68,7 +68,8 @@ export const SkipSchema = z.object({
   days: z.number().int().min(1).max(SKIP_MAX_DAYS),
   doing: z.string().max(300).default(''),
   practise: z.array(z.enum(tuple(SKILL_IDS))).max(PRACTICE_MAX).default([]),
-  working: z.boolean().optional()
+  working: z.boolean().optional(),
+  family: z.boolean().optional()
 })
 
 const short = (n: number) => z.string().max(n)
@@ -435,6 +436,16 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
     if (!b) return c.json({ error: 'That change could not be read.' }, 400)
     const r = guard(() => {
       campaigns.party(c.req.param('id'), b)
+      return campaigns.view(c.req.param('id'))
+    })
+    return r.ok ? c.json(r.value) : c.json({ error: r.error }, 400)
+  })
+
+  app.post('/api/campaigns/:id/family', async (c) => {
+    const b = await body(c, z.union([z.object({ marry: z.string().min(1).max(80) }), z.object({ child: z.object({ name: z.string().min(1).max(60), sex: z.enum(['male', 'female']) }) })]))
+    if (!b) return c.json({ error: 'That change could not be read.' }, 400)
+    const r = guard(() => {
+      campaigns.family(c.req.param('id'), b)
       return campaigns.view(c.req.param('id'))
     })
     return r.ok ? c.json(r.value) : c.json({ error: r.error }, 400)

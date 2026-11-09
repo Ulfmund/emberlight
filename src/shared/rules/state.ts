@@ -264,7 +264,7 @@ export type GameEvent =
    * After a death, a new character takes up the tale in the same world, some days (or years)
    * later. The dead one joins the Hall of the Fallen; a child may inherit savings and renown.
    */
-  | { type: 'new_character'; build: CharacterBuild; days: number; fallen: Fallen; inherit?: { coins: number; renown: number; items: { name: string; qty: number; icon?: string }[] } }
+  | { type: 'new_character'; build: CharacterBuild; days: number; fallen: Fallen; inherit?: { coins: number; renown: number; items: { name: string; qty: number; icon?: string }[] }; /** Their age in years, when the story knows it (a child born in it). */ age?: number }
   /** The player renamed or redescribed a character who took over the tale. */
   | { type: 'build_edit'; name?: string; appearance?: string; personality?: string }
   /** The character's picture: uploaded, or made by the image generator (null takes it away). */
@@ -680,8 +680,9 @@ export function applyEvent(prev: GameState, ev: GameEvent, settings: CampaignSet
       s.fallen = [...(s.fallen ?? []), ev.fallen]
       s.character = fresh
       s.combat = null
-      // Their own years begin when they take up the tale.
+      // Their own years begin when they take up the tale (at the age they really are, if known).
       fresh.startDay = s.time.day + Math.max(0, ev.days)
+      if (ev.age !== undefined) fresh.ageAtStart = Math.max(0, Math.round(ev.age))
       // A new hero sets out alone; old friends may be met again in the story. A child keeps the
       // family home; nobody keeps the dead's work.
       s.party = []

@@ -42,6 +42,7 @@ import { fillMacros, storyName } from '@shared/cards'
 import { estimateTokens, promptBlocks, type PromptReport } from '@shared/inspect'
 import { entityLine, projectMemory, questBrief, relevantEntities, sameName, storySoFar, type Summary } from '@shared/memory'
 import { factionBrief, factionStanding, withReputation } from '@shared/factions'
+import { birthsDuring, familyBrief, yearsOld } from '@shared/family'
 import type { LoreEntry } from '@shared/lore'
 import type { Memory } from '@shared/memory'
 import type { Embedder } from '../ai/embeddings'
@@ -471,9 +472,12 @@ export class TurnEngine {
     if (skip) {
       // The engine moves the calendar, mends them and trains what they practise; the DM tells it.
       const evs = skipEvents(state, settings, skip)
-      this.campaigns.db.addEvents(id, msg.id, newId('grp'), 'engine', evs)
+      const known = projectMemory(this.campaigns.activeEvents(c, path).map((e) => e.event))
+      const births = skip.family ? birthsDuring(state, known, skip.days, this.rng) : []
+      this.campaigns.db.addEvents(id, msg.id, newId('grp'), 'engine', [...evs, ...births])
       const after = project(state, evs, settings)
-      const notes = engineNotes(state, after, settings, [], undefined, skipNote(state, after, skip))
+      const born = births.map((b) => (b.type === 'entity' ? `${b.name} (${b.summary?.includes('daughter') ? 'a daughter' : 'a son'}, now ${yearsOld(b, after.time.day)})` : ''))
+      const notes = engineNotes(state, after, settings, [], undefined, skipNote(state, after, skip, born))
       const meta = { ...msg.meta, notes, skip: { days: skip.days, practise: skip.practise, working: skip.working } }
       this.campaigns.db.updateMessage(msg.id, { meta })
       yield { type: 'checks', checks: [] }
@@ -616,7 +620,8 @@ export class TurnEngine {
     const persona = this.personaFor(c.settings.persona)
     const factions = factionStanding(memory)
     const quests = questBrief(memory)
-    const build = (story: string) => narratorSystem(after, c.settings, names, c.cast, lore, { story, people, notes: pinned, companions, factions, quests }, persona)
+    const family = familyBrief(memory, after)
+    const build = (story: string) => narratorSystem(after, c.settings, names, c.cast, lore, { story, people, notes: pinned, companions, factions, quests, family }, persona)
     const storyBudget = Math.round(ctx.contextChars * tier.storyShare)
     const keep = new Set(recalled.summaries)
     let system = build(storySoFar(memory, storyBudget, () => false, keep))

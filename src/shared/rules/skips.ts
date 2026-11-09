@@ -19,6 +19,8 @@ export type SkipPlan = {
   practise: SkillId[]
   /** They spend it at their job (life.ts): pay comes in, and living costs go out. */
   working?: boolean
+  /** They spend it raising a family (family.ts): children may be born. */
+  family?: boolean
 }
 
 export const SKIP_SPANS = [

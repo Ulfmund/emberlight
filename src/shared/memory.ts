@@ -76,6 +76,8 @@ export type Entity = {
   standing?: number
   /** People only: how they're tied to other characters. */
   ties?: Tie[]
+  /** People only: the day they were born, when the story knows it (a child of the character). */
+  born?: number
   /** Quests only: who asked it of the character. */
   giver?: string
   /** Items only: who has it now ("you": the player character). */
@@ -130,6 +132,8 @@ export type MemoryEvent =
       standingChange?: number
       /** People: ties to other characters (added to those known). */
       ties?: Tie[]
+      /** People: the day they were born (family.ts). */
+      born?: number
       /** Quests: who asked it. Items: who has it now. */
       giver?: string
       holder?: string
@@ -314,6 +318,7 @@ export function applyMemoryEvent(m: Memory, ev: MemoryEvent, counter: { n: numbe
         for (const t of ev.ties) if (t.how.trim() && t.name.trim() && !ties.some((x) => sameName(x.name, t.name) && x.how.toLowerCase() === t.how.toLowerCase())) ties.push({ how: t.how.trim(), name: t.name.trim() })
         e.ties = ties.slice(-8)
       }
+      if (ev.born !== undefined && e.kind === 'person') e.born = ev.born
       if (ev.giver?.trim() && e.kind === 'quest') e.giver = ev.giver.trim()
       if (ev.holder?.trim() && e.kind === 'item') e.holder = ev.holder.trim()
       e.lastSeenDay = ev.day

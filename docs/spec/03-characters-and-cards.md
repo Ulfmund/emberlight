@@ -88,7 +88,7 @@ Other edits (appearance, personality) update the character's entity record, so t
 *Built (0.10.0)*: when a character dies, the DM writes an **epitaph** (a separate small AI job), shown on the death screen. The choices:
 
 - **A new adventurer in this world** opens the creator without the world step. They arrive a few days later with what their calling gives them. People and places stay in the Journal, but their ties and feelings toward the dead don't carry over.
-- **Continue as *name*, their child**, for each living person the Journal has as the character's child. Ten years later, the child (human or not, as their parent; young; the family name filled in) inherits their parent's savings, half their Renown, and their weapon ("Brenna's shortbow"). The family is re-labelled: the dead one's other children become siblings, their spouse a parent, their parents grandparents.
+- **Continue as *name*, their child**, for each living person the Journal has as the character's child (with their age, when the story knows it). A child born in the story takes up the tale when they've come of age ([04](04-rules-system.md#family)); otherwise ten years later, the child (human or not, as their parent; young; the family name filled in) inherits their parent's savings, half their Renown, and their weapon ("Brenna's shortbow"). The family is re-labelled: the dead one's other children become siblings, their spouse a parent, their parents grandparents.
 - **Rewind before the fatal moment**, unless Ironman.
 - **Back to the menu.**
 

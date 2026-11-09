@@ -78,6 +78,8 @@ export const api = {
   // ---- companions
   partyJoin: (id: string, name: string, role?: CompanionRole) => post(`/api/campaigns/${encodeURIComponent(id)}/party`, { join: { name, ...(role ? { role } : {}) } }).then((r) => json<CampaignView>(r)),
   partyLeave: (id: string, companion: string) => post(`/api/campaigns/${encodeURIComponent(id)}/party`, { leave: companion }).then((r) => json<CampaignView>(r)),
+  family: (id: string, act: { marry: string } | { child: { name: string; sex: 'male' | 'female' } }) =>
+    post(`/api/campaigns/${encodeURIComponent(id)}/family`, act).then((r) => json<CampaignView>(r)),
   life: (id: string, act: { home: HomeKind } | { leaveHome: true } | { job: { title: string; skill: SkillId; board: boolean } } | { quitJob: true }) =>
     post(`/api/campaigns/${encodeURIComponent(id)}/life`, act).then((r) => json<CampaignView>(r)),
   partyRole: (id: string, companion: string, role: CompanionRole) => post(`/api/campaigns/${encodeURIComponent(id)}/party`, { role: { id: companion, role } }).then((r) => json<CampaignView>(r)),

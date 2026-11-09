@@ -116,7 +116,7 @@ function loreAt(entries: CardBookEntry[], where: 'before_char' | 'after_char'): 
 }
 
 /** Long-term memory for the prompt: older story in summary, and people and places met. */
-export type MemoryText = { story: string; people: string; notes?: string; companions?: Record<string, string>; factions?: string; quests?: string }
+export type MemoryText = { story: string; people: string; notes?: string; companions?: Record<string, string>; factions?: string; quests?: string; family?: string }
 
 function memoryBlock(m?: MemoryText): string {
   if (!m) return ''
@@ -240,7 +240,7 @@ ${gear}
 ${carrying}${body}${magic}
 ${c.status === 'downed' ? 'STATUS: DOWNED: unconscious and dying.\n' : c.status === 'dead' ? 'STATUS: DEAD.\n' : ''}
 ${loreAt(lore, 'after_char')}WHERE AND WHEN
-Day ${state.time.day} (${dateLabel(state.time.day).toLowerCase()}), ${timeOfDay}${state.location ? `, at ${state.location}` : ''}.${skyLine(state)} ${SEASON_INFO[seasonOf(state.time.day)].dm}${lifeBlock(state)}${memoryBlock(memory)}${fallenBlock(state, third)}${companionBlock(state, cast, memory?.companions)}${loreBlock(lore)}${persona?.habit?.trim() ? `\n\nYOUR VOICE IN EVERY REPLY\n${persona.habit.trim()}` : ''}`
+Day ${state.time.day} (${dateLabel(state.time.day).toLowerCase()}), ${timeOfDay}${state.location ? `, at ${state.location}` : ''}.${skyLine(state)} ${SEASON_INFO[seasonOf(state.time.day)].dm}${lifeBlock(state)}${memory?.family?.trim() ? `\n\nFAMILY\n${memory.family.trim()}` : ''}${memoryBlock(memory)}${fallenBlock(state, third)}${companionBlock(state, cast, memory?.companions)}${loreBlock(lore)}${persona?.habit?.trim() ? `\n\nYOUR VOICE IN EVERY REPLY\n${persona.habit.trim()}` : ''}`
 }
 
 const SKY: Record<Weather, string> = { clear: '', rain: 'It is raining', storm: 'A storm is raging', fog: 'Thick fog lies over everything', snow: 'Snow is falling' }
@@ -328,7 +328,7 @@ function lifeBlock(state: GameState): string {
 }
 
 /** The DM's orders for a time-skip (skips.ts): a montage, not scenes, ending back in the present. */
-export function skipNote(before: GameState, after: GameState, plan: SkipPlan): string[] {
+export function skipNote(before: GameState, after: GameState, plan: SkipPlan, born: string[] = []): string[] {
   const name = after.character.build.name
   const stage = ageStage(after)
   const grew = stage !== ageStage(before) ? `, ${AGES[stage].label.toLowerCase()} now` : ''
@@ -342,6 +342,8 @@ export function skipNote(before: GameState, after: GameState, plan: SkipPlan): s
     const money = after.character.coins - before.character.coins
     lines.push(`They spend it at work, as ${before.job.title} in ${before.job.place}: ${money > 0 ? `they put by ${formatCoins(money)} after the cost of living` : money < 0 ? `the pay didn't cover the cost of living; their savings fell by ${formatCoins(-money)}` : 'the pay just covered the cost of living'}.`)
   }
+  if (born.length) lines.push(`Born to them in that time: ${born.join('; ')}. Weave the births into the telling.`)
+  else if (plan.family) lines.push('They hoped for children, but none came in that time.')
   if (after.party.length) lines.push(`Travelling with them when it began: ${after.party.map((a) => a.name).join(', ')}. Say whether they stayed through it, and how they fared.`)
   lines.push(
     plan.days >= 7 ? `${name} is rested, fed and healed.` : `${name} has slept and eaten.`,

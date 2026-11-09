@@ -1,6 +1,7 @@
 import {
   allyId,
   buildNow,
+  DAYS_PER_YEAR,
   guessRole,
   partyFromCast,
   PARTY_MAX,
@@ -42,8 +43,10 @@ import {
   SELL_SHARE,
   SETTLED,
   type HomeKind,
+  type SexId,
   type SkillId
 } from '@shared/rules'
+import { birthEvent, childrenOf, marriageEvent, MAX_CHILDREN, spouseOf, yearsOld, yearsToComeOfAge } from '@shared/family'
 import type { CampaignSummary, CampaignView, ChangeLine, MessageView } from '@shared/view'
 import type { CastMember } from '@shared/cards'
 import { projectMemory, sameName, samePlace, type MemoryEvent } from '@shared/memory'
@@ -319,9 +322,13 @@ export class Campaigns {
     const inherit = child
       ? { coins: dead.coins, renown: Math.floor(dead.renown / 2), items: weapon.unarmed ? [] : [{ name: `${first}'s ${weapon.name.toLowerCase()}`, qty: 1 }] }
       : undefined
-    const days = child ? HEIR_YEARS * 365 : 3
+    // A child born in the story takes up the tale when they've come of age; one met in it, years on.
+    const years = child ? yearsOld(child, state.time.day) : undefined
+    const wait = years === undefined ? HEIR_YEARS : yearsToComeOfAge(years, b.race)
+    const days = child ? Math.max(3, Math.min(20, wait) * DAYS_PER_YEAR) : 3
+    const age = years === undefined ? undefined : years + Math.floor(days / DAYS_PER_YEAR)
 
-    const events: (GameEvent | MemoryEvent)[] = [{ type: 'new_character', build, days, fallen, inherit }]
+    const events: (GameEvent | MemoryEvent)[] = [{ type: 'new_character', build, days, fallen, inherit, ...(age !== undefined ? { age } : {}) }]
     // The world remembers the dead…
     events.push({
       type: 'entity',
@@ -440,6 +447,39 @@ export class Campaigns {
     }
     const anchor = [...path].reverse().find((m) => m.role === 'user') ?? path[path.length - 1]
     this.db.addEvents(id, anchor.id, newId('grp'), 'player', evs)
+  }
+
+  /** A wedding to someone from the Journal, or a child born (family.ts). */
+  family(id: string, act: { marry: string } | { child: { name: string; sex: SexId } }) {
+    const c = this.get(id)
+    if (!c.head_id) throw new Error('This story has no messages yet.')
+    const path = this.path(c)
+    const st = this.state(c, { path })
+    if (st.combat) throw new Error('Not in the middle of a fight.')
+    if (st.character.status !== 'alive') throw new Error(`${st.character.build.name} is in no state for that.`)
+    const memory = projectMemory(this.activeEvents(c, path).map((e) => e.event))
+    const spouse = spouseOf(memory)
+    let ev: MemoryEvent
+    if ('marry' in act) {
+      const who = memory.entities.find((e) => e.kind === 'person' && [e.name, ...e.aliases].some((n) => sameName(n, act.marry)))
+      if (!who) throw new Error(`${act.marry} isn't in the Journal yet.`)
+      if (who.status === 'dead') throw new Error(`${who.name} is dead.`)
+      if (spouse && spouse.status !== 'dead') throw new Error(spouse.id === who.id ? `You're already married to ${who.name}.` : `You're married to ${spouse.name}.`)
+      if (who.relation === 'child' || who.relation === 'parent' || who.relation === 'sibling') throw new Error(`${who.name} is family already.`)
+      if (who.attitude === 'hostile' || who.attitude === 'unfriendly') throw new Error(`${who.name} doesn't think well enough of you for that.`)
+      ev = marriageEvent(st, who.name)
+    } else {
+      const name = act.child.name.trim().replace(/\s+/g, ' ').slice(0, 60)
+      if (!name) throw new Error('What is the child called?')
+      const lover = memory.entities.find((e) => e.kind === 'person' && e.relation === 'lover' && e.status !== 'dead')
+      const other = spouse && spouse.status !== 'dead' ? spouse : lover
+      if (!other) throw new Error('A child needs two parents: marry, or find someone first.')
+      if (memory.entities.some((e) => e.kind === 'person' && sameName(e.name, name))) throw new Error(`Someone called ${name} is already in the story.`)
+      if (childrenOf(memory).length >= MAX_CHILDREN) throw new Error(`At most ${MAX_CHILDREN} children.`)
+      ev = birthEvent(st, { name, sex: act.child.sex }, other.name)
+    }
+    const anchor = [...path].reverse().find((m) => m.role === 'user') ?? path[path.length - 1]
+    this.db.addEvents(id, anchor.id, newId('grp'), 'player', [ev])
   }
 
   /** New words for the character's appearance (the DM uses them from now on). */

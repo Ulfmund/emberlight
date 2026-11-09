@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { ageLabel, dateLabel, practiced, project, SKILL_IDS, SKILLS, skillLevelFromXp, SKIP_SPANS, skipEvents, skipText, spanLabel, weeklyPay, type SkillId, type SkipPlan } from '@shared/rules'
 import { coinText } from './Life'
+import { spouseOf } from '@shared/family'
 import type { CampaignView } from '@shared/view'
 import { Button } from '../../components/Button'
 import { Icon } from '../../components/Icon'
@@ -18,6 +19,9 @@ export function SkipDialog({ view, open, onClose, onSkip }: { view: CampaignView
   const [practise, setPractise] = useState<[SkillId | '', SkillId | '']>(['', ''])
   const job = view.state.job ?? null
   const [working, setWorking] = useState(true)
+  const spouse = spouseOf(view.memory)
+  const partner = spouse && spouse.status !== 'dead' ? spouse : undefined
+  const [family, setFamily] = useState(false)
   const close = useRef(onClose)
   close.current = onClose
   // With work, the time goes on it by default, and so does the practice.
@@ -47,7 +51,7 @@ export function SkipDialog({ view, open, onClose, onSkip }: { view: CampaignView
   const name = view.build.name
   const span = spanLabel(days)
   const submit = () => {
-    const plan: SkipPlan = { days, doing: doing.trim() || (atWork && job ? `I work as ${job.title} in ${job.place}.` : ''), practise: chosen, working: atWork }
+    const plan: SkipPlan = { days, doing: doing.trim() || (atWork && job ? `I work as ${job.title} in ${job.place}.` : ''), practise: chosen, working: atWork, family: Boolean(partner && family) }
     onSkip(skipText(plan), plan)
     onClose()
     setDoing('')
@@ -106,6 +110,12 @@ export function SkipDialog({ view, open, onClose, onSkip }: { view: CampaignView
                 <label className="flex items-center gap-2 text-sm text-parchment-300">
                   <input type="checkbox" checked={working} onChange={(e) => setWorking(e.target.checked)} className="accent-[var(--color-gold-400)]" />
                   At work as {job.title} (about {coinText(weeklyPay(view.state, job))} a week)
+                </label>
+              )}
+              {partner && days >= 360 && (
+                <label className="flex items-center gap-2 text-sm text-parchment-300">
+                  <input type="checkbox" checked={family} onChange={(e) => setFamily(e.target.checked)} className="accent-[var(--color-gold-400)]" />
+                  Raise a family with {partner.name} (children may be born)
                 </label>
               )}
               <div>

@@ -5,6 +5,7 @@ import { Icon } from '../../components/Icon'
 import { Button } from '../../components/Button'
 import { Medallion } from '../../components/Medallion'
 import { playerPortrait } from '../../portraits'
+import { yearsOld } from '@shared/family'
 
 export function Toasts() {
   const { toasts, dismissToast } = useGame()
@@ -78,7 +79,7 @@ export function DeathScreen({ view }: { view: CampaignView }) {
           </Button>
           {children.map((ch) => (
             <Button key={ch.id} variant="secondary" icon="laurel" onClick={() => startHeir({ ...heir, child: { id: ch.id, name: ch.name }, race: view.build.race })}>
-              Continue as {ch.name}, their child
+              Continue as {ch.name}, their child{yearsOld(ch, view.state.time.day) !== undefined ? ` (${yearsOld(ch, view.state.time.day)})` : ''}
             </Button>
           ))}
           {before && !view.settings.ironman && (
