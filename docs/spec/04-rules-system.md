@@ -245,6 +245,20 @@ The stage of life follows the years, and **the stage reached sets the character'
 
 Code: `src/shared/rules/calendar.ts`.
 
+### Time skips
+
+*Built (0.27.0).* "Five years pass." The player can skip ahead from the Sheet (*Let time pass…*, under the date), or ask out of character: `((five years pass))`, `((skip ahead a year while I train with Old Tam))`, `((let a season go by. I work the forge.))`.
+
+- **How long:** a week, a month, a season, a year, five years or ten in the dialog. Out of character, any number of days, weeks, months, seasons, years or decades, up to twenty years at once.
+- **What they do with it**, in the player's words (or left to the DM).
+- **Practice:** up to two skills, sharing the time. A day of practice is worth 4.8 skill XP (with the character's XP bonuses), so a year spent on one skill takes a beginner to about 13. The XP curve makes later years count for less, and practice stops at the skill's cap. Practice counts a third as much towards the character's level as skill XP earned in the story: years of quiet work make someone skilled, not a hero (five years at two skills bring about three levels).
+- **The engine** moves the calendar to the morning after the time has passed, so the character grows older (and may reach a new stage of life). They come out of it rested, fed and healed, with every condition gone except being a prisoner (the DM tells whether they got free). The weather is forgotten, and companions stay unless the story says otherwise. No Referee, no dice and no random events.
+- **The DM** is told how long passed, between which dates, how old the character is now, what they did, what they practised and who was with them. It writes **a montage, not scenes**: a few paragraphs moving through the time (how they lived, what became of the people they know, how the places changed), keeping to what the story has set up. It ends back in the present, on a morning, with something new to act on. The Scribe records the people, places and deeds the montage tells of, but not its time, rest or meals (the engine has already moved those).
+- **The timeline** marks it ("Five years went by: spring, year 6"), and a rewind takes it back like any other turn.
+- Not during a fight, and not while downed or dead.
+
+Code: `src/shared/rules/skips.ts`.
+
 ---
 
 ## Combat

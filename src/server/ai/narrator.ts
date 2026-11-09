@@ -35,8 +35,12 @@ import {
   type Weather,
   weatherNow,
   weatherPassed,
+  ageStage,
   ageYears,
   buildNow,
+  practiced,
+  spanSentence,
+  type SkipPlan,
   dateLabel,
   SEASON_INFO,
   seasonOf,
@@ -306,6 +310,25 @@ export function engineNotes(
     lines.push('The blow should have dropped them, but orcish fury keeps them on their feet (1 health left).')
   if (a.level > b.level) lines.push(`(The character has reached level ${a.level}. Don't mention numbers; at most a hint of growing confidence.)`)
   return lines.join('\n')
+}
+
+/** The DM's orders for a time-skip (skips.ts): a montage, not scenes, ending back in the present. */
+export function skipNote(before: GameState, after: GameState, plan: SkipPlan): string[] {
+  const name = after.character.build.name
+  const stage = ageStage(after)
+  const grew = stage !== ageStage(before) ? `, ${AGES[stage].label.toLowerCase()} now` : ''
+  const lines = [
+    `TIME SKIP: ${spanSentence(plan.days).replace(/\.$/, '')}, from ${dateLabel(before.time.day).toLowerCase()} to ${dateLabel(after.time.day).toLowerCase()}. ${name} is ${ageYears(after)} years old${grew}.`,
+    plan.doing.trim() ? `How they spend the time (the player's words): ${plan.doing.trim()}` : `The player didn't say how ${name} spends the time: choose what fits them and the story so far.`
+  ]
+  const grown = practiced(before, after, plan.practise).filter((p) => p.to > p.from)
+  if (grown.length) lines.push(`Practice over that time: ${grown.map((p) => `${SKILLS[p.skill].label} ${p.from} → ${p.to}`).join(', ')}.`)
+  if (after.party.length) lines.push(`Travelling with them when it began: ${after.party.map((a) => a.name).join(', ')}. Say whether they stayed through it, and how they fared.`)
+  lines.push(
+    `${name} is rested, fed and healed.`,
+    "Write it as a montage, not as scenes: a few short paragraphs that move through the time (the seasons turning, how they live and what they do, what became of the people they know: news, a wedding or a death, a newcomer, and how the places around them changed). Keep to what the story has set up: no great wars or deaths of major characters unless the story has led there. Then end in the present, on a morning after the time has passed, with something new for the player to act on."
+  )
+  return lines
 }
 
 /** A short reminder of past rolls, so the story keeps track of what happened. */

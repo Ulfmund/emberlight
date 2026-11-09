@@ -49,7 +49,9 @@ export function MobileDrawer({
   onClose,
   tab,
   setTab,
-  onJournal
+  onJournal,
+  onSkip,
+  canSkip
 }: {
   view: CampaignView
   open: boolean
@@ -57,6 +59,8 @@ export function MobileDrawer({
   tab: Tab
   setTab: (t: Tab) => void
   onJournal: () => void
+  onSkip?: () => void
+  canSkip?: boolean
 }) {
   const [part, setPart] = useState<'you' | 'more'>('you')
   // Back to "you" each time it opens.
@@ -105,6 +109,8 @@ export function MobileDrawer({
                   setPart('more')
                 }}
                 onOpenJournal={onJournal}
+                onSkip={onSkip}
+                canSkip={canSkip}
               />
             ) : (
               <SidePanel view={view} tab={tab} setTab={setTab} className="w-full" />

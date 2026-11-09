@@ -17,6 +17,7 @@ import {
   RENOWN_PER_LEVEL,
   SKILL_IDS,
   SKILL_TO_CHAR_XP,
+  PRACTICE_TO_CHAR_SHARE,
   type Attr,
   type ConditionId,
   type HarmSource,
@@ -31,7 +32,7 @@ import { COMPANION_ROLES, companionStats, PARTY_MAX, type Companion, type Compan
 import { findTemplate, itemTemplate, type ItemTemplate, type Slot } from './items'
 import type { Combat, CombatOutcome, FoeStatus } from './combat'
 import { startingSpells } from './spellbook'
-import { buildNow, startingAge } from './calendar'
+import { buildNow, SKIP_MAX_DAYS, startingAge } from './calendar'
 
 export type CombatMode = 'narrative' | 'turn' | 'mixed'
 export type EventFrequency = 'calm' | 'normal' | 'eventful' | 'chaos'
@@ -204,7 +205,7 @@ export type GameState = {
 /** One recorded change. Every event belongs to the message that caused it. */
 export type GameEvent =
   | { type: 'roll'; check: CheckResult }
-  | { type: 'skill_xp'; skill: SkillId; amount: number }
+  | { type: 'skill_xp'; skill: SkillId; amount: number; /** From practice in a time-skip (counts less towards the character's level). */ practice?: boolean }
   | { type: 'xp'; amount: number; reason: string }
   | { type: 'damage'; amount: number; source: HarmSource; reason: string }
   | { type: 'heal'; amount: number; reason: string }
@@ -214,6 +215,8 @@ export type GameEvent =
   | { type: 'condition'; id: ConditionId; on: boolean }
   | { type: 'rest'; kind: 'short' | 'long' }
   | { type: 'time'; minutes: number }
+  /** A long time-skip (skips.ts): the days go by, and the character is rested, fed and mended. */
+  | { type: 'time_skip'; days: number; doing?: string }
   | { type: 'renown'; amount: number; deed?: string }
   | { type: 'coins'; delta: number }
   | { type: 'item'; name: string; delta: number; icon?: string; spent?: boolean }
@@ -415,7 +418,7 @@ export function applyEvent(prev: GameState, ev: GameEvent, settings: CampaignSet
       break
     case 'skill_xp':
       c.skillXp[ev.skill] = (c.skillXp[ev.skill] ?? 0) + ev.amount
-      addCharXp(Math.round(ev.amount * SKILL_TO_CHAR_XP))
+      addCharXp(Math.round(ev.amount * SKILL_TO_CHAR_XP * (ev.practice ? PRACTICE_TO_CHAR_SHARE : 1)))
       break
     case 'xp':
       addCharXp(ev.amount)
@@ -472,6 +475,26 @@ export function applyEvent(prev: GameState, ev: GameEvent, settings: CampaignSet
       s.time.minute = ((total % 1440) + 1440) % 1440
       c.hungerMins += Math.max(0, ev.minutes)
       c.awakeMins += Math.max(0, ev.minutes)
+      break
+    }
+    case 'time_skip': {
+      if (c.status === 'dead') break
+      const days = Math.max(1, Math.min(SKIP_MAX_DAYS, Math.round(ev.days)))
+      s.time = { day: s.time.day + days, minute: 8 * 60 }
+      s.combat = null
+      // Whatever the sky was doing then has long since passed.
+      s.weather = null
+      s.weatherAt = undefined
+      // Rested, fed and mended: there's been time. Only a captor's chains outlast it (the DM tells whether).
+      c.status = 'alive'
+      c.deathRolls = { success: 0, fail: 0 }
+      c.conditions = c.conditions.filter((x) => x === 'captured')
+      c.hungerMins = 0
+      c.awakeMins = 0
+      const dd = d()
+      c.hp = dd.maxHp
+      c.stamina = dd.maxStamina
+      c.mana = dd.maxMana
       break
     }
     case 'renown':

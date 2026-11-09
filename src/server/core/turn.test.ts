@@ -925,4 +925,37 @@ describe('turn engine', () => {
     campaigns.rewind(id, v.messages.at(-3)!.id)
     expect(campaigns.view(id).state.party).toEqual([])
   })
+
+  it('lets years pass: the engine moves the calendar and mends them, the DM tells a montage, and the clock is not moved twice', async () => {
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    const before = campaigns.view(id).state
+    fake.calls = []
+    // The Scribe hears "years" and would move the clock and put them to bed: the engine already did.
+    fake.scribe = { ...blankScribe(), minutesPassed: 600, rest: 'long', location: 'Millbrook' }
+    fake.narration = 'The years pass quietly at the forge.'
+    await run(engine.act(id, '((Five years pass. I settle in Millbrook and work at the forge.))', signal))
+    expect(fake.calls).not.toContain('referee')
+    expect(lastNotes()).toContain('TIME SKIP: Five years pass, from spring, year 1 to spring, year 6.')
+    expect(lastNotes()).toContain("How they spend the time (the player's words): I settle in Millbrook and work at the forge.")
+    expect(lastNotes()).toMatch(/Write it as a montage/)
+    const v = campaigns.view(id)
+    expect(v.state.time).toEqual({ day: before.time.day + 1800, minute: 8 * 60 })
+    // What the montage tells is still recorded.
+    expect(v.state.location).toBe('Millbrook')
+    expect(v.timeline.map((e) => e.text)).toContain('Five years went by: spring, year 6')
+
+    // From the dialog, with practice.
+    fake.scribe = blankScribe()
+    await run(engine.act(id, '((A year passes.))', signal, { skip: { days: 360, doing: '', practise: ['smithing'] } }))
+    expect(lastNotes()).toMatch(/Practice over that time: Smithing 1 → 1\d/)
+    expect(campaigns.view(id).state.character.skillXp.smithing).toBeGreaterThan(1000)
+
+    // Not in the middle of a fight.
+    fake.referee = banditFight(2)
+    await run(engine.act(id, 'I draw my knife and charge the bandits.', signal))
+    expect(campaigns.view(id).state.combat).toBeTruthy()
+    const out = await run(engine.act(id, '((a year passes))', signal))
+    expect(out.find((e) => e.type === 'error')).toMatchObject({ message: expect.stringMatching(/Not in the middle of a fight/) })
+  })
 })

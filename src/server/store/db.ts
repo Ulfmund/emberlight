@@ -26,6 +26,8 @@ export type MessageMeta = {
   plan?: TurnPlan
   /** Player turns: what the game engine told the narrator (so the DM can rewrite its reply). */
   notes?: string
+  /** Player turns: a long time-skip (skips.ts), so the Scribe doesn't move the clock again. */
+  skip?: { days: number; practise: string[] }
   /** A picture the player showed with this message (media id), and what it shows, in words. */
   image?: string
   imageText?: string

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ImageSettingsPanel } from './ImageSettingsPanel'
 import { EmbeddingSettingsPanel } from './EmbeddingSettingsPanel'
 import { AnimatePresence, motion } from 'motion/react'
-import { PRESETS, findPreset, type Preset } from '@shared/presets'
+import { PRESETS, findPreset, presetForAddress, type Preset } from '@shared/presets'
 import type { Connection, TestResult } from '@shared/types'
 import { api } from '../api'
 import { useGame } from '../store'
@@ -26,6 +26,8 @@ export function ConnectScreen() {
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState<TestResult | null>(null)
   const [saveError, setSaveError] = useState('')
+  /** Set when a Custom address turned out to be a service with its own button. */
+  const [moved, setMoved] = useState('')
 
   const hasSavedKey = settings?.savedKeys[presetId] ?? false
 
@@ -41,6 +43,18 @@ export function ConnectScreen() {
     setModel(saved?.presetId === p.id ? saved.model : '')
     setKey('')
     setResult(null)
+    setMoved('')
+  }
+
+  const changeAddress = (url: string) => {
+    setBaseUrl(url)
+    const to = presetForAddress(presetId, url)
+    if (!to) return
+    // Same address and the key typed so far, under the button that says what it is.
+    setPresetId(to.id)
+    setModel('')
+    setResult(null)
+    setMoved(`That's ${to.label}'s address, so it's under the ${to.label} button now.`)
   }
 
   const test = async () => {
@@ -164,10 +178,10 @@ export function ConnectScreen() {
         {/* Details */}
         <motion.div layout className="panel mt-6 rounded-2xl p-6">
           <div className="grid gap-5 md:grid-cols-2">
-            <Field label="Address" hint={preset.kind === 'anthropic' ? 'Fixed for Claude' : 'Where the model server is listening'}>
+            <Field label="Address" hint={moved || (preset.kind === 'anthropic' ? 'Fixed for Claude' : 'Where the model server is listening')}>
               <input
                 value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
+                onChange={(e) => changeAddress(e.target.value)}
                 disabled={preset.kind === 'anthropic'}
                 spellCheck={false}
                 className="input"

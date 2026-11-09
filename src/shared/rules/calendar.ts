@@ -11,6 +11,8 @@ import { AGES, type AgeId, type RaceId, type SkillId } from './tables'
 
 export const DAYS_PER_SEASON = 90
 export const DAYS_PER_YEAR = 4 * DAYS_PER_SEASON
+/** The longest a time-skip can be (skips.ts). */
+export const SKIP_MAX_DAYS = 20 * DAYS_PER_YEAR
 
 export const SEASONS = ['spring', 'summer', 'autumn', 'winter'] as const
 export type Season = (typeof SEASONS)[number]

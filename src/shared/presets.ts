@@ -87,6 +87,18 @@ export const PRESETS: Preset[] = [
     defaultModel: 'claude-opus-5-5'
   },
   {
+    id: 'deepseek',
+    label: 'DeepSeek',
+    kind: 'openai',
+    baseUrl: 'https://api.deepseek.com',
+    needsKey: true,
+    local: false,
+    icon: 'drop',
+    blurb: "DeepSeek's own models in the cloud, with a key from platform.deepseek.com",
+    envKey: 'DEEPSEEK_API_KEY',
+    defaultModel: 'deepseek-chat'
+  },
+  {
     id: 'custom',
     label: 'Custom',
     kind: 'openai',
@@ -100,4 +112,23 @@ export const PRESETS: Preset[] = [
 
 export function findPreset(id: string): Preset | undefined {
   return PRESETS.find((p) => p.id === id)
+}
+
+const hostOf = (url: string) => {
+  try {
+    return new URL(url.trim()).host.toLowerCase()
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * A Custom address that belongs to a cloud service with its own preset (DeepSeek's, say): that
+ * preset's id, so the connection can move over to its button. Null for anything else.
+ */
+export function presetForAddress(presetId: string, baseUrl: string): Preset | null {
+  if (presetId !== 'custom') return null
+  const host = hostOf(baseUrl)
+  if (!host) return null
+  return PRESETS.find((p) => !p.local && p.kind === 'openai' && hostOf(p.baseUrl) === host) ?? null
 }

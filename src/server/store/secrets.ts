@@ -53,6 +53,14 @@ export class SecretStore {
     this.save()
   }
 
+  /** Moves a saved key to another preset, unless that one already has its own. */
+  move(from: string, to: string) {
+    if (!this.keys[from] || this.keys[to]) return
+    this.keys[to] = this.keys[from]
+    delete this.keys[from]
+    this.save()
+  }
+
   delete(presetId: string) {
     delete this.keys[presetId]
     this.save()

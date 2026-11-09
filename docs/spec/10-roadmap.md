@@ -66,7 +66,7 @@ Built in milestones. Each one ends with something playable, so the artist can te
 - **Seasons** with effects on gathering, weather and sound ✅ 0.24.0 (the DM plays winter roads as slow and a night in the open as dangerous)
 - **The peoples' ways** ✅ 0.25.0: how humans, dwarves and elves live, their customs for men's and women's work, and what they think of each other ([06](06-ai-dm.md#the-peoples-ways))
 - **Storytellers**, RimWorld-style ✅ 0.26.0: Whalechan, the Veteran, the Romance Writer, the Old Soul, the Mystery Writer and the Gambler join the original five; each has a voice, a habit, and leanings that shape which random events come ([03](03-characters-and-cards.md#the-dm-is-a-card-too))
-- Long time-skips ("five years pass…") with summarized events
+- **Long time-skips** ("five years pass…") ✅ 0.27.0: from the Sheet or out of character; the engine ages, mends and trains the character, and the DM tells the years as a montage ([04](04-rules-system.md#time-skips))
 - Homes, property, jobs, income from trade skills
 - Family and legacy: marriage, children growing up, heirs and inheritance *(playing the next generation after a death ✅ 0.10.0)*
 

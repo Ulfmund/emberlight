@@ -29,7 +29,10 @@ import {
   type GameEvent,
   type GameState,
   type TurnPlan,
-  type Work
+  type Work,
+  parseSkip,
+  skipEvents,
+  type SkipPlan
 } from '@shared/rules'
 import type { ChatMessage, Connection } from '@shared/types'
 import type { MessageView, TurnEvent } from '@shared/view'
@@ -50,7 +53,7 @@ import { runScribe } from '../ai/jobs/scribe'
 import { writeEpitaph } from '../ai/jobs/epitaph'
 import { ghostText, suggestActions, type Suggestion } from '../ai/jobs/suggest'
 import { describeImage } from '../ai/jobs/vision'
-import { engineNotes, extractFight, extractRollRequest, fitHistory, NameFilter, narratorSystem, pastRollNote, type PersonaText } from '../ai/narrator'
+import { engineNotes, extractFight, extractRollRequest, fitHistory, NameFilter, narratorSystem, pastRollNote, skipNote, type PersonaText } from '../ai/narrator'
 import { newId, type CampaignRow, type EventRow, type MessageRow } from '../store/db'
 import type { Campaigns } from './campaigns'
 
@@ -166,7 +169,7 @@ export class TurnEngine {
   // ---- public actions ------------------------------------------------------------------
 
   /** The player acts (free text; or a move picked on the tracker, or "Make" in the Bag). */
-  async *act(id: string, text: string, signal: AbortSignal, picked: { combat?: CombatAction; work?: Work; spell?: string; image?: string } = {}): AsyncGenerator<TurnEvent> {
+  async *act(id: string, text: string, signal: AbortSignal, picked: { combat?: CombatAction; work?: Work; spell?: string; image?: string; skip?: SkipPlan } = {}): AsyncGenerator<TurnEvent> {
     yield* this.playTurn(id, { text, kind: 'action', ...picked }, signal)
   }
 
@@ -420,7 +423,7 @@ export class TurnEngine {
 
   private async *playTurn(
     id: string,
-    input: { text: string; kind: 'action' | 'roll_response'; hidden?: boolean; forced?: CheckRequest; answers?: string; combat?: CombatAction; work?: Work; spell?: string; image?: string },
+    input: { text: string; kind: 'action' | 'roll_response'; hidden?: boolean; forced?: CheckRequest; answers?: string; combat?: CombatAction; work?: Work; spell?: string; image?: string; skip?: SkipPlan },
     signal: AbortSignal
   ): AsyncGenerator<TurnEvent> {
     let ctx: Ctx
@@ -436,6 +439,10 @@ export class TurnEngine {
     if (state.character.status === 'dead') return yield { type: 'error', message: `${state.character.build.name} is dead. Rewind, or start a new adventure.` }
     const head = path[path.length - 1]
     if (head?.role === 'user') return yield { type: 'error', message: 'The DM is still answering the last turn.' }
+    // A long time-skip: from the dialog, or asked for in words ("((five years pass))").
+    const skip = input.skip ?? (input.kind === 'action' && !input.combat && !input.work && !input.spell && !input.image ? parseSkip(input.text) : null)
+    if (skip && state.combat) return yield { type: 'error', message: 'Not in the middle of a fight. Finish it first.' }
+    if (skip && state.character.status !== 'alive') return yield { type: 'error', message: `${state.character.build.name} is in no state to let time pass.` }
 
     // A picture the player shows: put into words first, so any model (and the Referee) knows what it is.
     let imageText: string | undefined
@@ -460,6 +467,18 @@ export class TurnEngine {
     })
     this.campaigns.db.setHead(id, msg.id)
     yield { type: 'player', message: toView(msg) }
+
+    if (skip) {
+      // The engine moves the calendar, mends them and trains what they practise; the DM tells it.
+      const evs = skipEvents(state, settings, skip)
+      this.campaigns.db.addEvents(id, msg.id, newId('grp'), 'engine', evs)
+      const after = project(state, evs, settings)
+      const notes = engineNotes(state, after, settings, [], undefined, skipNote(state, after, skip))
+      const meta = { ...msg.meta, notes, skip: { days: skip.days, practise: skip.practise } }
+      this.campaigns.db.updateMessage(msg.id, { meta })
+      yield { type: 'checks', checks: [] }
+      return yield* this.narrate(id, { ...msg, meta }, signal, notes, ctx)
+    }
 
     // A downed character fights for their life before anything else. It's kept apart from the
     // turn's other dice, so a free reroll can't undo it.
@@ -689,6 +708,9 @@ export class TurnEngine {
         // sits down to eat, and the engine decides every wound (the story's blood isn't a new condition).
         const fightTurn = after.combat || events.some((e) => e.message_id === player.id && e.event.type.startsWith('combat_'))
         if (fightTurn) scribed = scribed.filter((e) => e.type !== 'rest' && e.type !== 'eat' && e.type !== 'condition').map((e) => (e.type === 'time' ? { ...e, minutes: Math.min(e.minutes, after.combat ? 1 : 10) } : e))
+        // A time-skip: the engine has already moved the clock and mended them; the montage's people,
+        // places and deeds are what's left to record.
+        if (player.meta.skip) scribed = scribed.filter((e) => e.type !== 'time' && e.type !== 'rest' && e.type !== 'eat' && e.type !== 'condition')
         if (scribed.length) this.campaigns.db.addEvents(id, dm.id, newId('grp'), 'ai', scribed)
       } catch {
         // Bookkeeping failing must never break the story; the next turn tries again.

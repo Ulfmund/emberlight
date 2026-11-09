@@ -9,6 +9,7 @@ import {
   SEASON_INFO,
   seasonNumber,
   seasonOf,
+  spanLabel,
   spellById,
   yearOf,
   type GameEvent,
@@ -43,8 +44,13 @@ export class TimelineLog {
 
   see(ev: GameEvent, before: GameState, after: GameState) {
     if (isMemoryEvent(ev)) return this.seeMemory(ev, after)
-    this.seeTime(before, after)
+    if (ev.type !== 'time_skip') this.seeTime(before, after)
     switch (ev.type) {
+      case 'time_skip': {
+        const span = spanLabel(ev.days)
+        this.add(after, `${span.charAt(0).toUpperCase()}${span.slice(1)} went by: ${dateLabel(after.time.day).toLowerCase()}`, 'hourglass')
+        break
+      }
       case 'location': {
         const name = ev.name.trim()
         if (!name || this.visited.some((v) => samePlace(v, name))) return

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { SettingsView } from '@shared/types'
-import type { Attr, CampaignSettings, CharacterBuild, CheckResult, CombatAction, RaceId, Work } from '@shared/rules'
+import type { Attr, CampaignSettings, CharacterBuild, CheckResult, CombatAction, RaceId, SkipPlan, Work } from '@shared/rules'
 import type { CampaignSummary, CampaignView, MessageView, TurnEvent } from '@shared/view'
 import { api, type CreateOptions } from './api'
 import type { MemoryEvent } from '@shared/memory'
@@ -60,7 +60,7 @@ type State = {
   takeUp(build: CharacterBuild): Promise<void>
 
   /** Free text, or a move picked on the combat tracker, or a recipe from the Bag. */
-  act(text: string, picked?: { combat?: CombatAction; work?: Work; spell?: string; image?: string }): Promise<void>
+  act(text: string, picked?: { combat?: CombatAction; work?: Work; spell?: string; image?: string; skip?: SkipPlan }): Promise<void>
   answer(messageId: string): Promise<void>
   regenerate(): Promise<void>
   reroll(checkId: string): Promise<void>

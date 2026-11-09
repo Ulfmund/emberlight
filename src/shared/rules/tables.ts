@@ -553,6 +553,11 @@ export const HARM_MULT: Partial<Record<Tier, number>> = {
 export const LEVEL_MAX = 30
 /** Share of skill XP that also counts as character XP. */
 export const SKILL_TO_CHAR_XP = 0.25
+/**
+ * Practice in a time-skip counts this much as much towards the character's level as skill XP
+ * earned in the story: years of quiet work make someone skilled, not a hero.
+ */
+export const PRACTICE_TO_CHAR_SHARE = 1 / 3
 export const RENOWN_PER_LEVEL = 2
 export const RENOWN_MAX = 100
 export const RENOWN_TIERS: { min: number; label: string }[] = [

@@ -11,6 +11,7 @@ import { DiceTray } from './play/DiceTray'
 import { DeathScreen, Toasts } from './play/Overlays'
 import { Journal } from './play/Journal'
 import { Inspector } from './play/Inspector'
+import { SkipDialog } from './play/SkipDialog'
 import { MobileDrawer, MobileStatus } from './play/Mobile'
 import { CombatTracker } from './play/CombatTracker'
 import { Icon } from '../components/Icon'
@@ -25,6 +26,7 @@ export function PlayScreen() {
   const [tab, setTab] = useState<Tab>('sheet')
   const [journal, setJournal] = useState(false)
   const [inspector, setInspector] = useState(false)
+  const [skipping, setSkipping] = useState(false)
   /** Phones: the character and side panels live in a drawer. */
   const [drawer, setDrawer] = useState(false)
   const portraits = useMemo(() => (view ? portraitMap(view) : {}), [view])
@@ -41,6 +43,7 @@ export function PlayScreen() {
   }, [hitAt, effects, screenShake, shake, shakeScope])
   if (!view) return null
   const dead = view.state.character.status === 'dead'
+  const canSkip = !busy && !view.state.combat && view.state.character.status === 'alive'
 
   return (
     <div ref={shakeScope} className="relative flex min-h-0 flex-1">
@@ -48,7 +51,7 @@ export function PlayScreen() {
       <EmberField density={0.15} className="opacity-40" />
 
       <div className="hidden md:flex">
-        <CharacterPanel view={view} onOpenSheet={() => setTab('sheet')} onOpenJournal={() => setJournal(true)} />
+        <CharacterPanel view={view} onOpenSheet={() => setTab('sheet')} onOpenJournal={() => setJournal(true)} onSkip={() => setSkipping(true)} canSkip={canSkip} />
       </div>
 
       <main className="relative flex min-w-0 flex-1 flex-col">
@@ -65,7 +68,23 @@ export function PlayScreen() {
         <SidePanel view={view} tab={tab} setTab={setTab} />
       </div>
 
-      <MobileDrawer view={view} open={drawer} onClose={() => setDrawer(false)} tab={tab} setTab={setTab} onJournal={() => { setDrawer(false); setJournal(true) }} />
+      <MobileDrawer
+        view={view}
+        open={drawer}
+        onClose={() => setDrawer(false)}
+        tab={tab}
+        setTab={setTab}
+        onJournal={() => {
+          setDrawer(false)
+          setJournal(true)
+        }}
+        onSkip={() => {
+          setDrawer(false)
+          setSkipping(true)
+        }}
+        canSkip={canSkip}
+      />
+      <SkipDialog view={view} open={skipping} onClose={() => setSkipping(false)} onSkip={(text, plan) => void act(text, { skip: plan })} />
       <Journal view={view} open={journal} onClose={() => setJournal(false)} />
       <Inspector campaignId={view.id} open={inspector} onClose={() => setInspector(false)} />
       <Toasts />

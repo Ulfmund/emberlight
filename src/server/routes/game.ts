@@ -22,7 +22,7 @@ import { applyRename, previewRename } from '../core/rename'
 import { MAX_COMPANIONS, type CastMember } from '@shared/cards'
 import { MAX_FACTS, type MemoryEvent } from '@shared/memory'
 import { findWorld } from '@shared/worlds'
-import { AGES, ageYears, BACKGROUNDS, RACES, SEXES } from '@shared/rules'
+import { AGES, ageYears, BACKGROUNDS, PRACTICE_MAX, RACES, SEXES, SKIP_MAX_DAYS } from '@shared/rules'
 import { attachment } from './cards'
 import { campaignFileName, exportCampaign, importCampaign, MAX_CAMPAIGN_FILE, PortableError } from '../core/portable'
 import { fileName, isPng, v2Data, writeCardPng } from '../cards/export'
@@ -271,10 +271,20 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
   const WorkSchema = z.object({ kind: z.literal('craft'), what: z.string().min(1).max(60) })
 
   app.post('/api/campaigns/:id/act', async (c) => {
-    const b = await body(c, z.object({ text: z.string().min(1).max(4000), combat: CombatMoveSchema.optional(), work: WorkSchema.optional(), spell: z.string().max(40).optional(), image: z.string().max(80).optional() }))
+    const b = await body(
+      c,
+      z.object({
+        text: z.string().min(1).max(4000),
+        combat: CombatMoveSchema.optional(),
+        work: WorkSchema.optional(),
+        spell: z.string().max(40).optional(),
+        image: z.string().max(80).optional(),
+        skip: z.object({ days: z.number().int().min(1).max(SKIP_MAX_DAYS), doing: z.string().max(300).default(''), practise: z.array(z.enum(tuple(SKILL_IDS))).max(PRACTICE_MAX).default([]) }).optional()
+      })
+    )
     const id = c.req.param('id')
     return stream(c, (signal) =>
-      b ? turns.act(id, b.text, signal, { combat: b.combat, work: b.work, spell: b.spell, image: b.image }) : (async function* () { yield { type: 'error', message: 'Write something first.' } as TurnEvent })()
+      b ? turns.act(id, b.text, signal, { combat: b.combat, work: b.work, spell: b.spell, image: b.image, skip: b.skip }) : (async function* () { yield { type: 'error', message: 'Write something first.' } as TurnEvent })()
     )
   })
 

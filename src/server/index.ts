@@ -5,7 +5,7 @@ import { Hono } from 'hono'
 import { getRequestListener } from '@hono/node-server'
 import { z } from 'zod'
 import { Connection, type RemoteView, type SettingsView, type TestResult, type UpdateStatus } from '@shared/types'
-import { findPreset } from '@shared/presets'
+import { findPreset, PRESETS, presetForAddress } from '@shared/presets'
 import { newRemoteKey, SettingsStore } from './store/settings'
 import { accessGate, isRemote, lanAddresses, LINK_PORT, WIFI_PORT } from './remote'
 import { SecretStore, type Cipher } from './store/secrets'
@@ -53,6 +53,18 @@ export async function startServer(opts: ServerOptions): Promise<{ port: number; 
   const extra: { wifi: { server: Server; port: number } | null; link: { server: Server; port: number } | null } = { wifi: null, link: null }
   const settings = new SettingsStore(opts.dataDir)
   const secrets = new SecretStore(opts.dataDir, opts.cipher)
+  /**
+   * A Custom connection whose address belongs to a cloud preset (DeepSeek's) moves over to that
+   * preset's button, key and all, so it's clear what it is. On start, and whenever it's saved.
+   */
+  const adoptPreset = () => {
+    const conn = settings.connection
+    const to = conn ? presetForAddress(conn.presetId, conn.baseUrl) : null
+    if (!conn || !to) return
+    secrets.move(conn.presetId, to.id)
+    settings.setConnection({ ...conn, presetId: to.id, kind: to.kind })
+  }
+  adoptPreset()
   const host = opts.host ?? '127.0.0.1'
   let port = opts.port
 
@@ -77,7 +89,7 @@ export async function startServer(opts: ServerOptions): Promise<{ port: number; 
   // ---- Settings & keys -----------------------------------------------------------------
   const settingsView = async (c?: Parameters<typeof isRemote>[0]): Promise<SettingsView> => {
     const savedKeys: Record<string, boolean> = {}
-    for (const id of ['openrouter', 'claude', 'custom', 'lmstudio', 'strata', 'koboldcpp', 'images']) savedKeys[id] = await secrets.has(id)
+    for (const id of [...PRESETS.map((p) => p.id), 'images']) savedKeys[id] = await secrets.has(id)
     return { connection: settings.connection, savedKeys, secureStorage: secrets.secure, remote: c ? isRemote(c, ports) : false }
   }
 
@@ -89,6 +101,7 @@ export async function startServer(opts: ServerOptions): Promise<{ port: number; 
     if (!parsed.success) return c.json({ error: 'Invalid connection settings' }, 400)
     if (!remoteMayUse(c, parsed.data)) return c.json({ error: 'A new server address can only be set on the computer running Emberlight.' }, 403)
     settings.setConnection(parsed.data)
+    adoptPreset()
     return c.json(await settingsView(c))
   })
 

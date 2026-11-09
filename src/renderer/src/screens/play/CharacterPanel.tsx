@@ -57,11 +57,16 @@ export function CharacterPanel({
   view,
   onOpenSheet,
   onOpenJournal,
+  onSkip,
+  canSkip = false,
   className = 'w-72 border-r border-gold-500/15 bg-ink-950/70 backdrop-blur'
 }: {
   view: CampaignView
   onOpenSheet: () => void
   onOpenJournal: () => void
+  /** Opens "Let time pass" (a long time-skip). */
+  onSkip?: () => void
+  canSkip?: boolean
   className?: string
 }) {
   const [renaming, setRenaming] = useState(false)
@@ -223,6 +228,17 @@ export function CharacterPanel({
           <Icon name={t.icon} size={16} className="text-gold-400" />
           Day {view.state.time.day} · {dateLabel(view.state.time.day)} · {t.part}
         </div>
+        {onSkip && (
+          <button
+            onClick={onSkip}
+            disabled={!canSkip}
+            title={canSkip ? 'Skip ahead: a week, a season, years' : 'Not now: in a fight, or while the DM is answering'}
+            className="no-drag -mt-1 ml-6 flex cursor-pointer items-center gap-1.5 text-xs text-gold-300 hover:text-gold-200 disabled:cursor-not-allowed disabled:opacity-40 touch:py-1.5 touch:text-sm"
+          >
+            <Icon name="hourglass" size={13} />
+            Let time pass…
+          </button>
+        )}
         {view.state.location && (
           <div className="flex items-center gap-2 text-parchment-300">
             <Icon name="map" size={16} className="text-gold-400" />
