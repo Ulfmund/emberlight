@@ -10,6 +10,7 @@ import { playerPortrait } from '../../portraits'
 import { Bar } from '../../components/Bar'
 import { Icon } from '../../components/Icon'
 import { Tip } from '../../components/Tip'
+import { PartyStrip } from './Party'
 
 export function formatCoins(copper: number) {
   const g = Math.floor(copper / 100)
@@ -147,6 +148,7 @@ export function CharacterPanel({
           <Bar value={Math.max(0, d.xpIntoLevel)} max={d.xpForNext} color="#e8b54d" thin />
         </div>
       </div>
+      <PartyStrip view={view} onOpen={onOpenSheet} />
 
       {c.attrPoints > 0 && (
         <motion.button

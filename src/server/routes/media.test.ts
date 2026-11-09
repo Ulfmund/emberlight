@@ -48,6 +48,18 @@ describe('pictures', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
+  it('asks someone along, changes their role and parts ways, over the app', async () => {
+    const joined = await post(`/api/campaigns/${id}/party`, { join: { name: 'Mira', role: 'healer' } })
+    expect(joined.status).toBe(200)
+    const party = (joined.body.state as { party: { id: string; name: string; role: string }[] }).party
+    expect(party.map((a) => [a.name, a.role])).toEqual([['Mira', 'healer']])
+    expect((await post(`/api/campaigns/${id}/party`, { role: { id: party[0].id, role: 'wizard' } })).status).toBe(400)
+    expect((await post(`/api/campaigns/${id}/party`, { role: { id: party[0].id, role: 'mage' } })).status).toBe(200)
+    expect((await post(`/api/campaigns/${id}/party`, { join: { name: 'Mira' } })).body.error).toMatch(/already travelling/)
+    const left = await post(`/api/campaigns/${id}/party`, { leave: party[0].id })
+    expect((left.body.state as { party: unknown[] }).party).toEqual([])
+  })
+
   it('takes pictures, but only real ones', async () => {
     const ok = await upload(PNG, 'image/png')
     expect(ok.status).toBe(200)

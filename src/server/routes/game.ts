@@ -5,6 +5,7 @@ import {
   AGE_IDS,
   ATTRS,
   BACKGROUND_IDS,
+  COMPANION_ROLES,
   DEFAULT_SETTINGS,
   RACE_IDS,
   SKILL_IDS,
@@ -389,6 +390,26 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
     if (!b) return c.json({ error: 'That change could not be read.' }, 400)
     const r = guard(() => {
       campaigns.journal(c.req.param('id'), b.edit as MemoryEvent)
+      return campaigns.view(c.req.param('id'))
+    })
+    return r.ok ? c.json(r.value) : c.json({ error: r.error }, 400)
+  })
+
+  // ---- companions (who travels with the player) ------------------------------------------------
+
+  app.post('/api/campaigns/:id/party', async (c) => {
+    const role = z.enum(COMPANION_ROLES)
+    const b = await body(
+      c,
+      z.union([
+        z.object({ join: z.object({ name: z.string().min(1).max(60), role: role.optional() }) }),
+        z.object({ leave: z.string().min(1).max(80) }),
+        z.object({ role: z.object({ id: z.string().min(1).max(80), role }) })
+      ])
+    )
+    if (!b) return c.json({ error: 'That change could not be read.' }, 400)
+    const r = guard(() => {
+      campaigns.party(c.req.param('id'), b)
       return campaigns.view(c.req.param('id'))
     })
     return r.ok ? c.json(r.value) : c.json({ error: r.error }, 400)

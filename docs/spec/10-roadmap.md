@@ -58,7 +58,7 @@ Built in milestones. Each one ends with something playable, so the artist can te
 - Semantic (embedding) memory search
 - Faction reputation
 - Location art; a simple map of visited places
-- Companions travelling with the player (AI-controlled in combat)
+- Companions travelling with the player (AI-controlled in combat) ✅ 0.17.0 (up to four, from cards or the story; five fighting roles; healers can save you)
 
 ## v2 — Life sim (if the artist wants it)
 - **Aging:** characters age over in-game time, and caps shift with it (physical caps fall after middle age, Intellect/Arcane caps rise), using the age table in [04](04-rules-system.md#attribute-caps) as stages

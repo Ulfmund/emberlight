@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { entityLine, mentions, projectMemory, relevantEntities, sameName, storySoFar, type MemoryEvent, type Summary } from './memory'
 import { scribeToEvents, type ScribeOutput } from '../server/ai/jobs/scribe'
-import { DEFAULT_SETTINGS, initialState, storyMinute, type CharacterBuild } from './rules'
+import { DEFAULT_SETTINGS, initialState, project, storyMinute, type CharacterBuild } from './rules'
 
 const person = (name: string, extra: Partial<Extract<MemoryEvent, { type: 'entity' }>> = {}): MemoryEvent => ({ type: 'entity', kind: 'person', name, day: 1, ...extra })
 
@@ -164,7 +164,9 @@ describe('Scribe memory output', () => {
     itemsUsed: [],
     itemsEquipped: [],
     spellsLearned: [],
-    weather: 'unchanged' as const
+    weather: 'unchanged' as const,
+    companionsJoined: [],
+    companionsLeft: []
   }
 
   it('records people and places, but never the player character or nameless extras', () => {
@@ -196,5 +198,19 @@ describe('Scribe memory output', () => {
     const longAgo = { ...state, weather: 'rain' as const, weatherAt: storyMinute(state.time) - 9 * 60 }
     expect(scribeToEvents({ ...blank, weather: 'rain' }, longAgo)).toContainEqual({ type: 'weather', weather: 'rain' })
     expect(scribeToEvents({ ...blank, weather: 'clear' }, { ...state, weather: 'rain' })).toContainEqual({ type: 'weather', weather: 'clear' })
+  })
+
+  it('companions come along when the story says so, and leave or die the same way', () => {
+    const state = initialState(build, DEFAULT_SETTINGS)
+    const mira = { name: 'Mira', otherNames: [], who: 'a priestess of the dawn', newFacts: [], status: 'alive' as const, attitude: 'friendly' as const, relation: 'companion' as const }
+    const evs = scribeToEvents({ ...blank, companionsJoined: ['Mira', 'Brenna'], people: [mira] }, state)
+    expect(evs.filter((e) => e.type === 'party_join')).toEqual([{ type: 'party_join', companion: { id: 'ally_mira', name: 'Mira', role: 'healer' } }])
+    const withMira = project(state, evs, DEFAULT_SETTINGS)
+    expect(withMira.party.map((a) => a.name)).toEqual(['Mira'])
+    expect(scribeToEvents({ ...blank, companionsJoined: ['Mira'] }, withMira).some((e) => e.type === 'party_join')).toBe(false)
+    expect(scribeToEvents({ ...blank, companionsLeft: ['mira'] }, withMira)).toContainEqual({ type: 'party_leave', id: 'ally_mira', name: 'Mira', why: 'left' })
+    expect(scribeToEvents({ ...blank, people: [{ ...mira, status: 'dead' }] }, withMira)).toContainEqual({ type: 'party_leave', id: 'ally_mira', name: 'Mira', why: 'dead' })
+    // Nobody joins who the story says is dead.
+    expect(scribeToEvents({ ...blank, companionsJoined: ['Mira'], people: [{ ...mira, status: 'dead' }] }, state).some((e) => e.type === 'party_join')).toBe(false)
   })
 })

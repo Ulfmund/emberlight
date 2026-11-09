@@ -26,7 +26,8 @@ import {
   type SkillId
 } from './tables'
 import type { CheckResult } from './checks'
-import { isMemoryEvent, type MemoryEvent } from '../memory'
+import { isMemoryEvent, sameName, type MemoryEvent } from '../memory'
+import { COMPANION_ROLES, companionStats, PARTY_MAX, type Companion, type CompanionRole } from './party'
 import { findTemplate, itemTemplate, type ItemTemplate, type Slot } from './items'
 import type { Combat, CombatOutcome, FoeStatus } from './combat'
 import { startingSpells } from './spellbook'
@@ -189,6 +190,8 @@ export type GameState = {
   combat: Combat | null
   /** Earlier characters of this story who died (the Hall of the Fallen). */
   fallen: Fallen[]
+  /** Who travels with the character (party.ts). */
+  party: Companion[]
 }
 
 /** One recorded change. Every event belongs to the message that caused it. */
@@ -225,10 +228,14 @@ export type GameEvent =
   | { type: 'combat_round'; round: number }
   | { type: 'combat_dodge' }
   | { type: 'combat_end'; outcome: CombatOutcome }
-  | { type: 'foe_hit'; id: string; amount: number; name?: string }
+  /** A blow on a foe: the character's, or a companion's (`by`). */
+  | { type: 'foe_hit'; id: string; amount: number; name?: string; by?: string }
   | { type: 'foe_status'; id: string; status: FoeStatus; name?: string }
-  /** A foe's attack on the player (for the log; the damage itself is a "damage" event). */
-  | { type: 'foe_attack'; id: string; roll: number; total: number; defense: number; hit: boolean; crit: boolean; damage: number; name?: string }
+  /**
+   * A foe's attack (for the log): on the player (the damage is a "damage" event), or on a
+   * companion, `target` (the damage is an "ally_hit" event).
+   */
+  | { type: 'foe_attack'; id: string; roll: number; total: number; defense: number; hit: boolean; crit: boolean; damage: number; name?: string; target?: string }
   /** A random event happened this turn (kept so they don't pile up). */
   | { type: 'world_event'; id: string; text: string }
   /** The DM's words for a character who just died. */
@@ -249,6 +256,14 @@ export type GameEvent =
   /** Magic in a fight: a ward for the rest of it, or a curse on a foe. */
   | { type: 'combat_ward'; amount: number }
   | { type: 'foe_weaken'; id: string; attack: number; name?: string }
+  /** Companions (party.ts): who travels with the character, and how they fare. */
+  | { type: 'party_join'; companion: { id: string; name: string; role: CompanionRole; card?: string } }
+  | { type: 'party_leave'; id: string; name?: string; why: 'left' | 'dead' }
+  | { type: 'party_role'; id: string; role: CompanionRole }
+  | { type: 'ally_hit'; id: string; amount: number; name?: string }
+  | { type: 'ally_heal'; id: string; amount: number; name?: string }
+  /** A healer companion brings the fallen character round (instead of a death roll). */
+  | { type: 'ally_care'; id: string; name?: string }
   /** Long-term memory: people, places and summaries (see shared/memory.ts). */
   | MemoryEvent
 
@@ -298,7 +313,7 @@ export function initialState(build: CharacterBuild, settings: CampaignSettings):
     spells: startingSpells(build.background, build.race)
   }
   for (const k of bg.kit) addItem(character, k.name, 'qty' in k && k.qty ? k.qty : 1, k.icon)
-  return { character, time: { day: 1, minute: 8 * 60 }, location: null, placeKind: null, combat: null, fallen: [] }
+  return { character, time: { day: 1, minute: 8 * 60 }, location: null, placeKind: null, combat: null, fallen: [], party: [] }
 }
 
 /** A proper meal (12 hours of food or more) leaves you fed whatever came before; a snack takes the edge off. */
@@ -434,6 +449,11 @@ export function applyEvent(prev: GameState, ev: GameEvent, settings: CampaignSet
         c.deathRolls = { success: 0, fail: 0 }
       }
       if (c.hp * 4 >= dd.maxHp) c.conditions = c.conditions.filter((x) => x !== 'wounded')
+      for (const a of s.party ?? []) {
+        const max = companionStats(a.role, c.level).maxHp
+        a.wounds = ev.kind === 'long' ? 0 : Math.max(0, a.wounds - Math.ceil(max / 4))
+        if (a.wounds < max) a.down = false
+      }
       break
     }
     case 'time': {
@@ -508,6 +528,11 @@ export function applyEvent(prev: GameState, ev: GameEvent, settings: CampaignSet
       break
     case 'combat_end':
       s.combat = null
+      for (const a of s.party ?? []) {
+        if (!a.down) continue
+        a.down = false
+        a.wounds = companionStats(a.role, c.level).maxHp - 1
+      }
       break
     case 'foe_hit': {
       const f = s.combat?.foes.find((x) => x.id === ev.id)
@@ -546,6 +571,47 @@ export function applyEvent(prev: GameState, ev: GameEvent, settings: CampaignSet
       if (f) f.attack += ev.attack
       break
     }
+    case 'party_join': {
+      const p = s.party ?? []
+      const who = ev.companion
+      if (p.length >= PARTY_MAX || p.some((x) => x.id === who.id || sameName(x.name, who.name)) || sameName(who.name, c.build.name)) break
+      const role = COMPANION_ROLES.includes(who.role) ? who.role : 'fighter'
+      s.party = [...p, { id: who.id, name: who.name.trim().slice(0, 60), role, ...(who.card ? { card: who.card } : {}), wounds: 0, down: false, joinedDay: s.time.day }]
+      break
+    }
+    case 'party_leave':
+      s.party = (s.party ?? []).filter((x) => x.id !== ev.id)
+      break
+    case 'party_role': {
+      const a = s.party?.find((x) => x.id === ev.id)
+      if (a && COMPANION_ROLES.includes(ev.role)) a.role = ev.role
+      break
+    }
+    case 'ally_hit': {
+      const a = s.party?.find((x) => x.id === ev.id)
+      if (a) {
+        const max = companionStats(a.role, c.level).maxHp
+        a.wounds = Math.min(max, a.wounds + Math.max(0, ev.amount))
+        if (a.wounds >= max) a.down = true
+      }
+      break
+    }
+    case 'ally_heal': {
+      const a = s.party?.find((x) => x.id === ev.id)
+      if (a) {
+        a.wounds = Math.max(0, a.wounds - Math.max(0, ev.amount))
+        if (a.wounds < companionStats(a.role, c.level).maxHp) a.down = false
+      }
+      break
+    }
+    case 'ally_care':
+      if (c.status === 'downed') {
+        c.status = 'alive'
+        c.hp = Math.max(1, c.hp)
+        c.deathRolls = { success: 0, fail: 0 }
+        if (!c.conditions.includes('wounded')) c.conditions.push('wounded')
+      }
+      break
     case 'build_edit':
       c.build = {
         ...c.build,
@@ -564,6 +630,8 @@ export function applyEvent(prev: GameState, ev: GameEvent, settings: CampaignSet
       s.fallen = [...(s.fallen ?? []), ev.fallen]
       s.character = fresh
       s.combat = null
+      // A new hero sets out alone; old friends may be met again in the story.
+      s.party = []
       s.time = { day: s.time.day + Math.max(0, ev.days), minute: 8 * 60 }
       break
     }

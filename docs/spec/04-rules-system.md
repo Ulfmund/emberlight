@@ -273,6 +273,24 @@ That stops the AI from quietly going easy on the player. Each template has a beh
 
 Once a fight ends (won, fled, yielded, or lost), the tracker closes and the story carries on. A character who goes down or is captured in a fight ends it as a defeat.
 
+### Companions
+
+*Built (0.17.0).* Up to four companions travel with the player: characters from cards brought along (from the first page), and people met in the story who agree to come (the Scribe hears it), or whom the player asks along from the Journal or the Sheet. The DM voices them and decides what they do in the story; in a fight the **engine plays them**, by their role, and rolls every blow like a foe's:
+
+| Role | Health (level 1) | Attack | Defense | Damage | In a fight |
+|---|---|---|---|---|---|
+| Fighter | 16 | +4 | 14 | 1d8+1 | Goes for the player's target; draws the foes' blows |
+| Archer | 12 | +4 | 13 | 1d8 | Shoots from range; seldom targeted |
+| Healer | 12 | +2 | 12 | 1d6 | First heals whoever is worst hurt (below half) for 1d8+2 |
+| Mage | 10 | +4 | 11 | 1d10+1 | Hits hard; seldom targeted, easily hurt |
+| Scout | 12 | +4 | 14 | 1d6+2 | Quick and hard to pin down |
+
+- A role is guessed from who they are ("a priestess of the dawn" is a healer) and can be changed on the Sheet. Their numbers grow with the player's level, as foes' do (health ×1.2 per level, attack +1 every two levels, defense and damage +1 every three).
+- Companions act after the player each round. They hold back while the player talks or yields, and when the party is ambushed in the first round. Each foe goes for the player twice as often as for an average companion. A fighter draws 1.2 times an average share; archers and mages, half.
+- A companion at 0 health is knocked out for the rest of the fight and gets up with 1 health when it's over. Only the story kills a companion (the Scribe hears it). A short rest mends a quarter of their health, a night's sleep all of it.
+- Their kills give the player XP. When the player falls and a healer companion is on their feet, the healer brings them round (1 health, wounded) instead of a death roll.
+- The DM sees each companion's card or Journal record, their role and how they're faring, and the fight log says what each did.
+
 ---
 
 ## Conditions

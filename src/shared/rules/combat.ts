@@ -5,13 +5,15 @@ import { ammoFor, defenseValue, mainWeapon } from './gear'
 import { itemTemplate } from './items'
 import { backfire, knownSpells, spellAmount, spellCheck, type Spell } from './spells'
 import { applyEvent, type CampaignSettings, type CombatMode, type GameEvent, type GameState } from './state'
+import { allyHealth, companionHp, companionStats, ROLE_INFO, standing, type Companion } from './party'
 import type { Work } from './crafting'
 import { TIER_INFO } from './tables'
 
 /**
  * Turn-based combat (docs/spec/04-rules-system.md#combat). The engine owns every number: enemy
  * stat blocks come from templates, every attack is rolled, and the narrator describes what the
- * engine decided. One player message is one round: the player's action and every enemy's.
+ * engine decided. One player message is one round: the player's action, their companions', and
+ * every enemy's.
  */
 
 export type FoeStatus = 'fighting' | 'fled' | 'down' | 'surrendered' | 'asleep'
@@ -299,6 +301,17 @@ export function resolveRound(
       log.push(`${f.name} ${leave === 'fled' ? 'breaks and flees' : 'throws down their weapon and yields'}.`)
       return
     }
+    // Who it goes for: mostly the character; fighters draw blows, archers and mages hang back.
+    const lvl = working.character.level
+    const allies = standing(working.party)
+    if (allies.length) {
+      const draws = allies.map((a) => companionStats(a.role, lvl).draw)
+      let r = rng() * (2 + draws.reduce((n, w) => n + w, 0)) - 2
+      for (let i = 0; i < allies.length && r >= 0; i++) {
+        if (r < draws[i]) return void foeOnAlly(f, allies[i])
+        r -= draws[i]
+      }
+    }
     const c = working.character
     const def = defenseValue(c, (working.combat?.dodging ? 2 : 0) + (working.combat?.ward ?? 0)).total
     const roll = d(rng, 20)
@@ -319,8 +332,67 @@ export function resolveRound(
     const after = working.character
     if (after.status !== 'alive' || after.conditions.includes('captured')) {
       log.push(after.status === 'dead' ? 'The character is killed.' : after.status === 'downed' ? 'The character falls, unconscious and dying.' : 'The character is overpowered and taken prisoner.')
+      const up = standing(working.party)
+      if (up.length) log.push(`Still on their feet: ${up.map((a) => a.name).join(', ')}. What they do now is for the story to tell.`)
       end('defeat')
     }
+  }
+
+  /** A foe's blow at one of the character's companions. */
+  const foeOnAlly = (f: Foe, a: Companion) => {
+    const lvl = working.character.level
+    const def = companionStats(a.role, lvl).defense
+    const roll = d(rng, 20)
+    const total = roll + f.attack
+    const crit = roll === 20
+    const hit = roll !== 1 && (crit || total >= def)
+    const damage = hit ? Math.max(1, rollDice(f.damage[0] * (crit ? 2 : 1), f.damage[1], rng) + f.damage[2]) : 0
+    push({ type: 'foe_attack', id: f.id, roll, total, defense: def, hit, crit, damage, name: f.name, target: a.id })
+    if (!hit) return void log.push(`${f.name} ${f.verb} ${a.name}: rolled ${roll} + ${f.attack} = ${total} vs Defense ${def}: MISS${roll === 1 ? ' (a natural 1)' : ''}.`)
+    push({ type: 'ally_hit', id: a.id, amount: damage, name: a.name })
+    const now = working.party.find((x) => x.id === a.id)
+    log.push(`${f.name} ${f.verb} ${a.name}: rolled ${roll} + ${f.attack} = ${total} vs Defense ${def}: ${crit ? 'CRITICAL HIT' : 'HIT'}, ${damage} damage. ${a.name} is now ${now ? allyHealth(now, lvl) : 'down'}${now?.down ? ', knocked out of the fight' : ''}.`)
+  }
+
+  // ---- a companion's turn (the engine plays them, by their role) ------------------------------
+  const playerTarget = action.kind === 'attack' || action.kind === 'power' || action.kind === 'cast' ? action.target : undefined
+  const allyTurn = (id: string) => {
+    if (over()) return
+    const a = working.party?.find((x) => x.id === id)
+    if (!a || a.down) return
+    const foes = fighting(working)
+    if (!foes.length) return
+    const lvl = working.character.level
+    const st = companionStats(a.role, lvl)
+    // A healer first tends whoever is worst hurt, if anyone is below half.
+    if (st.heal) {
+      const pcMax = derivedMax(working, settings)
+      const hurt = [
+        ...(working.character.status === 'alive' ? [{ id: '', name: 'the character', share: working.character.hp / pcMax }] : []),
+        ...working.party.filter((x) => x.id !== a.id && !x.down).map((x) => ({ id: x.id, name: x.name, share: companionHp(x, lvl) / companionStats(x.role, lvl).maxHp }))
+      ]
+        .filter((h) => h.share < 0.5)
+        .sort((x, y) => x.share - y.share)[0]
+      if (hurt) {
+        const amount = Math.max(1, rollDice(st.heal[0], st.heal[1], rng) + st.heal[2])
+        if (hurt.id) push({ type: 'ally_heal', id: hurt.id, amount, name: hurt.name })
+        else push({ type: 'heal', amount, reason: `${a.name} tends you` })
+        return void log.push(`${a.name} (companion, ${ROLE_INFO[a.role].label.toLowerCase()}) tends ${hurt.id ? hurt.name : 'the character'}: ${amount} health back.`)
+      }
+    }
+    // The rest go for the character's target, or else the foe nearest to falling.
+    const target = foes.find((f) => f.id === playerTarget) ?? [...foes].sort((x, y) => x.hp / x.maxHp - y.hp / y.maxHp)[0]
+    const roll = d(rng, 20)
+    const total = roll + st.attack
+    const crit = roll === 20
+    const hit = roll !== 1 && (crit || total >= target.defense)
+    const who = `${a.name} (companion, ${ROLE_INFO[a.role].label.toLowerCase()})`
+    if (!hit) return void log.push(`${who} ${st.verb} ${target.name}: rolled ${roll} + ${st.attack} = ${total} vs Defense ${target.defense}: MISS.`)
+    const damage = Math.max(1, rollDice(st.damage[0] * (crit ? 2 : 1), st.damage[1], rng) + st.damage[2])
+    push({ type: 'foe_hit', id: target.id, amount: damage, name: target.name, by: a.name })
+    const now = working.combat?.foes.find((f) => f.id === target.id)
+    log.push(`${who} ${st.verb} ${target.name}: rolled ${roll} + ${st.attack} = ${total} vs Defense ${target.defense}: ${crit ? 'CRITICAL HIT' : 'HIT'}, ${damage} damage. ${target.name} is now ${now ? foeHealth(now) : 'down'}.`)
+    if (now?.status === 'down') push({ type: 'xp', amount: now.xp, reason: `${a.name} felled ${now.name}` })
   }
 
   // ---- a known spell, cast in the fight ---------------------------------------------------
@@ -493,7 +565,7 @@ export function resolveRound(
         results.push(r.result)
         r.events.forEach(push)
         if (TIER_INFO[r.result.tier].success) {
-          log.push(`The character tries to flee: ${TIER_INFO[r.result.tier].label.toUpperCase()}. They get away.`)
+          log.push(`The character tries to flee: ${TIER_INFO[r.result.tier].label.toUpperCase()}. They get away${standing(working.party).length ? ', and their companions with them' : ''}.`)
           end('fled')
         } else log.push(`The character tries to flee: ${TIER_INFO[r.result.tier].label.toUpperCase()}. They can't break away.`)
         return
@@ -552,6 +624,12 @@ export function resolveRound(
   const foesAfter = combat.surprise === 'foes' && round === 1 ? [] : order.filter((id) => !foesFirst.includes(id))
   for (const id of foesFirst) foeTurn(id)
   playerTurn()
+  // Companions act after the character: not when caught off guard, nor while the character
+  // talks, yields or simply waits.
+  const allies = standing(working.party).map((a) => a.id)
+  const holdBack = (combat.surprise === 'player' && round === 1) || action.kind === 'talk' || action.kind === 'surrender' || action.kind === 'none'
+  if (allies.length && holdBack && !over() && action.kind === 'talk') log.push('The companions hold back while the character talks.')
+  if (!holdBack) for (const id of allies) allyTurn(id)
   for (const id of foesAfter) foeTurn(id)
 
   if (!over() && working.combat && !fighting(working).length) {
@@ -581,7 +659,9 @@ export function resolveRound(
       const cur = working.combat?.foes.find((x) => x.id === f.id) ?? f
       return `${cur.name}: ${foeHealth(cur)}`
     })
-    if (st && !outcome) log.push(`Where things stand: ${st.join('; ')}.`)
+    const lvl = working.character.level
+    const friends = (working.party ?? []).map((a) => `${a.name} (companion): ${allyHealth(a, lvl)}`)
+    if (st && !outcome) log.push(`Where things stand: ${[...st, ...friends].join('; ')}.`)
   }
   return { events, results, state: working, log, outcome }
 }
@@ -643,4 +723,9 @@ export function combatSummary(st: GameState): string {
   const cb = st.combat
   if (!cb) return ''
   return cb.foes.map((f) => `${f.name} (${f.id}, ${f.tier !== 'standard' ? `${f.tier} ` : ''}${enemyTemplate(f.template)?.name.toLowerCase() ?? f.template}): ${foeHealth(f)}`).join('; ')
+}
+
+/** The character's companions and how they're faring ("Mira (healer): hurt"); empty if none. */
+export function partySummary(st: GameState): string {
+  return (st.party ?? []).map((a) => `${a.name} (${ROLE_INFO[a.role].label.toLowerCase()}): ${allyHealth(a, st.character.level)}`).join('; ')
 }

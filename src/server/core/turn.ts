@@ -1,6 +1,7 @@
 import {
   actionLabel,
   buildFoes,
+  carer,
   deathRollEvents,
   foeRoster,
   guessCombatAction,
@@ -36,7 +37,7 @@ import { normalizeEntry, selectLoreDetailed } from '@shared/lore'
 import { DEFAULT_PERSONA, findPersona, personaCardId } from '@shared/personas'
 import { fillMacros, storyName } from '@shared/cards'
 import { estimateTokens, promptBlocks, type PromptReport } from '@shared/inspect'
-import { entityLine, projectMemory, relevantEntities, storySoFar, type Summary } from '@shared/memory'
+import { entityLine, projectMemory, relevantEntities, sameName, storySoFar, type Summary } from '@shared/memory'
 import { summarizeChapter, summarizeScene, updateArc } from '../ai/jobs/summarizer'
 import { createProvider, type Provider } from '../ai/providers'
 import { runCombatReferee, runReferee } from '../ai/jobs/referee'
@@ -213,7 +214,8 @@ export class TurnEngine {
     this.campaigns.db.setHead(id, lastUser.id)
     const dr = all.find((e) => e.message_id === lastUser.id && e.event.type === 'death_roll' && !e.superseded)?.event as { roll: number; success: boolean } | undefined
     const deathRoll = dr ? { roll: dr.roll, success: dr.success } : undefined
-    const notes = this.notesFor(before, out, c.settings, deathRoll)
+    const care = all.find((e) => e.message_id === lastUser.id && e.event.type === 'ally_care' && !e.superseded)?.event as { name?: string } | undefined
+    const notes = this.notesFor(before, out, c.settings, deathRoll, care?.name)
     const meta = { ...lastUser.meta, notes }
     this.campaigns.db.updateMessage(lastUser.id, { meta })
     yield { type: 'checks', checks: [...out.checks, ...out.fightRolls], deathRoll }
@@ -384,9 +386,10 @@ export class TurnEngine {
   }
 
   /** The [GAME ENGINE] notes for the narrator. */
-  private notesFor(before: GameState, out: EngineOut, settings: CampaignSettings, deathRoll?: { roll: number; success: boolean }) {
+  private notesFor(before: GameState, out: EngineOut, settings: CampaignSettings, deathRoll?: { roll: number; success: boolean }, care?: string) {
     const lines = out.log.length && (out.fought || out.after.combat) ? [FIGHT_HEADER, ...out.log] : out.log
-    return engineNotes(before, out.after, settings, out.checks, deathRoll, lines)
+    const cared = care ? [`${care} (a companion, a healer) tends the fallen character and brings them round. Tell it: it's their doing.`] : []
+    return engineNotes(before, out.after, settings, out.checks, deathRoll, [...cared, ...lines])
   }
 
   private async *playTurn(
@@ -436,12 +439,14 @@ export class TurnEngine {
     // turn's other dice, so a free reroll can't undo it.
     let working = state
     let deathRoll: { roll: number; success: boolean } | undefined
-    const dr = deathRollEvents(working, this.rng)
+    // A healer among the companions brings the character round; otherwise it's the dice.
+    const nurse = working.character.status === 'downed' ? carer(working.party) : undefined
+    const dr: GameEvent[] = nurse ? [{ type: 'ally_care', id: nurse.id, name: nurse.name }] : deathRollEvents(working, this.rng)
     if (dr.length) {
       this.campaigns.db.addEvents(id, msg.id, newId('grp'), 'engine', dr)
       working = project(working, dr, settings)
-      const ev = dr[0] as { roll: number; success: boolean }
-      deathRoll = { roll: ev.roll, success: ev.success }
+      const ev = dr[0]
+      if (ev.type === 'death_roll') deathRoll = { roll: ev.roll, success: ev.success }
     }
 
     // What is the player doing? In a fight, one move (picked on the tracker, or read from their
@@ -473,7 +478,7 @@ export class TurnEngine {
     const out = this.engineTurn(working, settings, plan, { action: input.kind === 'action', sinceEvent: this.turnsSinceEvent(c, path) })
     plan.event = out.eventId
     if (out.events.length) this.campaigns.db.addEvents(id, msg.id, newId('grp'), 'engine', out.events)
-    const notes = this.notesFor(state, out, settings, deathRoll)
+    const notes = this.notesFor(state, out, settings, deathRoll, nurse?.name)
     const meta = { ...msg.meta, plan, notes }
     this.campaigns.db.updateMessage(msg.id, { meta })
     yield { type: 'checks', checks: [...out.checks, ...out.fightRolls], deathRoll }
@@ -538,15 +543,25 @@ export class TurnEngine {
       if (history[at]?.role === 'user') history[at] = { ...history[at], content: `${history[at].content}\n\n[World note: ${e.content.trim()}]` }
     }
     const me = after.character.build.name
-    const people = relevantEntities(memory, path.slice(-6).map((m) => m.content).join('\n'), after.location, tier.people, [me])
+    const party = after.party ?? []
+    const people = relevantEntities(memory, path.slice(-6).map((m) => m.content).join('\n'), after.location, tier.people, [me, ...party.map((a) => a.name)])
       .map((e) => entityLine(e, tier.facts))
       .join('\n')
+    // Companions met in the story are described from their record (card companions by their card).
+    const companions = Object.fromEntries(
+      party
+        .filter((a) => !a.card)
+        .map((a) => {
+          const e = memory.entities.find((x) => x.kind === 'person' && [x.name, ...x.aliases].some((n) => sameName(n, a.name)))
+          return [a.id, e ? entityLine(e, tier.facts) : '']
+        })
+    )
     const index = new Map(path.map((m, i) => [m.id, i]))
     const budget = (sys: string) => Math.max(4000, ctx.contextChars - sys.length - 6000)
     const names = nameSuggestions(this.rng)
     const pinned = memory.notes.map((n) => `- ${n.text}`).join('\n')
     const persona = this.personaFor(c.settings.persona)
-    const build = (story: string) => narratorSystem(after, c.settings, names, c.cast, lore, { story, people, notes: pinned }, persona)
+    const build = (story: string) => narratorSystem(after, c.settings, names, c.cast, lore, { story, people, notes: pinned, companions }, persona)
     const storyBudget = Math.round(ctx.contextChars * tier.storyShare)
     let system = build(storySoFar(memory, storyBudget, () => false))
     let messages = fitHistory(history, budget(system))

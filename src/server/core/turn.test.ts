@@ -271,11 +271,14 @@ describe('turn engine', () => {
     expect(v0.awaitingNarration).toBe(false)
     expect(v0.messages[1]).toMatchObject({ role: 'assistant', content: '"Well, Brenna Rook. You found me."', swipe: { index: 0, count: 2 } })
     expect(v0.cast).toEqual([{ cardId: summary.id, role: 'companion', name: 'Elara', hasImage: false }])
+    // She travels with the player from the first page, an archer by her card.
+    expect(v0.state.party.map((a) => [a.id, a.name, a.role])).toEqual([[summary.id, 'Elara', 'archer']])
 
     fake.narration = 'Elara points at the tower.'
     await run(engine.act(id, 'I ask her about the tower.', signal))
     expect(fake.lastSystem).toContain('COMPANIONS (you play them)')
     expect(fake.lastSystem).toContain('Elara is an elf archer')
+    expect(fake.lastSystem).toContain('Elara (archer; unhurt):')
     expect(fake.lastSystem).toContain('The Glass Tower burned ten years ago.')
     // Elara is normally a banned name, but not when she's an imported character. Kael still is.
     const dm = campaigns.view(id).messages.at(-1)!.content
@@ -778,5 +781,67 @@ describe('turn engine', () => {
     await run(engine.act(id, 'And on.', signal))
     expect(fake.lastSystem).toContain('The rain has stopped.')
     expect(fake.lastSystem).not.toContain('It is raining')
+  })
+
+  it('companions join from the story, the DM is told who they are, and a healer brings a fallen character round', async () => {
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    fake.referee = { intent: 'other', checks: [] }
+    const mira = { name: 'Mira', otherNames: [], who: 'a priestess of the dawn', newFacts: [], status: 'alive', attitude: 'friendly', relation: 'companion' }
+    fake.scribe = { ...blankScribe(), companionsJoined: ['Mira'], people: [mira] }
+    await run(engine.act(id, 'Will you come with me, Mira?', signal))
+    expect(campaigns.view(id).state.party.map((a) => [a.name, a.role])).toEqual([['Mira', 'healer']])
+    fake.scribe = blankScribe()
+    await run(engine.act(id, 'We set off together.', signal))
+    expect(fake.lastSystem).toContain('COMPANIONS (you play them)')
+    expect(fake.lastSystem).toMatch(/Mira \(healer; unhurt\): .*priestess of the dawn/)
+
+    // The character falls; Mira tends them instead of a death roll.
+    db.addEvents(id, campaigns.get(id).head_id!, 'grp_fall', 'engine', [
+      { type: 'set_hp', hp: 0, reason: 'a fall' },
+      { type: 'status', status: 'downed', reason: 'a fall' }
+    ])
+    await run(engine.act(id, 'I try to stay awake.', signal))
+    expect(campaigns.view(id).state.character.status).toBe('alive')
+    expect(lastNotes()).toContain('Mira (a companion, a healer) tends the fallen character and brings them round')
+    expect(db.eventsFor(id).some((e) => e.event.type === 'death_roll')).toBe(false)
+    expect(campaigns.view(id).messages.at(-1)!.changes.map((c) => c.text)).toContain('Mira brought you round')
+
+    // The story says she goes her own way.
+    fake.scribe = { ...blankScribe(), companionsLeft: ['Mira'] }
+    await run(engine.act(id, 'Farewell, Mira.', signal))
+    expect(campaigns.view(id).state.party).toEqual([])
+  })
+
+  it('the player can ask someone along, say what they do in a fight, and part ways', async () => {
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    campaigns.party(id, { join: { name: 'Old Tam' } })
+    expect(() => campaigns.party(id, { join: { name: 'old tam' } })).toThrow(/already travelling/)
+    expect(() => campaigns.party(id, { join: { name: build.name } })).toThrow(/That's you/)
+    const tam = campaigns.view(id).state.party[0]
+    expect(tam).toMatchObject({ id: 'ally_old_tam', name: 'Old Tam', role: 'fighter' })
+    campaigns.party(id, { role: { id: tam.id, role: 'scout' } })
+    expect(campaigns.view(id).state.party[0].role).toBe('scout')
+    campaigns.party(id, { leave: tam.id })
+    expect(campaigns.view(id).state.party).toEqual([])
+    expect(() => campaigns.party(id, { leave: tam.id })).toThrow(/no longer travelling/)
+    for (const n of ['A', 'B', 'C', 'D']) campaigns.party(id, { join: { name: n } })
+    expect(() => campaigns.party(id, { join: { name: 'E' } })).toThrow(/At most 4/)
+  })
+
+  it("rewriting the DM's reply keeps someone the player asked along; rewinding past the turn doesn't", async () => {
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    fake.referee = { intent: 'other', checks: [] }
+    await run(engine.act(id, 'I wave to Wenna.', signal))
+    campaigns.party(id, { join: { name: 'Wenna' } })
+    expect(campaigns.view(id).messages.at(-1)!.changes.map((c) => c.text)).toContain('Wenna travels with you')
+    await run(engine.regenerate(id, signal))
+    const v = campaigns.view(id)
+    expect(v.messages.at(-1)!.swipe?.count).toBe(2)
+    expect(v.state.party.map((a) => a.name)).toEqual(['Wenna'])
+    campaigns.rewind(id, v.messages.at(-3)!.id)
+    expect(campaigns.view(id).state.party).toEqual([])
   })
 })

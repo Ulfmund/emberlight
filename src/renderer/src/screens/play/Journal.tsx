@@ -11,6 +11,7 @@ import { speakerColor } from '../../components/StoryText'
 import { LoreEditor } from '../LoreEditor'
 import { RenameDialog } from './RenameDialog'
 import { PortraitDialog } from './PortraitDialog'
+import { TravelButton } from './Party'
 import { mediaUrl } from '@shared/images'
 
 /**
@@ -265,6 +266,7 @@ function EntityCard({ entity: e, view }: { entity: Entity; view: CampaignView })
                 ))}
               </ul>
             )}
+            <TravelButton view={view} entity={e} />
             <p className="mt-2 text-[0.7rem] text-parchment-500">
               {e.firstSeenDay === e.lastSeenDay ? `Day ${e.firstSeenDay}` : `First day ${e.firstSeenDay} · last day ${e.lastSeenDay}`}
             </p>

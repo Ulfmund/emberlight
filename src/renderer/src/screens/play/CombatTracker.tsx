@@ -6,6 +6,7 @@ import { useGame } from '../../store'
 import { Icon } from '../../components/Icon'
 import { Bar } from '../../components/Bar'
 import { Tip } from '../../components/Tip'
+import { AllyChips } from './Party'
 
 /**
  * The fight on the tracker (docs/spec/04-rules-system.md#combat): who is in it, how hurt they
@@ -123,6 +124,7 @@ export function CombatTracker({ view }: { view: CampaignView }) {
             <FoeChip key={f.id} foe={f} selected={f.id === chosen?.id} onSelect={() => setTarget(f.id)} />
           ))}
         </div>
+        <AllyChips view={view} />
         {spellMenu && spells.length > 1 && (
           <div className="mt-1.5 grid gap-1 sm:grid-cols-2">
             {spells.map((sp) => (

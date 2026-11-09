@@ -1,4 +1,9 @@
 import {
+  allyId,
+  guessRole,
+  partyFromCast,
+  PARTY_MAX,
+  type CompanionRole,
   charXpForLevel,
   derived,
   initialState,
@@ -34,7 +39,7 @@ import {
 } from '@shared/rules'
 import type { CampaignSummary, CampaignView, ChangeLine, MessageView } from '@shared/view'
 import type { CastMember } from '@shared/cards'
-import { projectMemory, type MemoryEvent } from '@shared/memory'
+import { projectMemory, sameName, type MemoryEvent } from '@shared/memory'
 import { normalizeEntry, type LoreEntry } from '@shared/lore'
 import type { World } from '@shared/worlds'
 import { GameDb, newId, type CampaignRow, type EventRow, type LorebookRow, type MessageRow } from '../store/db'
@@ -154,10 +159,15 @@ export class Campaigns {
     return all.filter((e) => onPath.has(e.message_id) && !e.superseded)
   }
 
+  /** Where every story starts: the character, with the cast's companions beside them. */
+  private start(c: CampaignRow): GameState {
+    return { ...initialState(c.build, c.settings), party: partyFromCast(c.cast) }
+  }
+
   state(c: CampaignRow, upTo?: { path: MessageRow[]; excludeGroup?: string }): GameState {
     const path = upTo?.path ?? this.path(c)
     const events = this.activeEvents(c, path).filter((e) => e.group_id !== upTo?.excludeGroup)
-    return project(initialState(c.build, c.settings), events.map((e) => e.event), c.settings)
+    return project(this.start(c), events.map((e) => e.event), c.settings)
   }
 
   view(id: string): CampaignView {
@@ -165,7 +175,7 @@ export class Campaigns {
     const all = this.db.messagesFor(id)
     const path = this.path(c, all)
     const events = this.activeEvents(c, path)
-    const state = project(initialState(c.build, c.settings), events.map((e) => e.event), c.settings)
+    const state = project(this.start(c), events.map((e) => e.event), c.settings)
 
     const children = new Map<string, MessageRow[]>()
     for (const m of all) {
@@ -184,7 +194,7 @@ export class Campaigns {
       const mine = eventsByMsg.get(m.id) ?? []
       // A DM reply also shows what a fight or a random event did on the player's turn before it.
       const before = m.role === 'assistant' && m.parent_id ? (eventsByMsg.get(m.parent_id) ?? []) : []
-      const shown = before.some((e) => FIGHT_EVENTS.has(e.event.type)) ? [...before.filter((e) => e.event.type !== 'roll'), ...mine] : mine
+      const shown = before.some((e) => SHOWN_WITH_REPLY.has(e.event.type)) ? [...before.filter((e) => e.event.type !== 'roll'), ...mine] : mine
       return {
         id: m.id,
         role: m.role,
@@ -333,6 +343,42 @@ export class Campaigns {
     const c = this.get(id)
     if (!c.head_id) throw new Error('This story has no messages yet.')
     this.db.addEvents(id, c.head_id, newId('grp'), 'player', [{ type: 'portrait', media }])
+  }
+
+  /**
+   * Companions, from the player's side: ask someone to come along, part ways, or say what a
+   * companion does in a fight. Kept with the player's latest turn, so rewriting the DM's reply
+   * to it doesn't undo them (rewinding past that turn does).
+   */
+  party(id: string, act: { join: { name: string; role?: CompanionRole } } | { leave: string } | { role: { id: string; role: CompanionRole } }) {
+    const c = this.get(id)
+    if (!c.head_id) throw new Error('This story has no messages yet.')
+    const path = this.path(c)
+    const st = this.state(c, { path })
+    let ev: GameEvent
+    if ('join' in act) {
+      const name = act.join.name.trim().slice(0, 60)
+      if (!name) throw new Error('Who should come along?')
+      if (sameName(name, st.character.build.name)) throw new Error("That's you.")
+      if (st.party.some((a) => sameName(a.name, name))) throw new Error(`${name} is already travelling with you.`)
+      if (st.party.length >= PARTY_MAX) throw new Error(`At most ${PARTY_MAX} can travel with you. Part ways with someone first.`)
+      // A card's character keeps their card; someone from the Journal, their record.
+      const card = c.cast.find((m) => m.role === 'companion' && sameName(m.name, name))
+      const person = projectMemory(this.activeEvents(c, path).map((e) => e.event)).entities.find((e) => e.kind === 'person' && [e.name, ...e.aliases].some((n) => sameName(n, name)))
+      if (person?.status === 'dead') throw new Error(`${person.name} is dead.`)
+      const role = act.join.role ?? guessRole(card ? `${card.description}\n${card.personality}` : `${person?.summary ?? ''}\n${(person?.facts ?? []).join('\n')}`)
+      ev = { type: 'party_join', companion: card ? { id: card.cardId, name: card.name, role, card: card.cardId } : { id: allyId(person?.name ?? name), name: person?.name ?? name, role } }
+    } else if ('leave' in act) {
+      const a = st.party.find((x) => x.id === act.leave)
+      if (!a) throw new Error('They are no longer travelling with you.')
+      ev = { type: 'party_leave', id: a.id, name: a.name, why: 'left' }
+    } else {
+      const a = st.party.find((x) => x.id === act.role.id)
+      if (!a) throw new Error('They are no longer travelling with you.')
+      ev = { type: 'party_role', id: a.id, role: act.role.role }
+    }
+    const anchor = [...path].reverse().find((m) => m.role === 'user') ?? path[path.length - 1]
+    this.db.addEvents(id, anchor.id, newId('grp'), 'player', [ev])
   }
 
   /** New words for the character's appearance (the DM uses them from now on). */
@@ -522,7 +568,24 @@ export function describeEvents(events: GameEvent[]): ChangeLine[] {
         out.push({ text: `A fight: ${foeRoster(ev.combat.foes)}`, tone: 'bad', icon: 'sword' })
         break
       case 'foe_hit':
-        out.push({ text: `Hit ${ev.name ?? 'a foe'} for ${ev.amount}`, tone: 'good', icon: 'sword' })
+        out.push({ text: `${ev.by ? `${ev.by} hit` : 'Hit'} ${ev.name ?? 'a foe'} for ${ev.amount}`, tone: 'good', icon: 'sword' })
+        break
+      case 'party_join':
+        out.push({ text: `${ev.companion.name} travels with you`, tone: 'good', icon: 'party' })
+        break
+      case 'party_leave':
+        out.push({ text: ev.why === 'dead' ? `${ev.name ?? 'A companion'} is dead` : `${ev.name ?? 'A companion'} parted ways with you`, tone: ev.why === 'dead' ? 'bad' : 'neutral', icon: ev.why === 'dead' ? 'skull' : 'party' })
+        break
+      case 'ally_hit':
+        out.push({ text: `${ev.name ?? 'A companion'} took ${ev.amount} damage`, tone: 'bad', icon: 'heart' })
+        break
+      case 'ally_heal':
+        out.push({ text: `${ev.name ?? 'A companion'}: +${ev.amount} HP`, tone: 'good', icon: 'heart' })
+        break
+      case 'ally_care':
+        out.push({ text: `${ev.name ?? 'A companion'} brought you round`, tone: 'good', icon: 'heart' })
+        break
+      case 'party_role':
         break
       case 'foe_status':
         out.push({ text: `${ev.name ?? 'A foe'} ${ev.status === 'fled' ? 'fled' : ev.status === 'surrendered' ? 'yielded' : ev.status === 'down' ? 'is down' : ev.status === 'asleep' ? 'fell asleep' : 'fights on'}`, tone: 'good', icon: ev.status === 'fled' ? 'boot' : ev.status === 'asleep' ? 'moon' : 'sword' })
@@ -563,7 +626,9 @@ export function describeEvents(events: GameEvent[]): ChangeLine[] {
 }
 
 /** Events from a fight or a random event (their change lines show under the DM's reply). */
-const FIGHT_EVENTS = new Set<GameEvent['type']>(['combat_start', 'combat_round', 'combat_end', 'foe_hit', 'foe_status', 'foe_attack', 'world_event'])
+const FIGHT_EVENTS = new Set<GameEvent['type']>(['combat_start', 'combat_round', 'combat_end', 'foe_hit', 'foe_status', 'foe_attack', 'ally_hit', 'ally_heal', 'world_event'])
+/** On the player's turn, these (and whatever came with them) show under the DM's reply: player messages show no changes of their own. */
+const SHOWN_WITH_REPLY = new Set<GameEvent['type']>([...FIGHT_EVENTS, 'ally_care', 'party_join', 'party_leave'])
 
 const COMBAT_END_LINE: Record<CombatOutcome, string> = {
   victory: 'Won the fight',

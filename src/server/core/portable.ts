@@ -167,7 +167,7 @@ export function importCampaign(db: GameDb, bytes: Uint8Array): string {
   const msgIds = new Map<string, string>([...f.messages.map((m) => [m.id, newId('msg')] as [string, string]), ...f.media.map((m) => [m.id, newId('img')] as [string, string])])
   const groupIds = new Map<string, string>()
   const group = (g: string) => groupIds.get(g) ?? (groupIds.set(g, newId('grp')), groupIds.get(g)!)
-  /** Message ids inside events and meta (summaries, answered rolls) follow the messages. */
+  /** Message ids inside events and meta (summaries, answered rolls) follow the messages; card ids (companions) follow the cards. */
   const remap = (v: unknown): unknown => {
     if (typeof v === 'string') return msgIds.get(v) ?? v
     if (Array.isArray(v)) return v.map(remap)
@@ -202,6 +202,7 @@ export function importCampaign(db: GameDb, bytes: Uint8Array): string {
     const persona = PERSONA_CARD.exec(settings.persona)?.[1]
     if (persona) settings.persona = cardIds.has(persona) ? `card:${cardIds.get(persona)}` : 'chronicler'
     const cast = (f.campaign.cast as unknown as CastMember[]).filter((m) => cardIds.has(m.cardId)).map((m) => ({ ...m, cardId: cardIds.get(m.cardId)! }))
+    for (const [from, to] of cardIds) msgIds.set(from, to)
     const taken = new Set(db.listCampaigns().map((x) => x.name))
     const name = taken.has(f.campaign.name) ? `${f.campaign.name} (imported)`.slice(0, 80) : f.campaign.name.slice(0, 80)
     db.createCampaign({

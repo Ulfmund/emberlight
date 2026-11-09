@@ -23,6 +23,7 @@ import { Icon } from '../../components/Icon'
 import { Tip } from '../../components/Tip'
 import { Button } from '../../components/Button'
 import { CraftList } from './Crafting'
+import { PartySection } from './Party'
 import { DeviceSettings } from '../DeviceSettings'
 import { api } from '../../api'
 
@@ -77,6 +78,7 @@ function SheetTab({ view }: { view: CampaignView }) {
   const sCaps = skillCapBreakdown(view.build, view.settings.sexModifiers)
   return (
     <div className="space-y-5">
+      <PartySection view={view} />
       <section>
         <h3 className="mb-2 flex items-center justify-between text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">
           Attributes

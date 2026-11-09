@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import {
   combatSummary,
+  partySummary,
   DIFFICULTIES,
   DIFFICULTY_LABEL,
   ENEMY_TIERS,
@@ -186,7 +187,7 @@ export async function runCombatReferee(provider: Provider, model: string, state:
     return t && (t.food || t.heal || t.cures?.length)
   })
   const spells = knownSpells(state).filter((sp) => sp.combat)
-  const prompt = `Recent story:\n${storyOf(recent)}\n\n${sheet(state)} Wielding ${weapon.unarmed ? 'nothing' : weapon.name}. Mana ${c.mana}. Spells: ${spells.map((sp) => sp.name).join(', ') || 'none'}. Usable items: ${usable.map((i) => i.name).join(', ') || 'none'}.\nFOES: ${combatSummary(state)}\n\nThe player now writes:\n"""${action}"""\n\nWhat is the character doing this round?`
+  const prompt = `Recent story:\n${storyOf(recent)}\n\n${sheet(state)} Wielding ${weapon.unarmed ? 'nothing' : weapon.name}. Mana ${c.mana}. Spells: ${spells.map((sp) => sp.name).join(', ') || 'none'}. Usable items: ${usable.map((i) => i.name).join(', ') || 'none'}.\nFOES: ${combatSummary(state)}${partySummary(state) ? `\nBESIDE THE CHARACTER (companions the game plays; never a target): ${partySummary(state)}` : ''}\n\nThe player now writes:\n"""${action}"""\n\nWhat is the character doing this round?`
   const out = await provider.complete(model, {
     system: COMBAT_SYSTEM,
     messages: [{ role: 'user', content: prompt }],

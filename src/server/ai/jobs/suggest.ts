@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { BACKGROUNDS, combatSummary, mainWeapon, RACES, type GameState } from '@shared/rules'
+import { BACKGROUNDS, combatSummary, mainWeapon, partySummary, RACES, type GameState } from '@shared/rules'
 import type { ChatMessage } from '@shared/types'
 import type { Provider } from '../providers'
 
@@ -29,7 +29,7 @@ function who(state: GameState) {
   const b = c.build
   const weapon = mainWeapon(c)
   const pack = c.inventory.map((i) => `${i.name}${i.qty > 1 ? ` ×${i.qty}` : ''}`).join(', ') || 'nothing'
-  const fight = state.combat ? `\nA fight is on: ${combatSummary(state)}.` : ''
+  const fight = state.combat ? `\nA fight is on: ${combatSummary(state)}.${partySummary(state) ? ` Fighting beside them: ${partySummary(state)}.` : ''}` : ''
   return `The player character: ${b.name}, ${RACES[b.race].label.toLowerCase()} ${BACKGROUNDS[b.background].label.toLowerCase()}. Health ${c.hp}. Wielding ${weapon.unarmed ? 'nothing' : weapon.name}. Carrying: ${pack}.${fight}`
 }
 

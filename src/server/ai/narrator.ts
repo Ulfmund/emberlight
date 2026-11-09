@@ -34,7 +34,10 @@ import {
   type SkillId,
   type Weather,
   weatherNow,
-  weatherPassed
+  weatherPassed,
+  allyHealth,
+  ROLE_INFO,
+  type Companion
 } from '@shared/rules'
 import type { ChatMessage } from '@shared/types'
 import type { CardBookEntry, CastMember } from '@shared/cards'
@@ -57,12 +60,20 @@ const TONE = {
 const clip = (s: string, max: number) => (s.length > max ? `${s.slice(0, max).replace(/\s+\S*$/, '')} […]` : s)
 
 /** Companions from imported cards, played by the DM. */
-function companionBlock(cast: CastMember[]): string {
-  const comps = cast.filter((m) => m.role === 'companion')
-  if (!comps.length) return ''
-  const one = (m: CastMember) =>
-    [
-      `${m.name}:`,
+/**
+ * Who travels with the player: characters from cards (their card in full) and people met in
+ * the story (their record), with how each is faring.
+ */
+function companionBlock(state: GameState, cast: CastMember[], records: Record<string, string> = {}): string {
+  const party = state.party ?? []
+  if (!party.length) return ''
+  const lvl = state.character.level
+  const one = (a: Companion) => {
+    const head = `${a.name} (${ROLE_INFO[a.role].label.toLowerCase()}; ${allyHealth(a, lvl)})`
+    const m = a.card ? cast.find((x) => x.cardId === a.card) : undefined
+    if (!m) return `${head}: ${records[a.id] || 'met on the road; little is known of them yet.'}`
+    return [
+      `${head}:`,
       m.description && clip(m.description, 4000),
       m.personality && `Personality: ${clip(m.personality, 800)}`,
       m.scenario && `Their situation: ${clip(m.scenario, 1200)}`,
@@ -70,9 +81,10 @@ function companionBlock(cast: CastMember[]): string {
     ]
       .filter(Boolean)
       .join('\n')
+  }
   return `\n\nCOMPANIONS (you play them)
-${comps.length === 1 ? 'This character travels' : 'These characters travel'} with the player. You voice them and decide what they do, like any other non-player character: they have their own will, can disagree, get hurt or die, and don't solve the player's problems for them. Their speech uses the @Name: line format too.
-${comps.map(one).join('\n\n')}`
+${party.length === 1 ? 'This character travels' : 'These characters travel'} with the player. You voice them and decide what they do, like any other non-player character: they have their own will, can disagree, get hurt or die, and don't solve the player's problems for them. Their speech uses the @Name: line format too. In a fight the game rolls their blows and tells you what each of them did: tell it as it happened.
+${party.map(one).join('\n\n')}`
 }
 
 /** Lorebook entries the recent story touches, with the world notes (and in the other places they ask for). */
@@ -90,7 +102,7 @@ function loreAt(entries: CardBookEntry[], where: 'before_char' | 'after_char'): 
 }
 
 /** Long-term memory for the prompt: older story in summary, and people and places met. */
-export type MemoryText = { story: string; people: string; notes?: string }
+export type MemoryText = { story: string; people: string; notes?: string; companions?: Record<string, string> }
 
 function memoryBlock(m?: MemoryText): string {
   if (!m) return ''
@@ -207,7 +219,7 @@ ${gear}
 ${carrying}${body}${magic}
 ${c.status === 'downed' ? 'STATUS: DOWNED: unconscious and dying.\n' : c.status === 'dead' ? 'STATUS: DEAD.\n' : ''}
 ${loreAt(lore, 'after_char')}WHERE AND WHEN
-Day ${state.time.day}, ${timeOfDay}${state.location ? `, at ${state.location}` : ''}.${skyLine(state)}${memoryBlock(memory)}${fallenBlock(state, third)}${companionBlock(cast)}${loreBlock(lore)}`
+Day ${state.time.day}, ${timeOfDay}${state.location ? `, at ${state.location}` : ''}.${skyLine(state)}${memoryBlock(memory)}${fallenBlock(state, third)}${companionBlock(state, cast, memory?.companions)}${loreBlock(lore)}`
 }
 
 const SKY: Record<Weather, string> = { clear: '', rain: 'It is raining', storm: 'A storm is raging', fog: 'Thick fog lies over everything', snow: 'Snow is falling' }

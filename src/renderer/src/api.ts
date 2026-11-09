@@ -1,5 +1,5 @@
 import type { Connection, RemoteView, SettingsView, TestResult, UpdateStatus } from '@shared/types'
-import type { CampaignSettings, CharacterBuild, Attr } from '@shared/rules'
+import type { CampaignSettings, CharacterBuild, Attr, CompanionRole } from '@shared/rules'
 import type { CampaignSummary, CampaignView, TurnEvent } from '@shared/view'
 import type { CardDetail, CardSummary } from '@shared/cards'
 import type { MemoryEvent } from '@shared/memory'
@@ -74,6 +74,10 @@ export const api = {
   setPortrait: (id: string, media: string | null, describe = false) =>
     post(`/api/campaigns/${encodeURIComponent(id)}/portrait`, { media, describe }).then((r) => json<{ view: CampaignView; description?: string; note?: string }>(r)),
   setAppearance: (id: string, appearance: string) => post(`/api/campaigns/${encodeURIComponent(id)}/appearance`, { appearance }).then((r) => json<CampaignView>(r)),
+  // ---- companions
+  partyJoin: (id: string, name: string, role?: CompanionRole) => post(`/api/campaigns/${encodeURIComponent(id)}/party`, { join: { name, ...(role ? { role } : {}) } }).then((r) => json<CampaignView>(r)),
+  partyLeave: (id: string, companion: string) => post(`/api/campaigns/${encodeURIComponent(id)}/party`, { leave: companion }).then((r) => json<CampaignView>(r)),
+  partyRole: (id: string, companion: string, role: CompanionRole) => post(`/api/campaigns/${encodeURIComponent(id)}/party`, { role: { id: companion, role } }).then((r) => json<CampaignView>(r)),
   entityImage: (id: string, entity: string, media: string | null) => post(`/api/campaigns/${encodeURIComponent(id)}/entity-image`, { entity, media }).then((r) => json<CampaignView>(r)),
   imagePrompt: (id: string, entity?: string) =>
     fetch(`/api/campaigns/${encodeURIComponent(id)}/images/prompt${entity ? `?entity=${encodeURIComponent(entity)}` : ''}`).then((r) => json<{ prompt: string; ready: boolean }>(r)),

@@ -140,7 +140,10 @@ describe('files that travel', () => {
     expect(db2.cardImage(v2.cast[0].cardId)?.mime).toBe('image/png')
     expect(v2.lorebooks).toEqual([{ id: 'lb_test', name: 'Test lore', entries: 0 }])
     expect(db2.getMedia(v2.state.character.portrait!)?.mime).toBe('image/png')
-    expect({ ...v2.state, character: { ...v2.state.character, portrait: face } }).toEqual(before.state)
+    // The card's companion follows their card to its new id.
+    expect(v2.state.party.map((a) => [a.id, a.card])).toEqual([[v2.cast[0].cardId, v2.cast[0].cardId]])
+    const asBefore = v2.state.party.map((a) => ({ ...a, id: card.id, card: card.id }))
+    expect({ ...v2.state, party: asBefore, character: { ...v2.state.character, portrait: face } }).toEqual(before.state)
     db2.close()
   })
 
