@@ -898,6 +898,16 @@ function AdventureStep({
         <Row label="Fail forward" text="Narrow failures can succeed at a cost">
           <Segmented value={settings.failForward ? 'on' : 'off'} onChange={(v) => set({ failForward: v === 'on' })} options={[{ id: 'off', label: 'Off' }, { id: 'on', label: 'On' }]} />
         </Row>
+        <Row label="The peoples' ways" text="How humans, dwarves and elves live, and what they think of each other">
+          <Segmented
+            value={settings.cultures ? 'on' : 'off'}
+            onChange={(v) => set({ cultures: v === 'on' })}
+            options={[
+              { id: 'on', label: 'On', hint: "The DM plays each people's customs: elves' scorn, dwarves' guarded holds, and, with sex differences on, the roles men and women keep." },
+              { id: 'off', label: 'Off', hint: 'The DM makes up its own.' }
+            ]}
+          />
+        </Row>
         <Row label="Ironman" text="No rerolls and no rewinds">
           <Segmented value={settings.ironman ? 'on' : 'off'} onChange={(v) => set({ ironman: v === 'on' })} options={[{ id: 'off', label: 'Off' }, { id: 'on', label: 'On' }]} />
         </Row>

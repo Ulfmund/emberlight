@@ -59,7 +59,8 @@ const SettingsSchema = z.object({
   pacing: z.enum(['sandbox', 'guided']),
   perspective: z.enum(['second', 'third']),
   limits: z.string().max(1000),
-  persona: z.string().max(80)
+  persona: z.string().max(80),
+  cultures: z.boolean()
 })
 
 const short = (n: number) => z.string().max(n)

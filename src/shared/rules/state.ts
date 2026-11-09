@@ -60,6 +60,8 @@ export type CampaignSettings = {
   limits: string
   /** Who the DM is: a built-in persona id, or "card:<id>" for a character card. */
   persona: string
+  /** The peoples' ways and customs, told to the DM (cultures.ts). */
+  cultures: boolean
 }
 
 export const DEFAULT_SETTINGS: CampaignSettings = {
@@ -78,6 +80,7 @@ export const DEFAULT_SETTINGS: CampaignSettings = {
   pacing: 'sandbox',
   perspective: 'second',
   limits: '',
+  cultures: true,
   persona: 'chronicler'
 }
 

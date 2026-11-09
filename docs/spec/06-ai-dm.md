@@ -163,8 +163,19 @@ Under *Campaign → DM Style*, as simple choices with icons:
 | Roll frequency | Fewer · **Normal** · More |
 | Perspective | **Second person** ("you") · Third person |
 | Content limits | Free-text list of things to avoid or fade to black |
+| The peoples' ways | **On** · Off (see [below](#the-peoples-ways)) |
 
 *Built (0.8.0):* all of these except event frequency (it arrives with random events), in the creator's Adventure step and in-game under Saves. Roll frequency is told to the Referee; the rest to the narrator.
+
+## The peoples' ways
+
+*Built (0.25.0).* Unless the world's own lore says otherwise, the DM is told how the peoples live, in a block of its own ("THE PEOPLES OF THIS WORLD"), and plays it straight:
+
+- **Humans** are the most numerous people, and their customs differ by nation and place. They keep strict roles for men and women and look askance at anyone who breaks them. The big cities are a little looser; the countryside and small towns hold to the old ways. Magic is the exception: more and more human mages are women. Human women mostly prefer work that is neither fighting nor heavy labour.
+- **Dwarves** keep strict roles too, and guard their women closely: a dwarf woman is rarely seen outside the hold. Inside, the women work as hard as the men, as record-keepers, cooks, mystics, weavers and leatherworkers. The work is divided rather than shared.
+- **Elves** are haughty, condescending and (mostly rightly) sure they are better than everyone else. There are few of them, and they never waste elven lives. To them, insulting the other peoples is a necessity. They send their women to fight the other peoples, knowing that losing to a woman is a double humiliation for a human or a dwarf. The DM plays all this straight: the player may find it funny, but the elves never do.
+
+These ways apply to the player character too: a dwarf woman on the road is a rare and remarked-on sight. The customs about men and women follow the [sex setting](04-rules-system.md#attribute-caps): with it **Off** they're left out, and the rest stays. Halflings and orcs have no notes yet, so the DM makes up its own. A campaign can switch the whole block off (*The peoples' ways*, in the creator's Adventure step and in-game under Saves). Code: `src/shared/cultures.ts`.
 
 ## No favoritism
 

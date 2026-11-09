@@ -64,7 +64,7 @@ Built in milestones. Each one ends with something playable, so the artist can te
 *Decided 2026-11-09: the life sim comes into 1.0 instead of a later v2, along with storyteller personalities and the peoples' cultures.*
 - **Aging** ✅ 0.24.0: characters grow older with the calendar (some peoples much slower), and the stage of life they reach sets their caps (physical caps fall after middle age, Intellect and Arcane caps rise) ([04](04-rules-system.md#seasons-and-aging))
 - **Seasons** with effects on gathering, weather and sound ✅ 0.24.0 (the DM plays winter roads as slow and a night in the open as dangerous)
-- The peoples' cultures: how humans, dwarves and elves live, their customs for men's and women's work, and what they think of each other
+- **The peoples' ways** ✅ 0.25.0: how humans, dwarves and elves live, their customs for men's and women's work, and what they think of each other ([06](06-ai-dm.md#the-peoples-ways))
 - Storyteller personalities, RimWorld-style: Whalechan, the Veteran, the Romance Writer, the Old Soul and more
 - Long time-skips ("five years pass…") with summarized events
 - Homes, property, jobs, income from trade skills

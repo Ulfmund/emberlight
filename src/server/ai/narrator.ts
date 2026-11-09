@@ -47,6 +47,7 @@ import {
 import type { ChatMessage } from '@shared/types'
 import type { CardBookEntry, CastMember } from '@shared/cards'
 import { formatCoins } from '../core/campaigns'
+import { peoplesBlock } from '@shared/cultures'
 
 /**
  * The Narrator's prompt (docs/spec/06-ai-dm.md#6-narrate). The engine has already decided
@@ -179,6 +180,8 @@ export function narratorSystem(
     settings.pacing === 'guided'
       ? 'Keep a story moving: give the character a clear goal, raise the stakes, and steer gently toward the next turn of the plot, without taking choices away from the player.'
       : "Let the player lead. Offer hooks and let the world react to what they do, but don't push a plot on them."
+  // The peoples' ways (cultures.ts): the world's defaults, unless its lore says otherwise.
+  const peoples = peoplesBlock(settings, b)
   const limits = settings.limits.trim() ? `\n- Content to avoid, or to fade to black instead of describing: ${settings.limits.trim().replace(/\s+/g, ' ')}.` : ''
 
   // Fights (docs/spec/04-rules-system.md#combat): on the tracker, the engine owns every blow.
@@ -218,7 +221,9 @@ HOW TO RUN THE GAME
 - For new characters, prefer names from this list: ${names.join(', ')}. Never use these overused names: ${BANNED_NAMES.slice(0, 10).join(', ')}.
 - Avoid stock phrases ("a shiver ran down your spine", "a testament to", "barely above a whisper").${askRoll}${fight}
 
-${loreAt(lore, 'before_char')}THE PLAYER CHARACTER
+${peoples ? `${peoples}
+
+` : ''}${loreAt(lore, 'before_char')}THE PLAYER CHARACTER
 ${b.name}: ${RACES[b.race].label.toLowerCase()}, ${sex.label.toLowerCase()}, ${ageYears(state)} years old (${AGES[b.age].label.toLowerCase()}), ${BACKGROUNDS[b.background].label.toLowerCase()}.${b.appearance ? `\nAppearance: ${b.appearance}` : ''}${b.personality ? `\nPersonality: ${b.personality}` : ''}
 Level ${c.level}. Health ${c.hp}/${d.maxHp}, stamina ${c.stamina}/${d.maxStamina}${d.maxMana ? `, mana ${c.mana}/${d.maxMana}` : ''}.${c.conditions.length ? `\nConditions: ${c.conditions.map((x) => CONDITIONS[x].label).join(', ')}.` : ''}
 Best skills: ${skills || 'none trained yet'}.

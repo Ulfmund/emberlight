@@ -433,6 +433,7 @@ function SavesTab({ view }: { view: CampaignView }) {
         <Opt k="pacing" label="Pacing" options={[{ id: 'sandbox', label: 'Sandbox' }, { id: 'guided', label: 'Guided story' }]} />
         <Opt k="perspective" label="Perspective" options={[{ id: 'second', label: 'You (2nd person)' }, { id: 'third', label: 'Third person' }]} />
         <Opt k="acting" label="Acting for you" options={[{ id: 'never', label: 'Never' }, { id: 'light', label: 'Small reactions' }]} />
+        <Opt k="cultures" label="Peoples' ways" options={[{ id: true, label: 'On' }, { id: false, label: 'Off' }]} />
         <LimitsField value={s.limits} onSave={(limits) => set({ limits })} />
       </section>
       <DeviceSettings />
