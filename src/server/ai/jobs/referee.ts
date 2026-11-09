@@ -41,7 +41,8 @@ const CheckSchema = z.object({
   dramatic: z.boolean().describe('True if a lot hangs on this roll'),
   withStrangers: z.boolean().describe('Social checks only: true if talking to strangers, officials or authority'),
   risk: z.enum(SEVERITIES).describe('How badly the character can be hurt if this fails'),
-  riskSource: z.enum(HARM_SOURCES).describe('Who or what would hurt them: sentient = people/intelligent foes')
+  riskSource: z.enum(HARM_SOURCES).describe('Who or what would hurt them: sentient = people/intelligent foes'),
+  faction: z.string().default('').describe('Social checks only: the named group (from FACTIONS) the person being dealt with belongs to; otherwise empty')
 })
 
 const FoeSchema = z.object({
@@ -108,7 +109,8 @@ const toRequest = (ch: z.infer<typeof CheckSchema>): CheckRequest => ({
   reason: ch.reason.slice(0, 120),
   dramatic: ch.dramatic,
   withStrangers: ch.withStrangers,
-  risk: { severity: ch.risk, source: ch.riskSource }
+  risk: { severity: ch.risk, source: ch.riskSource },
+  ...(ch.faction?.trim() ? { faction: ch.faction.trim().slice(0, 60) } : {})
 })
 
 function sheet(state: GameState) {
@@ -132,9 +134,11 @@ export async function runReferee(
   state: GameState,
   recent: ChatMessage[],
   action: string,
-  rolls: 'fewer' | 'normal' | 'more' = 'normal'
+  rolls: 'fewer' | 'normal' | 'more' = 'normal',
+  /** What known groups think of the character, and who belongs to them (factions.ts). */
+  factions = ''
 ): Promise<RefereeResult> {
-  const prompt = `Recent story:\n${storyOf(recent) || '(the adventure is just starting)'}\n\n${sheet(state)}\n\nThe player now writes:\n"""${action}"""\n\nWhich checks (if any) does this need, and does a fight start?`
+  const prompt = `Recent story:\n${storyOf(recent) || '(the adventure is just starting)'}\n\n${sheet(state)}${factions ? `\nFACTIONS (what groups think of the character): ${factions}` : ''}\n\nThe player now writes:\n"""${action}"""\n\nWhich checks (if any) does this need, and does a fight start?`
   const out = await provider.complete(model, {
     system: SYSTEM + ROLL_FREQUENCY[rolls],
     messages: [{ role: 'user', content: prompt }],
@@ -179,7 +183,7 @@ const COMBAT_SYSTEM = `You are the Referee in the middle of a fight in a fantasy
 - other: anything else (shoving, grabbing, climbing, picking a lock, helping someone). Give at most one check if it's uncertain.
 Speech in "quotes" alone, while still fighting, is talk only if it's meant to end the fight.`
 
-export async function runCombatReferee(provider: Provider, model: string, state: GameState, recent: ChatMessage[], action: string): Promise<CombatAction> {
+export async function runCombatReferee(provider: Provider, model: string, state: GameState, recent: ChatMessage[], action: string, factions = ''): Promise<CombatAction> {
   const c = state.character
   const weapon = mainWeapon(c)
   const usable = c.inventory.filter((i) => {
@@ -187,7 +191,7 @@ export async function runCombatReferee(provider: Provider, model: string, state:
     return t && (t.food || t.heal || t.cures?.length)
   })
   const spells = knownSpells(state).filter((sp) => sp.combat)
-  const prompt = `Recent story:\n${storyOf(recent)}\n\n${sheet(state)} Wielding ${weapon.unarmed ? 'nothing' : weapon.name}. Mana ${c.mana}. Spells: ${spells.map((sp) => sp.name).join(', ') || 'none'}. Usable items: ${usable.map((i) => i.name).join(', ') || 'none'}.\nFOES: ${combatSummary(state)}${partySummary(state) ? `\nBESIDE THE CHARACTER (companions the game plays; never a target): ${partySummary(state)}` : ''}\n\nThe player now writes:\n"""${action}"""\n\nWhat is the character doing this round?`
+  const prompt = `Recent story:\n${storyOf(recent)}\n\n${sheet(state)} Wielding ${weapon.unarmed ? 'nothing' : weapon.name}. Mana ${c.mana}. Spells: ${spells.map((sp) => sp.name).join(', ') || 'none'}. Usable items: ${usable.map((i) => i.name).join(', ') || 'none'}.\nFOES: ${combatSummary(state)}${partySummary(state) ? `\nBESIDE THE CHARACTER (companions the game plays; never a target): ${partySummary(state)}` : ''}${factions ? `\nFACTIONS (what groups think of the character): ${factions}` : ''}\n\nThe player now writes:\n"""${action}"""\n\nWhat is the character doing this round?`
   const out = await provider.complete(model, {
     system: COMBAT_SYSTEM,
     messages: [{ role: 'user', content: prompt }],

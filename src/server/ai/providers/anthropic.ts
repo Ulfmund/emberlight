@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import type { ContextReport, ModelInfo, StreamEvent } from '@shared/types'
-import { STALLED, stallGuard, type ChatOptions, type CompleteOptions, type Provider } from './types'
+import { parseJsonReply, STALLED, stallGuard, toJsonSchema, type ChatOptions, type CompleteOptions, type Provider } from './types'
 import { describeContext } from './context'
 
 /** Models that take adaptive thinking (and reject a fixed thinking budget). */
@@ -9,12 +9,19 @@ const ADAPTIVE = /^claude-(fable|mythos|opus-5|opus-4-[6-9]|sonnet-5|sonnet-4-6|
 /** Models that support the server-side refusal fallback ("default" routing). */
 const FALLBACK_DEFAULT = new Set(['claude-fable-5-1', 'claude-opus-5-5', 'claude-opus-5', 'claude-sonnet-5-5'])
 
+/**
+ * Jobs whose answer format is too big for Claude's strict output (it compiles each format into
+ * a grammar, with a size limit). They're asked for plain JSON instead, checked here.
+ */
+const TOO_BIG = new Set<string>()
+const tooBig = (err: unknown) => err instanceof Anthropic.APIError && err.status === 400 && /grammar is too large/i.test(err.message)
+
 /** Claude, through the official Anthropic SDK. */
 export class AnthropicProvider implements Provider {
   private client: Anthropic
 
-  constructor(apiKey: string | undefined) {
-    this.client = new Anthropic({ apiKey })
+  constructor(apiKey: string | undefined, baseURL?: string) {
+    this.client = new Anthropic({ apiKey, ...(baseURL ? { baseURL } : {}) })
   }
 
   async listModels(): Promise<ModelInfo[]> {
@@ -52,23 +59,37 @@ export class AnthropicProvider implements Provider {
         : { role: m.role, content: m.content }
     )
     if (messages[0]?.role !== 'user') messages.unshift({ role: 'user', content: '(Begin.)' })
-    const params: Record<string, unknown> = {
-      model,
-      max_tokens: 8000,
-      system: opts.system,
-      messages,
-      // Bookkeeping jobs are simple: keep reasoning light so they're quick and cheap.
-      output_config: { format: zodOutputFormat(opts.schema), ...(ADAPTIVE.test(model) ? { effort: 'low' } : {}) }
+    // Bookkeeping jobs are simple: keep reasoning light so they're quick and cheap.
+    const effort = ADAPTIVE.test(model) ? { effort: 'low' } : {}
+    if (!TOO_BIG.has(opts.name)) {
+      const params: Record<string, unknown> = { model, max_tokens: 8000, system: opts.system, messages, output_config: { format: zodOutputFormat(opts.schema), ...effort } }
+      try {
+        const response = await this.client.messages.parse(
+          params as unknown as Parameters<typeof this.client.messages.parse>[0],
+          { signal: opts.signal }
+        )
+        if (response.stop_reason === 'refusal') throw new Error('The model declined this request.')
+        const parsed = (response as unknown as { parsed_output: T | null }).parsed_output
+        if (parsed == null) throw new Error("The model's answer didn't match the expected format.")
+        return parsed
+      } catch (err) {
+        if (!tooBig(err)) {
+          if (err instanceof Error && !(err instanceof Anthropic.APIError)) throw err
+          throw new Error(describeAnthropicError(err))
+        }
+        TOO_BIG.add(opts.name)
+      }
     }
+    // The format is written into the prompt instead, and the answer checked here.
+    const system = `${opts.system}\n\nAnswer with one JSON object and nothing else, matching this JSON Schema:\n${JSON.stringify(toJsonSchema(opts.schema))}`
     try {
-      const response = await this.client.messages.parse(
-        params as unknown as Parameters<typeof this.client.messages.parse>[0],
+      const response = await this.client.messages.create(
+        { model, max_tokens: 8000, system, messages, ...(ADAPTIVE.test(model) ? { output_config: effort } : {}) } as unknown as Parameters<typeof this.client.messages.create>[0],
         { signal: opts.signal }
       )
-      if (response.stop_reason === 'refusal') throw new Error('The model declined this request.')
-      const parsed = (response as unknown as { parsed_output: T | null }).parsed_output
-      if (parsed == null) throw new Error("The model's answer didn't match the expected format.")
-      return parsed
+      const message = response as Anthropic.Message
+      if (message.stop_reason === 'refusal') throw new Error('The model declined this request.')
+      return parseJsonReply(message.content.map((b) => (b.type === 'text' ? b.text : '')).join(''), opts.schema)
     } catch (err) {
       if (err instanceof Error && !(err instanceof Anthropic.APIError)) throw err
       throw new Error(describeAnthropicError(err))

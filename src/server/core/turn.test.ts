@@ -813,6 +813,28 @@ describe('turn engine', () => {
     expect(campaigns.view(id).state.party).toEqual([])
   })
 
+  it('what a group thinks of the character goes on social checks with its people, and the DM is told', async () => {
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    fake.referee = { intent: 'other', checks: [] }
+    const pell = { name: 'Sergeant Pell', otherNames: [], who: 'a gruff watchman', newFacts: [], status: 'alive', attitude: 'neutral', relation: 'none', faction: 'the Town Watch' }
+    fake.scribe = { ...blankScribe(), factions: [{ name: 'the Town Watch', what: 'keepers of the peace', standingChange: 2, why: 'caught the cutpurse for them' }], people: [pell] }
+    await run(engine.act(id, 'I hand the cutpurse over to the watch.', signal))
+    expect(campaigns.view(id).memory.entities.find((e) => e.kind === 'faction')).toMatchObject({ name: 'the Town Watch', standing: 2 })
+
+    fake.scribe = blankScribe()
+    fake.referee = {
+      intent: 'social',
+      checks: [{ skill: 'persuasion', difficulty: 'moderate', modifier: 0, advantage: 'none', reason: 'asking Pell for the gate key', dramatic: false, withStrangers: true, risk: 'none', riskSource: 'sentient', faction: '' }]
+    }
+    await run(engine.act(id, 'Sergeant, could you let me through the gate tonight?', signal))
+    const roll = [...campaigns.view(id).messages].reverse().find((m) => m.role === 'user')!.checks[0]
+    expect(roll.reputation).toEqual({ faction: 'the Town Watch', value: 2 })
+    expect(roll.breakdown).toContainEqual({ label: 'Standing with the Town Watch', value: 2 })
+    expect(fake.lastSystem).toContain('WHAT GROUPS THINK OF THE CHARACTER')
+    expect(fake.lastSystem).toContain('- the Town Watch: trusted (+2). Why: caught the cutpurse for them (+2).')
+  })
+
   it('the player can ask someone along, say what they do in a fight, and part ways', async () => {
     const id = campaigns.create(build, DEFAULT_SETTINGS)
     await run(engine.narrateHead(id, signal))

@@ -1,12 +1,12 @@
 /**
- * Long-term memory (docs/spec/07-memory-and-lore.md): the people and places met in play,
- * and the story condensed into layered summaries (scenes → chapters → the story so far).
+ * Long-term memory (docs/spec/07-memory-and-lore.md): the people, places and factions met in
+ * play, and the story condensed into layered summaries (scenes → chapters → the story so far).
  *
  * Memory is built from events, like the rest of the game state, so it follows the branch
  * being played: rewind past the moment you met someone and the record of them is gone too.
  */
 
-export type EntityKind = 'person' | 'place'
+export type EntityKind = 'person' | 'place' | 'faction'
 export type Attitude = 'hostile' | 'unfriendly' | 'neutral' | 'friendly' | 'devoted'
 export type EntityStatus = 'alive' | 'dead' | 'missing' | 'unknown'
 
@@ -30,6 +30,16 @@ export const RELATION_LABEL: Record<Relation, string> = {
   enemy: 'your enemy'
 }
 
+/**
+ * What a faction thinks of the player character (docs/spec/04-rules-system.md#factions), from
+ * −3 (hated) to +3 (honoured). Social checks with its people carry it as a bonus or a penalty.
+ */
+export const STANDINGS = [-3, -2, -1, 0, 1, 2, 3] as const
+const STANDING_LABEL: Record<string, string> = { '-3': 'Hated', '-2': 'Hostile', '-1': 'Distrusted', '0': 'Neutral', '1': 'Liked', '2': 'Trusted', '3': 'Honoured' }
+export const clampStanding = (n: number) => Math.max(-3, Math.min(3, Math.round(n || 0)))
+export const standingLabel = (n = 0) => STANDING_LABEL[String(clampStanding(n))]
+export const fmtStanding = (n = 0) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0')
+
 export type Entity = {
   id: string
   kind: EntityKind
@@ -44,6 +54,10 @@ export type Entity = {
   attitude?: Attitude
   /** People only: how they're tied to the player character. */
   relation?: Relation
+  /** People only: the faction they belong to, by name. */
+  faction?: string
+  /** Factions only: what they think of the player character (−3 to +3). */
+  standing?: number
   /** A picture of them (a media id). */
   image?: string
   firstSeenDay: number
@@ -88,6 +102,10 @@ export type MemoryEvent =
       status?: EntityStatus
       attitude?: Attitude
       relation?: Relation
+      /** People: the faction they belong to. */
+      faction?: string
+      /** Factions: how much the player's deeds just moved them (added up, kept to −3…+3). */
+      standingChange?: number
       day: number
     }
   | { type: 'summary'; summary: Summary }
@@ -108,6 +126,10 @@ export type JournalEdit =
       attitude?: Attitude | null
       relation?: Relation | null
       image?: string | null
+      /** Factions: set outright (null: neutral). */
+      standing?: number | null
+      /** People: the faction they belong to (null: none). */
+      faction?: string | null
     }
   | { type: 'entity_forget'; id: string }
   | { type: 'summary_edit'; level: Summary['level']; to: string; title: string; text: string }
@@ -173,9 +195,24 @@ export const samePlace = (a: string, b: string) => {
   return strip(a) !== '' && strip(a) === strip(b)
 }
 
+/** Groups go by shorter names too: "the Watch" is "the Town Watch". */
+export function sameFaction(a: string, b: string): boolean {
+  const strip = (s: string) => normName(s).replace(/^the /, '')
+  const na = strip(a)
+  const nb = strip(b)
+  if (!na || !nb) return false
+  if (na === nb) return true
+  const words = (s: string) => s.split(/[\s-]+/).filter((t) => t.length > 1 && !['of', 'the', 'and'].includes(t))
+  const wa = words(na)
+  const wb = words(nb)
+  if (!wa.length || !wb.length) return false
+  const [short, long] = wa.length <= wb.length ? [wa, wb] : [wb, wa]
+  return short.every((t) => long.includes(t))
+}
+
 export function findEntity(m: Memory, kind: EntityKind, name: string, aliases: string[] = []): Entity | undefined {
   const names = [name, ...aliases]
-  const same = kind === 'place' ? samePlace : sameName
+  const same = kind === 'place' ? samePlace : kind === 'faction' ? sameFaction : sameName
   return m.entities.find((e) => e.kind === kind && [e.name, ...e.aliases].some((x) => names.some((n) => same(x, n))))
 }
 
@@ -210,7 +247,8 @@ export function applyMemoryEvent(m: Memory, ev: MemoryEvent, counter: { n: numbe
           lastSeen: counter.n,
           mentions: 0
         }
-        if (ev.kind === 'place') e.status = 'unknown'
+        if (ev.kind !== 'person') e.status = 'unknown'
+        if (ev.kind === 'faction') e.standing = 0
         m.entities.push(e)
       } else {
         // Their real name came out ("Sibbert", other names: "grey-bearded man"), or a fuller one
@@ -236,6 +274,8 @@ export function applyMemoryEvent(m: Memory, ev: MemoryEvent, counter: { n: numbe
       if (ev.attitude && e.kind === 'person') e.attitude = ev.attitude
       // "none" from the Scribe doesn't undo a tie it recorded before; the Journal can.
       if (ev.relation && ev.relation !== 'none' && e.kind === 'person') e.relation = ev.relation
+      if (ev.faction?.trim() && e.kind === 'person') e.faction = ev.faction.trim()
+      if (ev.standingChange && e.kind === 'faction') e.standing = clampStanding((e.standing ?? 0) + ev.standingChange)
       e.lastSeenDay = ev.day
       e.lastSeen = counter.n
       e.mentions++
@@ -264,6 +304,8 @@ export function applyMemoryEvent(m: Memory, ev: MemoryEvent, counter: { n: numbe
       if (ev.attitude !== undefined && e.kind === 'person') e.attitude = ev.attitude ?? undefined
       if (ev.relation !== undefined && e.kind === 'person') e.relation = ev.relation && ev.relation !== 'none' ? ev.relation : undefined
       if (ev.image !== undefined) e.image = ev.image ?? undefined
+      if (ev.standing !== undefined && e.kind === 'faction') e.standing = clampStanding(ev.standing ?? 0)
+      if (ev.faction !== undefined && e.kind === 'person') e.faction = ev.faction?.trim() || undefined
       break
     }
     case 'entity_forget':
@@ -330,6 +372,11 @@ export function relevantEntities(m: Memory, recent: string, location: string | n
   const byRecent = [...live].sort((a, b) => b.lastSeen - a.lastSeen)
   if (location) for (const e of live) if (e.kind === 'place' && [e.name, ...e.aliases].some((n) => samePlace(n, location))) add(e)
   for (const e of byRecent) if (mentions(recent, e)) add(e)
+  // The groups the people in the scene belong to.
+  for (const e of [...picked]) {
+    const f = e.kind === 'person' && e.faction ? findEntity(m, 'faction', e.faction) : undefined
+    if (f && !skip(f)) add(f)
+  }
   for (const e of byRecent) if (e.kind === 'person' && e.status !== 'dead') add(e)
   return picked
 }
@@ -337,7 +384,9 @@ export function relevantEntities(m: Memory, recent: string, location: string | n
 export function entityLine(e: Entity, facts: number): string {
   const tags = [
     e.kind === 'place' ? 'place' : null,
+    e.kind === 'faction' ? `faction; the player is ${standingLabel(e.standing).toLowerCase()} by them (${fmtStanding(e.standing ?? 0)})` : null,
     e.aliases.length ? `also called ${e.aliases.slice(0, 3).join(', ')}` : null,
+    e.kind === 'person' && e.faction ? `of ${e.faction}` : null,
     e.kind === 'person' && e.relation ? RELATION_LABEL[e.relation].replace('your', "the player's") : null,
     e.kind === 'person' && e.attitude ? `${e.attitude} toward the player` : null,
     e.status === 'dead' ? 'DEAD' : e.status === 'missing' ? 'missing' : null,

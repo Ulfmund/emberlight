@@ -1,9 +1,14 @@
 import { z } from 'zod'
 import { allyId, CONDITION_IDS, findSpell, findTemplate, guessRole, PARTY_MAX, PLACE_KINDS, SPELLS, templateOf, weatherNow, type ConditionId, type GameEvent, type GameState, type InventoryItem } from '@shared/rules'
 import type { Provider } from '../providers'
-import { entityLine, findEntity, relevantEntities, RELATIONS, sameName, samePlace, type Memory } from '@shared/memory'
+import { entityLine, findEntity, relevantEntities, RELATIONS, sameFaction, sameName, samePlace, type Memory } from '@shared/memory'
 
 const conditionEnum = z.enum(CONDITION_IDS as [ConditionId, ...ConditionId[]])
+/**
+ * One shape for every list of things, shared rather than repeated, so Claude's strict output
+ * format (which has a size limit) compiles it once. Keep this schema lean: see anthropic.ts.
+ */
+const ItemQty = z.object({ name: z.string(), qty: z.number().int() })
 
 export const ScribeSchema = z.object({
   minutesPassed: z.number().int().describe('In-story minutes that passed during this narration (0 if barely any)'),
@@ -11,8 +16,8 @@ export const ScribeSchema = z.object({
   location: z.string().describe('Where the character now is, if it changed to a new named place; otherwise empty'),
   deed: z.string().describe('If the character did something people would talk about, a short line like "slew the river-thing at Millbrook"; otherwise empty'),
   deedRenown: z.number().int().describe('0 to 3: how much renown that deed earns (0 if none)'),
-  itemsGained: z.array(z.object({ name: z.string(), qty: z.number().int() })),
-  itemsLost: z.array(z.object({ name: z.string(), qty: z.number().int() })),
+  itemsGained: z.array(ItemQty),
+  itemsLost: z.array(ItemQty),
   coinsChange: z.number().int().describe('Coins gained (positive) or spent (negative), in copper. 10 copper = 1 silver, 100 copper = 1 gold'),
   milestoneXp: z.number().int().describe('0 to 50: XP for finishing a quest or a major story moment, otherwise 0'),
   healing: z.number().int().describe('Health restored by the story that is NOT from an item in itemsUsed (a healer, rest at a temple, magic), otherwise 0'),
@@ -24,7 +29,7 @@ export const ScribeSchema = z.object({
   weather: z.enum(['clear', 'rain', 'storm', 'fog', 'snow', 'unchanged']).default('unchanged').describe('The weather now, if this exchange shows or changes it (clear skies, rain, a storm, fog, snow); unchanged if it says nothing about it, or the character is indoors'),
   ate: z.enum(['none', 'snack', 'meal', 'feast']).describe('Did the character eat food that is not from their own pack? snack = a bite or a drink; meal = a proper meal; feast = a big hot meal or banquet'),
   itemsUsed: z
-    .array(z.object({ name: z.string(), qty: z.number().int() }))
+    .array(ItemQty)
     .describe("Things from the character's own pack used up for their effect: eaten, drunk, a bandage or salve applied. Use the names from Carrying. Not things given away, sold or lost (those go in itemsLost)"),
   itemsEquipped: z.array(z.string()).describe('Things from the pack the character put on, wielded or took in hand in this exchange. Usually empty'),
   spellsLearned: z.array(z.string()).default([]).describe('Spells the character clearly learns in this exchange (from a teacher, a tome, a revelation), by name. Usually empty'),
@@ -42,7 +47,8 @@ export const ScribeSchema = z.object({
         newFacts: z.array(z.string()).describe('At most 2 short, lasting facts the story states about them. Usually empty'),
         status: z.enum(['alive', 'dead', 'missing', 'unknown']).describe('missing only if the story says so; unknown if not stated'),
         attitude: z.enum(['hostile', 'unfriendly', 'neutral', 'friendly', 'devoted', 'unknown']).describe('How they now feel about the player character'),
-        relation: z.enum(RELATIONS).describe("How they're tied to the player character: child, parent, sibling, spouse, lover, friend, ally, companion, employer, rival, enemy, or none")
+        relation: z.enum(RELATIONS).describe("How they're tied to the player character: child, parent, sibling, spouse, lover, friend, ally, companion, employer, rival, enemy, or none"),
+        faction: z.string().default('').describe('The named group they belong to, if the story says ("the Town Watch", "the Free Pennies"); otherwise empty')
       })
     )
     .describe('Named characters (not the player character) who appear or are talked about in this exchange. At most 4'),
@@ -54,7 +60,21 @@ export const ScribeSchema = z.object({
         newFacts: z.array(z.string()).describe('At most 1 short, lasting fact the story states about it. Usually empty')
       })
     )
-    .describe('Named places visited or talked about in this exchange. At most 2')
+    .describe('Named places visited or talked about in this exchange. At most 2'),
+  factions: z
+    .array(
+      z.object({
+        name: z.string().describe('A named group: a guild, an order, a noble house, a gang, a temple, the town watch, a mercenary company. Not a crowd ("some villagers")'),
+        what: z.string().describe('One short line: what they are. Empty if already known'),
+        standingChange: z
+          .number()
+          .int()
+          .describe("-2 to 2: how the character's own deeds in this exchange changed what the group thinks of them. +1 a favour, +2 a great service, -1 a slight or an insult, -2 violence against them or a betrayal. Usually 0"),
+        why: z.string().describe('If standingChange is not 0, a few words why ("helped the watch catch a thief"); otherwise empty')
+      })
+    )
+    .default([])
+    .describe('Named groups that appear, act or are talked about in this exchange. At most 2')
 })
 export type ScribeOutput = z.infer<typeof ScribeSchema>
 
@@ -70,6 +90,7 @@ const SYSTEM = `You are the Scribe for a fantasy roleplaying game. You keep the 
 - Facts are what someone would still need to know a month later: "owes the player 5 silver", "lost two fingers to the river-thing", "is secretly the baron's son", "took the player prisoner". Never moods, gestures, smells, what a room looks like, or a blow-by-blow of a fight. Never guesses ("possibly", "seems to"): only what the story states. For someone already in KNOWN, add only what's new, and most turns add nothing.
 - When someone recorded under a description ("grey-bearded man") gives their name, record them under the name and put the description in otherNames, so the record is renamed rather than duplicated.
 - relation: only ties the story makes clear. A child is the player character's own son or daughter.
+- factions: named groups only. standingChange is for what the character did in this exchange, not for what the group is like; most turns it is 0.
 - companionsJoined and companionsLeft: only when the story makes it clear someone now travels with the character, or a companion goes their own way. Someone walking alongside for one scene, or a guide hired for an afternoon, isn't a companion.
 - spellsLearned: only when the story says the character now knows the spell. The spells that exist: ${SPELLS.map((sp) => sp.name).join(', ')}.
 - Whatever the GAME ENGINE block lists was already recorded by the game: damage, a fight's blows, loot taken from fallen foes, spells and potions used in a fight, and things gathered or crafted (with the materials used up). Never record those again.
@@ -246,6 +267,7 @@ export function scribeToEvents(out: ScribeOutput, state: GameState, memory?: Mem
       status: p.status === 'unknown' ? (known ? undefined : 'alive') : p.status,
       attitude: p.attitude === 'unknown' ? undefined : p.attitude,
       relation: p.relation && p.relation !== 'none' ? p.relation : undefined,
+      faction: line(p.faction ?? '', 60) || undefined,
       day
     })
   }
@@ -253,6 +275,28 @@ export function scribeToEvents(out: ScribeOutput, state: GameState, memory?: Mem
     const name = line(pl.name, 60)
     if (!name) continue
     events.push({ type: 'entity', kind: 'place', name, summary: line(pl.what, 140) || undefined, facts: facts(pl.newFacts, 1), day })
+  }
+  // Groups, and what the character's deeds did to what they think of them.
+  for (const f of (out.factions ?? []).slice(0, 2)) {
+    const name = line(f.name, 60)
+    if (!name || name.length < 3) continue
+    const change = clamp(f.standingChange ?? 0, -2, 2)
+    const why = line(f.why ?? '', 120)
+    events.push({
+      type: 'entity',
+      kind: 'faction',
+      name,
+      summary: line(f.what ?? '', 140) || undefined,
+      facts: change && why ? [`${why} (${change > 0 ? '+' : '−'}${Math.abs(change)})`] : [],
+      ...(change ? { standingChange: change } : {}),
+      day
+    })
+  }
+  // The groups people belong to are on record too.
+  for (const ev of [...events]) {
+    if (ev.type !== 'entity' || ev.kind !== 'person' || !ev.faction) continue
+    const g = ev.faction
+    if (!events.some((e) => e.type === 'entity' && e.kind === 'faction' && sameFaction(e.name, g)) && !(memory && findEntity(memory, 'faction', g))) events.push({ type: 'entity', kind: 'faction', name: g, day })
   }
   // The place the character is now at is always on record.
   const at = events.find((e) => e.type === 'location') as { name: string } | undefined

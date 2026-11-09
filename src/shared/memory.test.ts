@@ -166,7 +166,8 @@ describe('Scribe memory output', () => {
     spellsLearned: [],
     weather: 'unchanged' as const,
     companionsJoined: [],
-    companionsLeft: []
+    companionsLeft: [],
+    factions: []
   }
 
   it('records people and places, but never the player character or nameless extras', () => {
@@ -176,9 +177,9 @@ describe('Scribe memory output', () => {
         ...blank,
         location: 'The Wicker Goose',
         people: [
-          { name: 'Old Tam', otherNames: ['the ferryman'], who: 'ferryman at Millbrook', newFacts: ['owes Brenna a favour'], status: 'alive', attitude: 'friendly', relation: 'none' },
-          { name: 'Brenna', otherNames: [], who: 'the hunter', newFacts: [], status: 'alive', attitude: 'unknown', relation: 'none' },
-          { name: 'the tall guard', otherNames: [], who: 'a guard', newFacts: [], status: 'alive', attitude: 'neutral', relation: 'none' }
+          { name: 'Old Tam', otherNames: ['the ferryman'], who: 'ferryman at Millbrook', newFacts: ['owes Brenna a favour'], status: 'alive', attitude: 'friendly', relation: 'none', faction: '' },
+          { name: 'Brenna', otherNames: [], who: 'the hunter', newFacts: [], status: 'alive', attitude: 'unknown', relation: 'none', faction: '' },
+          { name: 'the tall guard', otherNames: [], who: 'a guard', newFacts: [], status: 'alive', attitude: 'neutral', relation: 'none', faction: '' }
         ],
         places: [{ name: 'Millbrook Crossing', what: 'a ferry landing', newFacts: [] }]
       },
@@ -200,9 +201,32 @@ describe('Scribe memory output', () => {
     expect(scribeToEvents({ ...blank, weather: 'clear' }, { ...state, weather: 'rain' })).toContainEqual({ type: 'weather', weather: 'clear' })
   })
 
+  it("records groups, and what the character's deeds did to their standing", () => {
+    const state = initialState(build, DEFAULT_SETTINGS)
+    const evs = scribeToEvents(
+      {
+        ...blank,
+        factions: [
+          { name: 'the Town Watch', what: 'keepers of the peace in Millbrook', standingChange: 5, why: 'caught the cutpurse for them' },
+          { name: 'x', what: '', standingChange: 0, why: '' }
+        ],
+        people: [
+          { name: 'Sergeant Pell', otherNames: [], who: 'a gruff watchman', newFacts: [], status: 'alive', attitude: 'neutral', relation: 'none', faction: 'the Watch' },
+          { name: 'Ysolde', otherNames: [], who: 'a guild clerk', newFacts: [], status: 'alive', attitude: 'neutral', relation: 'none', faction: 'the Merchant Guild' }
+        ]
+      },
+      state
+    )
+    expect(evs.filter((e) => e.type === 'entity' && e.kind === 'faction')).toEqual([
+      { type: 'entity', kind: 'faction', name: 'the Town Watch', summary: 'keepers of the peace in Millbrook', facts: ['caught the cutpurse for them (+2)'], standingChange: 2, day: 1 },
+      { type: 'entity', kind: 'faction', name: 'the Merchant Guild', day: 1 }
+    ])
+    expect(evs).toContainEqual(expect.objectContaining({ kind: 'person', name: 'Sergeant Pell', faction: 'the Watch' }))
+  })
+
   it('companions come along when the story says so, and leave or die the same way', () => {
     const state = initialState(build, DEFAULT_SETTINGS)
-    const mira = { name: 'Mira', otherNames: [], who: 'a priestess of the dawn', newFacts: [], status: 'alive' as const, attitude: 'friendly' as const, relation: 'companion' as const }
+    const mira = { name: 'Mira', otherNames: [], who: 'a priestess of the dawn', newFacts: [], status: 'alive' as const, attitude: 'friendly' as const, relation: 'companion' as const, faction: '' }
     const evs = scribeToEvents({ ...blank, companionsJoined: ['Mira', 'Brenna'], people: [mira] }, state)
     expect(evs.filter((e) => e.type === 'party_join')).toEqual([{ type: 'party_join', companion: { id: 'ally_mira', name: 'Mira', role: 'healer' } }])
     const withMira = project(state, evs, DEFAULT_SETTINGS)

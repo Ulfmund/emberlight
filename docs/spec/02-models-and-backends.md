@@ -40,6 +40,8 @@ Local models vary a lot in how well they follow formats. The `ai/protocol/` modu
 
 All schemas are defined once with Zod and reused for validation, prompts and constrained output.
 
+*Built:* Claude uses structured outputs (`output_config.format`), which compiles each schema into a grammar with a size limit. The Scribe's schema is the biggest and sits near it: shapes used more than once are shared (one `ItemQty` for every item list) so they compile once, and new Scribe fields should be weighed against the limit. If a schema is ever refused as too large, the provider asks for plain JSON matching the schema instead (checked with the tolerant parser) and remembers that for the job, so a growing schema slows down rather than breaks (0.18.0).
+
 ## Capability profile
 
 When a model is connected, the app runs a quick probe (a few seconds) and saves a profile per model:

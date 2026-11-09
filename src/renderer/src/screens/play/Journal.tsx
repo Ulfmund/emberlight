@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { ATTITUDES, MAX_FACTS, sameName, type Attitude, type Entity, type EntityStatus, type MemoryEvent, type Summary } from '@shared/memory'
+import { ATTITUDES, fmtStanding, MAX_FACTS, sameFaction, sameName, STANDINGS, standingLabel, type Attitude, type Entity, type EntityStatus, type MemoryEvent, type Summary } from '@shared/memory'
 import { cardImageUrl } from '@shared/cards'
 import { BACKGROUNDS, RACES } from '@shared/rules'
 import type { CampaignView } from '@shared/view'
@@ -20,7 +20,7 @@ import { mediaUrl } from '@shared/images'
  * correction to what the DM knows.
  */
 
-type Section = 'people' | 'places' | 'story' | 'notes' | 'lore' | 'fallen'
+type Section = 'people' | 'places' | 'factions' | 'story' | 'notes' | 'lore' | 'fallen'
 
 const ATTITUDE_INFO: Record<Attitude, { label: string; color: string }> = {
   hostile: { label: 'Hostile', color: '#d9574c' },
@@ -41,6 +41,7 @@ export function Journal({ view, open, onClose }: { view: CampaignView; open: boo
   const m = view.memory
   const people = useMemo(() => m.entities.filter((e) => e.kind === 'person').sort(bySeen), [m.entities])
   const places = useMemo(() => m.entities.filter((e) => e.kind === 'place').sort(bySeen), [m.entities])
+  const factions = useMemo(() => m.entities.filter((e) => e.kind === 'faction').sort(bySeen), [m.entities])
 
   useEffect(() => {
     if (!open) return
@@ -52,6 +53,7 @@ export function Journal({ view, open, onClose }: { view: CampaignView; open: boo
   const sections: { id: Section; label: string; icon: string; count?: number }[] = [
     { id: 'people', label: 'People', icon: 'user', count: people.length },
     { id: 'places', label: 'Places', icon: 'map', count: places.length },
+    ...(factions.length ? [{ id: 'factions' as const, label: 'Factions', icon: 'party', count: factions.length }] : []),
     { id: 'story', label: 'Story', icon: 'scroll', count: m.scenes.length + m.chapters.length || undefined },
     { id: 'notes', label: 'Pinned', icon: 'pin', count: m.notes.length || undefined },
     { id: 'lore', label: 'Lore', icon: 'book', count: view.lorebooks.length || undefined },
@@ -110,6 +112,7 @@ export function Journal({ view, open, onClose }: { view: CampaignView; open: boo
               <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-8 md:px-7 md:pt-0">
                 {section === 'people' && <EntityList view={view} items={people} kind="person" />}
                 {section === 'places' && <EntityList view={view} items={places} kind="place" />}
+                {section === 'factions' && <EntityList view={view} items={factions} kind="faction" />}
                 {section === 'story' && <StorySection view={view} />}
                 {section === 'notes' && <NotesSection view={view} />}
                 {section === 'lore' && <LoreSection view={view} />}
@@ -183,19 +186,22 @@ function useSave() {
 
 // ---- People and places ----------------------------------------------------------------------
 
-function EntityList({ view, items, kind }: { view: CampaignView; items: Entity[]; kind: 'person' | 'place' }) {
+const LIST_TEXT: Record<Entity['kind'], { title: string; text: string; empty: string }> = {
+  person: { title: 'People', text: 'Everyone you have met or heard of, and how they feel about you.', empty: 'Nobody yet. The people you meet will be written here.' },
+  place: { title: 'Places', text: 'Where you have been, and what you learned there.', empty: 'Nowhere yet. The places you visit will be written here.' },
+  faction: { title: 'Factions', text: 'The groups you have dealt with, and what they think of you. It counts when you talk with their people.', empty: 'No groups yet.' }
+}
+
+function EntityList({ view, items, kind }: { view: CampaignView; items: Entity[]; kind: Entity['kind'] }) {
   const [query, setQuery] = useState('')
   const shown = query.trim() ? items.filter((e) => [e.name, ...e.aliases, e.summary, ...e.facts].join(' ').toLowerCase().includes(query.trim().toLowerCase())) : items
   return (
     <>
-      <Heading
-        title={kind === 'person' ? 'People' : 'Places'}
-        text={kind === 'person' ? 'Everyone you have met or heard of, and how they feel about you.' : 'Where you have been, and what you learned there.'}
-      />
+      <Heading title={LIST_TEXT[kind].title} text={LIST_TEXT[kind].text} />
       {items.length > 6 && (
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" className="input mb-4 py-2 text-sm" />
       )}
-      {!items.length && <Empty>{kind === 'person' ? 'Nobody yet. The people you meet will be written here.' : 'Nowhere yet. The places you visit will be written here.'}</Empty>}
+      {!items.length && <Empty>{LIST_TEXT[kind].empty}</Empty>}
       <div className="space-y-3">
         <AnimatePresence initial={false}>
           {shown.map((e) => (
@@ -213,6 +219,7 @@ function EntityCard({ entity: e, view }: { entity: Entity; view: CampaignView })
   const companion = view.cast.find((m) => m.role === 'companion' && m.hasImage && sameName(m.name, e.name))
   const color = speakerColor(e.name)
   const dead = e.status === 'dead'
+  const members = e.kind === 'faction' ? view.memory.entities.filter((x) => x.kind === 'person' && x.faction && sameFaction(x.faction, e.name)) : []
   return (
     <motion.div
       layout
@@ -233,7 +240,7 @@ function EntityCard({ entity: e, view }: { entity: Entity; view: CampaignView })
             className="no-drag grid h-12 w-12 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-full border-2 font-display text-base font-bold text-ink-950 disabled:cursor-default"
             style={{
               borderColor: color,
-              background: e.kind === 'place' ? 'var(--color-ink-800)' : `radial-gradient(circle at 35% 30%, ${color}, color-mix(in oklab, ${color} 40%, #120d10))`,
+              background: e.kind !== 'person' ? 'var(--color-ink-800)' : `radial-gradient(circle at 35% 30%, ${color}, color-mix(in oklab, ${color} 40%, #120d10))`,
               filter: dead ? 'grayscale(1) brightness(0.65)' : undefined
             }}
           >
@@ -243,6 +250,8 @@ function EntityCard({ entity: e, view }: { entity: Entity; view: CampaignView })
               <img src={cardImageUrl(companion.cardId)} alt="" className="h-full w-full object-cover" style={{ objectPosition: 'center 18%' }} />
             ) : e.kind === 'place' ? (
               <Icon name="map" size={22} style={{ color }} />
+            ) : e.kind === 'faction' ? (
+              <Icon name="party" size={22} style={{ color }} />
             ) : (
               initials(e.name)
             )}
@@ -253,8 +262,10 @@ function EntityCard({ entity: e, view }: { entity: Entity; view: CampaignView })
               <span className={`font-display text-lg tracking-wide ${dead ? 'text-parchment-400 line-through decoration-blood-400/60' : 'text-parchment-50'}`}>{e.name}</span>
               {e.kind === 'person' && e.status !== 'alive' && <span className={`text-xs font-semibold uppercase ${STATUS_INFO[e.status].tone}`}>{STATUS_INFO[e.status].label}</span>}
               {e.aliases.length > 0 && <span className="text-xs text-parchment-500">also {e.aliases.join(', ')}</span>}
+              {e.kind === 'person' && e.faction && <span className="text-xs text-gold-300/80">of {e.faction}</span>}
             </div>
             {e.kind === 'person' && <AttitudeMeter value={e.attitude} />}
+            {e.kind === 'faction' && <StandingMeter value={e.standing ?? 0} />}
             <p className="mt-1.5 text-[0.92rem] leading-snug text-parchment-200">{e.summary || <span className="text-parchment-500 italic">No description yet.</span>}</p>
             {e.facts.length > 0 && (
               <ul className="mt-2 space-y-1">
@@ -266,6 +277,7 @@ function EntityCard({ entity: e, view }: { entity: Entity; view: CampaignView })
                 ))}
               </ul>
             )}
+            {members.length > 0 && <p className="mt-2 text-[0.8rem] text-parchment-400">People you know there: {members.map((x) => x.name).join(', ')}</p>}
             <TravelButton view={view} entity={e} />
             <p className="mt-2 text-[0.7rem] text-parchment-500">
               {e.firstSeenDay === e.lastSeenDay ? `Day ${e.firstSeenDay}` : `First day ${e.firstSeenDay} · last day ${e.lastSeenDay}`}
@@ -290,6 +302,26 @@ const initials = (name: string) =>
     .map((w) => w[0])
     .join('')
     .slice(0, 2) || name.slice(0, 1).toUpperCase()
+
+const standingColor = (v: number) => (v < 0 ? (v <= -2 ? '#d9574c' : '#e8894d') : v > 0 ? (v >= 2 ? '#6fc8a0' : '#a7c46a') : '#b9a98a')
+
+/** What a faction thinks of you: −3 (hated) to +3 (honoured), lit out from neutral. */
+function StandingMeter({ value }: { value: number }) {
+  const color = standingColor(value)
+  return (
+    <div className="mt-1.5 flex items-center gap-2" title={`${standingLabel(value)}: ${fmtStanding(value)} on talks with their people`}>
+      <div className="flex gap-0.5">
+        {STANDINGS.map((n) => {
+          const lit = (value < 0 && n < 0 && n >= value) || (value > 0 && n > 0 && n <= value) || n === 0
+          return <span key={n} className="h-1.5 w-4 rounded-full" style={{ background: n === value ? color : lit ? `color-mix(in oklab, ${color} 35%, transparent)` : 'rgb(255 255 255 / 0.07)' }} />
+        })}
+      </div>
+      <span className="text-[0.72rem] font-semibold" style={{ color }}>
+        {standingLabel(value)} {value !== 0 && <span className="tabular-nums">({fmtStanding(value)})</span>}
+      </span>
+    </div>
+  )
+}
 
 function AttitudeMeter({ value }: { value?: Attitude }) {
   if (!value) return <div className="mt-1 text-[0.72rem] text-parchment-500">Feelings unknown</div>
@@ -345,8 +377,11 @@ function EntityEditor({ entity: e, onDone }: { entity: Entity; onDone: () => voi
   const [facts, setFacts] = useState(e.facts.join('\n'))
   const [status, setStatus] = useState<EntityStatus>(e.status)
   const [attitude, setAttitude] = useState<Attitude | 'unknown'>(e.attitude ?? 'unknown')
+  const [standing, setStanding] = useState(String(e.standing ?? 0))
+  const [faction, setFaction] = useState(e.faction ?? '')
   const [confirmForget, setConfirmForget] = useState(false)
   const person = e.kind === 'person'
+  const group = e.kind === 'faction'
 
   const submit = async () => {
     const ok = await save({
@@ -357,7 +392,9 @@ function EntityEditor({ entity: e, onDone }: { entity: Entity; onDone: () => voi
       summary,
       facts: facts.split('\n').map((f) => f.replace(/^[-•*]\s*/, '').trim()).filter(Boolean).slice(-MAX_FACTS),
       status,
-      attitude: person ? (attitude === 'unknown' ? null : attitude) : undefined
+      attitude: person ? (attitude === 'unknown' ? null : attitude) : undefined,
+      standing: group ? Number(standing) : undefined,
+      faction: person ? faction.trim() || null : undefined
     })
     if (ok) onDone()
   }
@@ -385,13 +422,25 @@ function EntityEditor({ entity: e, onDone }: { entity: Entity; onDone: () => voi
         </label>
       </div>
       <label className="block">
-        <Label>{person ? 'Who they are' : 'What it is'}</Label>
+        <Label>{person ? 'Who they are' : group ? 'What they are' : 'What it is'}</Label>
         <input value={summary} onChange={(x) => setSummary(x.target.value)} maxLength={400} className="input py-2 text-sm" />
       </label>
       <label className="block">
         <Label>What you know (one per line)</Label>
         <textarea value={facts} onChange={(x) => setFacts(x.target.value)} rows={Math.min(8, Math.max(3, e.facts.length + 1))} className="input resize-y py-2 text-sm leading-relaxed" />
       </label>
+      {person && (
+        <label className="block">
+          <Label>Belongs to</Label>
+          <input value={faction} onChange={(x) => setFaction(x.target.value)} maxLength={80} placeholder="A guild, an order, a house… (optional)" className="input py-2 text-sm" />
+        </label>
+      )}
+      {group && (
+        <div>
+          <Label>What they think of you</Label>
+          <Choice value={standing} onChange={setStanding} options={STANDINGS.map((n) => ({ id: String(n), label: `${standingLabel(n)}${n ? ` ${fmtStanding(n)}` : ''}`, color: standingColor(n) }))} />
+        </div>
+      )}
       {person && (
         <div className="grid gap-3 md:grid-cols-2">
           <div>
@@ -422,7 +471,7 @@ function EntityEditor({ entity: e, onDone }: { entity: Entity; onDone: () => voi
           title="Remove this from the DM's memory"
         >
           <Icon name="trash" size={15} />
-          {confirmForget ? (person ? 'Forget them?' : 'Forget it?') : 'Forget'}
+          {confirmForget ? (person || group ? 'Forget them?' : 'Forget it?') : 'Forget'}
         </button>
       </div>
     </div>

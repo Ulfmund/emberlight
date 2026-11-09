@@ -138,7 +138,8 @@ describe('the Scribe and the pack', () => {
     spellsLearned: [],
     weather: 'unchanged' as const,
     companionsJoined: [],
-    companionsLeft: []
+    companionsLeft: [],
+    factions: []
   }
 
   it('turns eating, drinking and bandaging into the items doing their work', () => {

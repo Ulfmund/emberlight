@@ -103,7 +103,8 @@ describe('spells', () => {
       spellsLearned: ['Firebolt', 'Mend', 'Fireball of Doom'],
       weather: 'unchanged' as const,
     companionsJoined: [],
-    companionsLeft: []
+    companionsLeft: [],
+    factions: []
     }
     const evs = scribeToEvents(out as Parameters<typeof scribeToEvents>[0], st)
     expect(evs.filter((e) => e.type === 'learn_spell')).toEqual([{ type: 'learn_spell', id: 'firebolt', name: 'Firebolt' }])

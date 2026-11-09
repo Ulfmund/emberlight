@@ -377,6 +377,15 @@ Damage and healing add the Arcane modifier and +1 every four Spellcasting levels
 - The Scribe proposes changes after each scene. The engine limits the size of each change.
 - Mechanical effects: shop prices, Persuasion DC modifiers, whether they'll help, and whether they'll betray you.
 
+### Factions
+
+*Built (0.18.0).* Named groups (a guild, an order, a noble house, a gang, a temple, the town watch) are remembered like people and places, with a **standing** toward the character from −3 to +3: Hated, Hostile, Distrusted, Neutral, Liked, Trusted, Honoured.
+
+- **What moves it:** the character's own deeds, as the Scribe reads them: +1 for a favour, +2 for a great service, −1 for a slight or an insult, −2 for violence against them or a betrayal. Each change is noted with its reason. The player can set it outright in the Journal.
+- **Who belongs:** people are recorded with the group they belong to ("Sergeant Pell, of the Town Watch"), and the Journal can change it.
+- **Social checks:** a Persuasion, Deception, Intimidation (or other social) check with a group's people gets its standing as a bonus or penalty, shown as "Standing with the Town Watch +2". The Referee names the group; failing that, the engine finds it from the person or group the check is about.
+- **The DM** is told what the groups that think well or ill of the character think, and lets it show in how their people treat them: a welcome or a cold shoulder, help or hindrance, prices, trust.
+
 ---
 
 ## Player overrides

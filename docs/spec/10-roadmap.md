@@ -56,7 +56,7 @@ Built in milestones. Each one ends with something playable, so the artist can te
 ## v1.x
 - Ambient audio and dynamic music ([09](09-audio.md)) ✅ 0.16.0 (made on the spot, or from your own tagged tracks)
 - Semantic (embedding) memory search
-- Faction reputation
+- Faction reputation ✅ 0.18.0 (standing from hated to honoured, moved by your deeds; it counts on social checks with their people)
 - Location art; a simple map of visited places
 - Companions travelling with the player (AI-controlled in combat) ✅ 0.17.0 (up to four, from cards or the story; five fighting roles; healers can save you)
 

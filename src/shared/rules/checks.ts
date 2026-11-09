@@ -32,6 +32,10 @@ export type CheckRequest = {
   /** A fixed target instead of the difficulty ladder (e.g. an enemy's Defense), and what it is. */
   dcOverride?: number
   against?: string
+  /** Social checks: the faction the person being dealt with belongs to (the Referee's word). */
+  faction?: string
+  /** What that faction thinks of the character, put on by the engine (shown in the breakdown). */
+  reputation?: { faction: string; value: number }
 }
 
 export type CheckResult = CheckRequest & {
@@ -76,6 +80,7 @@ export function checkBreakdown(state: GameState, settings: CampaignSettings, req
     { label: `${info.label} level ${level}`, value: Math.floor(level / 5) }
   ]
   if (req.modifier) parts.push({ label: 'Situation', value: req.modifier })
+  if (req.reputation?.value) parts.push({ label: `Standing with ${req.reputation.faction}`, value: Math.max(-3, Math.min(3, req.reputation.value)) })
   if (SOCIAL_SKILLS.includes(req.skill) && req.withStrangers) {
     const sm = socialModifier(c.build.sex, settings.sexModifiers, c.renown)
     if (sm) parts.push({ label: sm < 0 ? 'Must prove yourself' : 'Standing & Renown', value: sm })

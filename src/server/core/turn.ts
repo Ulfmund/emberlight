@@ -38,6 +38,7 @@ import { DEFAULT_PERSONA, findPersona, personaCardId } from '@shared/personas'
 import { fillMacros, storyName } from '@shared/cards'
 import { estimateTokens, promptBlocks, type PromptReport } from '@shared/inspect'
 import { entityLine, projectMemory, relevantEntities, sameName, storySoFar, type Summary } from '@shared/memory'
+import { factionBrief, factionStanding, withReputation } from '@shared/factions'
 import { summarizeChapter, summarizeScene, updateArc } from '../ai/jobs/summarizer'
 import { createProvider, type Provider } from '../ai/providers'
 import { runCombatReferee, runReferee } from '../ai/jobs/referee'
@@ -452,15 +453,18 @@ export class TurnEngine {
     // What is the player doing? In a fight, one move (picked on the tracker, or read from their
     // words); otherwise, the Referee decides on checks and whether a fight starts.
     const recent = path.filter((m) => !m.meta.hidden).slice(-4).map((m) => ({ role: m.role, content: m.content }))
+    // What the groups the character deals with think of them: on social checks with their people.
+    const known = projectMemory(this.campaigns.activeEvents(c, path).map((e) => e.event))
+    const factions = factionBrief(known)
     const plan: TurnPlan = {}
-    if (input.forced) plan.ref = { checks: [input.forced], intent: 'other', fight: NO_FIGHT }
+    if (input.forced) plan.ref = { checks: withReputation(known, [input.forced]), intent: 'other', fight: NO_FIGHT }
     else if (input.work && working.character.status === 'alive' && !working.combat) plan.ref = { checks: [], intent: input.work.kind, fight: NO_FIGHT, work: input.work }
     else if (input.spell && working.character.status === 'alive' && !working.combat) plan.ref = { checks: [], intent: 'other', fight: NO_FIGHT, spell: input.spell }
     else if (working.character.status === 'alive' && working.combat) {
       plan.combat = input.combat
       if (!plan.combat) {
         try {
-          plan.combat = await runCombatReferee(ctx.provider, ctx.model, working, recent, withPicture(input.text, imageText))
+          plan.combat = await runCombatReferee(ctx.provider, ctx.model, working, recent, withPicture(input.text, imageText), factions)
         } catch (err) {
           plan.combat = guessCombatAction(input.text)
           yield { type: 'notice', message: `The referee couldn't read that move (${(err as Error).message}), so it counts as ${actionLabel(plan.combat, working)}.` }
@@ -468,13 +472,15 @@ export class TurnEngine {
       }
     } else if (working.character.status === 'alive') {
       try {
-        plan.ref = await runReferee(ctx.provider, ctx.model, working, recent, withPicture(input.text, imageText), settings.rolls)
+        plan.ref = await runReferee(ctx.provider, ctx.model, working, recent, withPicture(input.text, imageText), settings.rolls, factions)
+        plan.ref.checks = withReputation(known, plan.ref.checks)
       } catch (err) {
         plan.ref = null
         yield { type: 'notice', message: `The referee couldn't decide on a roll (${(err as Error).message}), so the story continues without one.` }
       }
     }
 
+    if (plan.combat && (plan.combat.kind === 'talk' || plan.combat.kind === 'other')) plan.combat = { ...plan.combat, checks: withReputation(known, plan.combat.checks) }
     const out = this.engineTurn(working, settings, plan, { action: input.kind === 'action', sinceEvent: this.turnsSinceEvent(c, path) })
     plan.event = out.eventId
     if (out.events.length) this.campaigns.db.addEvents(id, msg.id, newId('grp'), 'engine', out.events)
@@ -561,7 +567,8 @@ export class TurnEngine {
     const names = nameSuggestions(this.rng)
     const pinned = memory.notes.map((n) => `- ${n.text}`).join('\n')
     const persona = this.personaFor(c.settings.persona)
-    const build = (story: string) => narratorSystem(after, c.settings, names, c.cast, lore, { story, people, notes: pinned, companions }, persona)
+    const factions = factionStanding(memory)
+    const build = (story: string) => narratorSystem(after, c.settings, names, c.cast, lore, { story, people, notes: pinned, companions, factions }, persona)
     const storyBudget = Math.round(ctx.contextChars * tier.storyShare)
     let system = build(storySoFar(memory, storyBudget, () => false))
     let messages = fitHistory(history, budget(system))
