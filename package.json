@@ -12,7 +12,8 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "package": "electron-vite build && electron-builder --win --publish never"
+    "package": "electron-vite build && electron-builder --win --publish never",
+    "test": "vitest run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",
@@ -40,6 +41,7 @@
     "tailwindcss": "^4.3.5",
     "typescript": "^7.0.2",
     "vite": "^8.3.6",
+    "vitest": "^5.1.0",
     "zustand": "^5.1.0"
   }
 }

@@ -2,22 +2,17 @@ import { createServer as createHttpServer } from 'node:http'
 import { readFile } from 'node:fs/promises'
 import { extname, join, normalize, sep } from 'node:path'
 import { Hono } from 'hono'
-import { streamSSE } from 'hono/streaming'
 import { getRequestListener } from '@hono/node-server'
 import { z } from 'zod'
-import {
-  ChatRequest,
-  Connection,
-  type SettingsView,
-  type StreamEvent,
-  type TestResult,
-  type UpdateStatus
-} from '@shared/types'
+import { Connection, type SettingsView, type TestResult, type UpdateStatus } from '@shared/types'
 import { findPreset } from '@shared/presets'
 import { SettingsStore } from './store/settings'
 import { SecretStore, type Cipher } from './store/secrets'
+import { GameDb } from './store/db'
 import { createProvider } from './ai/providers'
-import { NARRATOR_SYSTEM } from './ai/narrator'
+import { Campaigns } from './core/campaigns'
+import { TurnEngine } from './core/turn'
+import { registerGameRoutes } from './routes/game'
 
 export type ServerOptions = {
   dataDir: string
@@ -165,29 +160,11 @@ export async function startServer(opts: ServerOptions): Promise<{ port: number; 
     return c.json<TestResult>({ ok: false, message: lastError || 'Could not connect.' })
   })
 
-  // ---- Chat (streamed) -----------------------------------------------------------------
-  app.post('/api/chat', async (c) => {
-    const body = ChatRequest.safeParse(await c.req.json().catch(() => null))
-    const conn = settings.connection
-    return streamSSE(c, async (stream) => {
-      const send = (ev: StreamEvent) => stream.writeSSE({ data: JSON.stringify(ev) })
-      if (!body.success) return void (await send({ type: 'error', message: 'Invalid chat request.' }))
-      if (!conn || !conn.model) {
-        return void (await send({ type: 'error', message: 'No model is connected yet. Open Connect a Model first.' }))
-      }
-      const controller = new AbortController()
-      stream.onAbort(() => controller.abort())
-      const provider = createProvider(conn, await secrets.get(conn.presetId))
-      for await (const ev of provider.chat(conn.model, {
-        system: NARRATOR_SYSTEM,
-        messages: body.data.messages,
-        signal: controller.signal
-      })) {
-        if (controller.signal.aborted) break
-        await send(ev)
-      }
-    })
-  })
+  // ---- The game (campaigns, turns, saves) -----------------------------------------------
+  const db = new GameDb(opts.dataDir)
+  const campaigns = new Campaigns(db)
+  const turns = new TurnEngine(campaigns, () => settings.connection, (id) => secrets.get(id))
+  registerGameRoutes(app, campaigns, turns)
 
   // ---- The UI itself (production) ------------------------------------------------------
   if (opts.staticDir) {
@@ -222,7 +199,7 @@ export async function startServer(opts: ServerOptions): Promise<{ port: number; 
           resolve()
         })
       })
-      return { port, close: () => server.close() }
+      return { port, close: () => { server.close(); db.close() } }
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'EADDRINUSE' || i === tries - 1) throw err
       port++

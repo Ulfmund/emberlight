@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import type { ContextReport, ModelInfo, StreamEvent } from '@shared/types'
-import type { ChatOptions, Provider } from './types'
+import type { ChatOptions, CompleteOptions, Provider } from './types'
 import { describeContext } from './context'
 
 /** Models that take adaptive thinking (and reject a fixed thinking budget). */
@@ -35,6 +36,32 @@ export class AnthropicProvider implements Provider {
       return describeContext({ max: m.max_input_tokens, loaded: m.max_input_tokens })
     } catch {
       return {}
+    }
+  }
+
+  async complete<T>(model: string, opts: CompleteOptions<T>): Promise<T> {
+    const messages: Anthropic.MessageParam[] = opts.messages.map((m) => ({ role: m.role, content: m.content }))
+    if (messages[0]?.role !== 'user') messages.unshift({ role: 'user', content: '(Begin.)' })
+    const params: Record<string, unknown> = {
+      model,
+      max_tokens: 8000,
+      system: opts.system,
+      messages,
+      // Bookkeeping jobs are simple: keep reasoning light so they're quick and cheap.
+      output_config: { format: zodOutputFormat(opts.schema), ...(ADAPTIVE.test(model) ? { effort: 'low' } : {}) }
+    }
+    try {
+      const response = await this.client.messages.parse(
+        params as unknown as Parameters<typeof this.client.messages.parse>[0],
+        { signal: opts.signal }
+      )
+      if (response.stop_reason === 'refusal') throw new Error('The model declined this request.')
+      const parsed = (response as unknown as { parsed_output: T | null }).parsed_output
+      if (parsed == null) throw new Error("The model's answer didn't match the expected format.")
+      return parsed
+    } catch (err) {
+      if (err instanceof Error && !(err instanceof Anthropic.APIError)) throw err
+      throw new Error(describeAnthropicError(err))
     }
   }
 

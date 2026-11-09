@@ -1,0 +1,70 @@
+import type { CampaignSettings, CharacterBuild, CheckResult, GameState, SkillId } from './rules'
+
+/** What the interface gets for one campaign. Built by the server from the save file. */
+
+export type ChangeLine = { text: string; tone: 'good' | 'bad' | 'neutral'; icon: string }
+
+export type MessageView = {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  thinking: string
+  hidden: boolean
+  kind?: string
+  error?: string
+  notice?: string
+  requestCheck?: { skill: SkillId; difficulty: string; reason: string; hidden: boolean }
+  /** Alternate versions (swipes) of this message. */
+  swipe?: { index: number; count: number; ids: string[] }
+  checks: CheckResult[]
+  changes: ChangeLine[]
+  createdAt: number
+}
+
+export type CampaignView = {
+  id: string
+  name: string
+  settings: CampaignSettings
+  build: CharacterBuild
+  state: GameState
+  derived: {
+    maxHp: number
+    maxStamina: number
+    maxMana: number
+    attrCaps: Record<string, number>
+    skillCaps: Record<string, number>
+    skillLevels: Record<string, number>
+    renownTier: string
+    xpIntoLevel: number
+    xpForNext: number
+  }
+  messages: MessageView[]
+  /** The newest message is the player's and the DM hasn't answered yet. */
+  awaitingNarration: boolean
+  saves: { id: string; name: string; messageId: string; createdAt: number }[]
+}
+
+export type CampaignSummary = {
+  id: string
+  name: string
+  characterName: string
+  race: string
+  sex: string
+  background: string
+  level: number
+  status: string
+  location: string | null
+  day: number
+  updatedAt: number
+}
+
+/** Streamed while a turn is being played out. */
+export type TurnEvent =
+  | { type: 'player'; message: MessageView }
+  | { type: 'checks'; checks: CheckResult[]; deathRoll?: { roll: number; success: boolean } }
+  | { type: 'narration_start'; messageId: string }
+  | { type: 'thinking'; text: string }
+  | { type: 'text'; text: string }
+  | { type: 'view'; view: CampaignView }
+  | { type: 'error'; message: string }
+  | { type: 'notice'; message: string }

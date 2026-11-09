@@ -1,5 +1,17 @@
 import type { ContextReport, ModelInfo, StreamEvent } from '@shared/types'
-import { type ChatOptions, type Provider, friendlyError, getJson, readHttpError, readLines, ThinkTagSplitter } from './types'
+import {
+  type ChatOptions,
+  type CompleteOptions,
+  type Provider,
+  friendlyError,
+  getJson,
+  JSON_ONLY,
+  parseJsonReply,
+  readHttpError,
+  readLines,
+  ThinkTagSplitter,
+  toJsonSchema
+} from './types'
 import { describeContext } from './context'
 
 /** Ollama's default context is small unless you raise it, so we ask for this much by default. */
@@ -54,6 +66,30 @@ export class OllamaProvider implements Provider {
       { max, requested },
       'You can raise it under Advanced on the Connect screen (bigger uses more memory).'
     )
+  }
+
+  async complete<T>(model: string, opts: CompleteOptions<T>): Promise<T> {
+    let res: Response
+    try {
+      res = await fetch(`${this.baseUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: opts.signal ?? AbortSignal.timeout(120_000),
+        body: JSON.stringify({
+          model,
+          stream: false,
+          // Ollama constrains the output to this JSON Schema.
+          format: toJsonSchema(opts.schema),
+          messages: [{ role: 'system', content: opts.system + JSON_ONLY }, ...opts.messages],
+          options: { num_ctx: await this.numCtx(model), temperature: 0.3, num_predict: 1500 }
+        })
+      })
+    } catch (err) {
+      throw new Error(friendlyError(err, 'Ollama'))
+    }
+    if (!res.ok) throw new Error(await readHttpError(res))
+    const j = (await res.json()) as { message?: { content?: string } }
+    return parseJsonReply(j.message?.content ?? '', opts.schema)
   }
 
   async *chat(model: string, opts: ChatOptions): AsyncIterable<StreamEvent> {

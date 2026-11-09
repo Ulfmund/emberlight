@@ -1,9 +1,20 @@
+import { z } from 'zod'
 import type { ChatMessage, ContextReport, ModelInfo, StreamEvent } from '@shared/types'
 
 export type ChatOptions = {
   system: string
   messages: ChatMessage[]
   signal: AbortSignal
+}
+
+export type CompleteOptions<T> = {
+  system: string
+  messages: ChatMessage[]
+  /** The shape the answer must have. Used to constrain the model where the server supports it. */
+  schema: z.ZodType<T>
+  /** Short name for the schema (some servers require one). */
+  name: string
+  signal?: AbortSignal
 }
 
 /**
@@ -14,8 +25,43 @@ export interface Provider {
   listModels(signal?: AbortSignal): Promise<ModelInfo[]>
   /** Best-effort look at the model's context size. Never throws. */
   inspectContext(model: string, signal?: AbortSignal): Promise<ContextReport>
+  /** Streams story text. */
   chat(model: string, opts: ChatOptions): AsyncIterable<StreamEvent>
+  /** A short structured answer (JSON matching `schema`). Throws if the model can't produce one. */
+  complete<T>(model: string, opts: CompleteOptions<T>): Promise<T>
 }
+
+/** JSON Schema for servers that take one (LM Studio, llama.cpp, Ollama…). */
+export function toJsonSchema(schema: z.ZodType): Record<string, unknown> {
+  const js = z.toJSONSchema(schema, { target: 'draft-7' }) as Record<string, unknown>
+  delete js.$schema
+  return js
+}
+
+/**
+ * Pulls a JSON object out of a model reply, tolerating thinking tags, code fences and chatter
+ * around it, then checks it against the schema. Throws with a readable reason on failure.
+ */
+export function parseJsonReply<T>(text: string, schema: z.ZodType<T>): T {
+  let s = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+  const fence = /```(?:json)?\s*([\s\S]*?)```/.exec(s)
+  if (fence) s = fence[1]
+  const start = s.indexOf('{')
+  const end = s.lastIndexOf('}')
+  if (start < 0 || end <= start) throw new Error('The model did not reply with JSON.')
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(s.slice(start, end + 1))
+  } catch {
+    throw new Error('The model replied with broken JSON.')
+  }
+  const result = schema.safeParse(parsed)
+  if (!result.success) throw new Error(`The model's JSON didn't match: ${result.error.issues[0]?.message ?? 'invalid'}`)
+  return result.data
+}
+
+export const JSON_ONLY =
+  '\n\nReply with a single JSON object only, matching the requested format. No other text.'
 
 /** A short, readable error for the UI, from whatever fetch/HTTP failure happened. */
 export function friendlyError(err: unknown, serverName: string): string {

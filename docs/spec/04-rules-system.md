@@ -41,14 +41,18 @@ Each character has a personal maximum for every attribute:
 | Halfling | −3 | +3 | 0 | 0 | −1 | 0 | +1 | **Small & Lucky:** once per day reroll a natural 1 |
 | Orc | +3 | 0 | +2 | −2 | −1 | 0 | −2 | **Relentless:** once per day stay at 1 HP instead of going down |
 
-**Sex:**
+**Sex** (campaign setting **Sex modifiers: Realistic** (default) **/ Off**):
 
-| | STR | PRE |
-|---|---|---|
-| Male | +1 | −1 |
-| Female | −1 | +1 |
+The design goal is two very different playthroughs. Men hold the physical power but must prove themselves socially; women gain access easily but are fragile in a fight, and mostly fight with magic.
 
-(Campaign setting: "Sex modifiers on/off". On by default.)
+| | STR | AGI | END | INT | ARC | WIT | PRE | Other |
+|---|---|---|---|---|---|---|---|---|
+| Male | +2 | 0 | +1 | 0 | 0 | 0 | −1 | Base HP 10. **Must prove himself:** −2 on social checks with strangers and authority, offset by Renown (+1 per 12 Renown, up to +6). |
+| Female | −3 | +1 | −2 | 0 | +2 | +1 | +2 | Base HP 6. +5 affinity to Spellcasting, Enchanting, Alchemy and Medicine caps. **Easy access:** +2 on social checks; Renown counts for less (+1 per 25, up to +3). |
+
+**Defeat by human (or other sentient) enemies** can mean capture instead of death: when a character is downed by sentient foes, the engine first rolls for capture (**female 65%**, **male 20%**). A captured character wakes at 1 HP, stripped of weapons, as a prisoner; the DM then runs the captivity and any escape. Beasts, monsters and the environment never capture.
+
+With the setting **Off**, both sexes use the male physical row with no social modifiers, base HP 8, and a 35% capture chance.
 
 **Age** (aging over time is a v2 feature; at character creation it's a one-time choice):
 
@@ -56,8 +60,8 @@ Each character has a personal maximum for every attribute:
 |---|---|---|---|---|---|---|---|---|
 | Young | 0 | +1 | +1 | −1 | −1 | 0 | 0 | +10% skill XP |
 | Adult | 0 | 0 | 0 | 0 | 0 | 0 | 0 | — |
-| Middle-aged | −1 | −1 | 0 | +1 | +1 | +1 | 0 | +1 starting skill point |
-| Elder | −2 | −2 | −2 | +2 | +2 | +1 | +1 | +3 starting skill points |
+| Middle-aged | −1 | −1 | 0 | +1 | +1 | +1 | 0 | +2 starting skill levels, +3 Renown |
+| Elder | −2 | −2 | −2 | +2 | +2 | +1 | +1 | +5 starting skill levels, +8 Renown |
 
 ### Starting attributes
 
@@ -67,7 +71,7 @@ All attributes start at 8. Spend **24 points**: 1 point per level up to 14, 2 po
 
 ## Skills
 
-Skills level from **1 to 50**, by **use** (OSRS-style XP) and by **skill points** from leveling up.
+Skills level from **1 to 50** **only by doing** (OSRS-style XP): every check with a skill trains it. The only exception is character creation, where the background's starting levels plus **6 starting skill levels** (more for older characters) are spread by the player, up to level 10 in any one skill.
 
 **Skill check bonus = governing attribute modifier + floor(skill level / 5)** (so +0 to +10 from the skill).
 
@@ -181,7 +185,7 @@ Both sides roll (e.g. Stealth vs. Perception); the higher total wins, and the at
 
 | Resource | Formula | Recovers by |
 |---|---|---|
-| **HP** | 8 + END + level × max(1, 3 + END mod) | Long rest (half max), food, potions, Medicine, healing magic |
+| **HP** | Base HP (by sex: 10 / 6, or 8) + END + level × max(1, 3 + END mod) | Long rest (half max), food, potions, Medicine, healing magic |
 | **Stamina** | 10 + END + AGI mod | Short rest (full); spent on sprinting, power attacks, dodging, heavy labor |
 | **Mana** | ARC × 2 + level × max(0, ARC mod) | Long rest (full); spent on spells |
 
@@ -242,6 +246,7 @@ Bleeding, Poisoned, Diseased, Burning, Stunned, Prone, Frightened, Exhausted (st
 
 ## Death
 
+- **Downed by sentient enemies:** roll for capture first (see the sex table). Captured characters survive as prisoners.
 - **0 HP → Downed.** Unconscious, and each turn you make a **death roll** (d20 + END mod vs. 10). Three failures: death. Three successes: stable at 0 HP. A natural 1 counts as two failures.
 - **Instant death:** if damage would take you to −(half max HP) or lower.
 - Allies or NPCs can stabilize a downed character with Medicine (DC 12) or healing.
@@ -256,7 +261,16 @@ Bleeding, Poisoned, Diseased, Burning, Stunned, Prone, Frightened, Exhausted (st
 ## Character level
 
 - **Character XP** comes from: skill XP (a fraction of all of it), defeating enemies, quests and story milestones (granted by the DM through a `grant_xp` request, limited by the engine).
-- **Level-up** (levels 1–30): +1 attribute point (up to the cap), +3 skill points (each raises a skill one level, up to its cap), and an HP increase. A big level-up moment with animation and a sound. Points can be spent now or later.
+- **Level-up** (levels 1–30): +1 attribute point (up to the cap), an HP increase, and **+2 Renown**. A big level-up moment with animation and a sound. The attribute point can be spent now or later. (Skills never get points; they only grow by use.)
+
+## Renown
+
+Renown is how widely and how well the character is known. It changes how people treat them, and it grows **slowly** and **from the story**.
+
+- **Score 0–100**, shown as a tier: Nobody (0–4) · Local name (5–14) · Known (15–29) · Respected (30–49) · Renowned (50–74) · Famous (75–89) · Legendary (90+).
+- **Gained from:** each level-up (+2), and notable deeds the Scribe picks out of the story (+1 to +3, at most one deed per scene, each deed recorded with a short line such as "slew the river-thing at Millbrook"). Infamy counts too: a notorious deed raises Renown but sours first impressions.
+- **Effects:** a bonus on social checks (scaled by sex; see the sex table), better first impressions from strangers, and the narrator is told the tier and the character's best-known deeds so NPCs can recognise them ("You're the one who…").
+- Renown points are never spent; they accumulate.
 
 ---
 

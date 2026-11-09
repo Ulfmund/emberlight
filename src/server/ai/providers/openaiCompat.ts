@@ -1,12 +1,16 @@
 import type { ContextReport, ModelInfo, StreamEvent } from '@shared/types'
 import {
   type ChatOptions,
+  type CompleteOptions,
   type Provider,
   friendlyError,
   getJson,
+  JSON_ONLY,
+  parseJsonReply,
   readHttpError,
   readLines,
-  ThinkTagSplitter
+  ThinkTagSplitter,
+  toJsonSchema
 } from './types'
 import { describeContext } from './context'
 
@@ -92,6 +96,10 @@ export class OpenAICompatProvider implements Provider {
     return {}
   }
 
+  complete<T>(model: string, opts: CompleteOptions<T>): Promise<T> {
+    return openAiComplete(this.baseUrl, this.headers(), this.serverName, model, opts)
+  }
+
   async *chat(model: string, opts: ChatOptions): AsyncIterable<StreamEvent> {
     let res: Response
     try {
@@ -150,6 +158,53 @@ export class OpenAICompatProvider implements Provider {
     for (const ev of splitter.flush()) yield ev
     yield { type: 'done', stopReason }
   }
+}
+
+/** Remembers servers that rejected `response_format`, so we don't keep asking. */
+const noSchemaSupport = new Set<string>()
+
+export async function openAiComplete<T>(
+  baseUrl: string,
+  headers: Record<string, string>,
+  serverName: string,
+  model: string,
+  opts: CompleteOptions<T>
+): Promise<T> {
+  const useSchema = !noSchemaSupport.has(baseUrl)
+  const body = (withSchema: boolean) =>
+    JSON.stringify({
+      model,
+      stream: false,
+      temperature: 0.3,
+      max_tokens: 1500,
+      messages: [{ role: 'system', content: opts.system + JSON_ONLY }, ...opts.messages],
+      ...(withSchema
+        ? { response_format: { type: 'json_schema', json_schema: { name: opts.name, schema: toJsonSchema(opts.schema) } } }
+        : {})
+    })
+  const send = async (withSchema: boolean) => {
+    try {
+      return await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers,
+        body: body(withSchema),
+        signal: opts.signal ?? AbortSignal.timeout(120_000)
+      })
+    } catch (err) {
+      throw new Error(friendlyError(err, serverName))
+    }
+  }
+
+  let res = await send(useSchema)
+  if (useSchema && (res.status === 400 || res.status === 422 || res.status === 500)) {
+    // This server doesn't understand schema-constrained output; fall back to plain JSON.
+    noSchemaSupport.add(baseUrl)
+    res = await send(false)
+  }
+  if (!res.ok) throw new Error(await readHttpError(res))
+  const j = (await res.json()) as { choices?: { message?: { content?: string } }[] }
+  const text = j.choices?.[0]?.message?.content ?? ''
+  return parseJsonReply(text, opts.schema)
 }
 
 function num(v: unknown): number | undefined {
