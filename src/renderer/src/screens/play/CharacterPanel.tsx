@@ -21,7 +21,14 @@ export function timeLabel(minute: number) {
   return { part, icon: h < 6 || h >= 20 ? 'moon' : 'sparkle' }
 }
 
-export function CharacterPanel({ view, onOpenSheet }: { view: CampaignView; onOpenSheet: () => void }) {
+function journalLine(v: CampaignView) {
+  const people = v.memory.entities.filter((e) => e.kind === 'person').length
+  const places = v.memory.entities.length - people
+  if (!people && !places) return 'People and places you meet'
+  return `${people} ${people === 1 ? 'person' : 'people'} · ${places} ${places === 1 ? 'place' : 'places'}`
+}
+
+export function CharacterPanel({ view, onOpenSheet, onOpenJournal }: { view: CampaignView; onOpenSheet: () => void; onOpenJournal: () => void }) {
   const c = view.state.character
   const b = view.build
   const d = view.derived
@@ -50,6 +57,19 @@ export function CharacterPanel({ view, onOpenSheet }: { view: CampaignView; onOp
           </motion.div>
         )}
       </AnimatePresence>
+
+      <motion.button
+        whileHover={{ y: -1 }}
+        whileTap={{ scale: 0.97 }}
+        onClick={onOpenJournal}
+        className="no-drag focus-ring flex w-full cursor-pointer items-center gap-3 rounded-xl border border-gold-500/25 bg-ink-900/80 px-3 py-2.5 text-left hover:border-gold-400/60"
+      >
+        <Icon name="book" size={22} className="shrink-0 text-gold-300" />
+        <span className="min-w-0">
+          <span className="block font-display text-sm tracking-wider text-gold-200">Journal</span>
+          <span className="block truncate text-xs text-parchment-400">{journalLine(view)}</span>
+        </span>
+      </motion.button>
 
       {view.cast.some((m) => m.role === 'companion') && (
         <div>

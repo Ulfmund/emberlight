@@ -140,3 +140,5 @@ A **📖 Journal** tab with sub-tabs, all editable:
 - **Hall of the Fallen:** dead characters
 
 Correcting something in the Journal corrects the AI's memory, since the Journal *is* the memory.
+
+**Built (0.4.0):** a Journal overlay (button on the character panel) with **People**, **Places**, **Story** (the story so far, then chapters with their scenes, then scenes since the last chapter) and **Pinned** notes. Everything is editable: name, other names, description, facts, feelings and status; summary titles and text; the story so far. People and places can be forgotten. Pinned notes go into every prompt ("PINNED NOTES"). Journal changes are player events (`entity_edit`, `entity_forget`, `summary_edit`, `arc`, `note`, `note_remove`) tied to the very first message, so they survive rerolls, rewrites and rewinds; a correction to someone who doesn't exist on the current branch does nothing there. A renamed record keeps its old name as another name, so the AI's later mentions still find it. Factions, quests and the Hall of the Fallen come later.

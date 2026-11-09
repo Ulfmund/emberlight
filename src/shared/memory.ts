@@ -48,7 +48,11 @@ export type Memory = {
   chapters: Summary[]
   /** "The story so far": a running summary of everything in the chapters. */
   arc: string
+  /** Facts the player pinned: the DM always sees these. */
+  notes: Note[]
 }
+
+export type Note = { id: string; text: string }
 
 /** Memory events (part of the GameEvent union). */
 export type MemoryEvent =
@@ -65,10 +69,29 @@ export type MemoryEvent =
     }
   | { type: 'summary'; summary: Summary }
   | { type: 'arc'; text: string }
+  | JournalEdit
+
+/** Corrections the player makes in the Journal. They win over what the AI recorded. */
+export type JournalEdit =
+  | {
+      type: 'entity_edit'
+      id: string
+      name?: string
+      aliases?: string[]
+      summary?: string
+      facts?: string[]
+      status?: EntityStatus
+      /** null clears it. */
+      attitude?: Attitude | null
+    }
+  | { type: 'entity_forget'; id: string }
+  | { type: 'summary_edit'; level: Summary['level']; to: string; title: string; text: string }
+  | { type: 'note'; id: string; text: string }
+  | { type: 'note_remove'; id: string }
 
 export const MAX_FACTS = 12
 
-export const emptyMemory = (): Memory => ({ entities: [], scenes: [], chapters: [], arc: '' })
+export const emptyMemory = (): Memory => ({ entities: [], scenes: [], chapters: [], arc: '', notes: [] })
 
 // ---- Names ----------------------------------------------------------------------------------
 
@@ -182,11 +205,51 @@ export function applyMemoryEvent(m: Memory, ev: MemoryEvent, counter: { n: numbe
     case 'arc':
       m.arc = ev.text.trim()
       break
+    case 'entity_edit': {
+      const e = m.entities.find((x) => x.id === ev.id)
+      if (!e) break
+      if (ev.aliases) e.aliases = ev.aliases.map((a) => a.trim()).filter(Boolean)
+      if (ev.name?.trim() && ev.name.trim() !== e.name) {
+        // Keep the old spelling as another name, so the AI's later mentions still find this record.
+        if (!e.aliases.some((a) => normName(a) === normName(e.name))) e.aliases.push(e.name)
+        e.name = ev.name.trim()
+      }
+      e.aliases = e.aliases.filter((a) => normName(a) !== normName(e.name)).slice(-6)
+      if (ev.summary !== undefined) e.summary = ev.summary.trim()
+      if (ev.facts) e.facts = ev.facts.map((f) => f.trim()).filter(Boolean).slice(-MAX_FACTS)
+      if (ev.status) e.status = ev.status
+      if (ev.attitude !== undefined && e.kind === 'person') e.attitude = ev.attitude ?? undefined
+      break
+    }
+    case 'entity_forget':
+      m.entities = m.entities.filter((x) => x.id !== ev.id)
+      break
+    case 'summary_edit': {
+      const list = ev.level === 'scene' ? m.scenes : m.chapters
+      const sm = list.find((x) => x.to === ev.to)
+      if (sm) {
+        sm.title = ev.title.trim() || sm.title
+        sm.text = ev.text.trim() || sm.text
+      }
+      break
+    }
+    case 'note': {
+      const text = ev.text.trim()
+      const n = m.notes.find((x) => x.id === ev.id)
+      if (!text) m.notes = m.notes.filter((x) => x.id !== ev.id)
+      else if (n) n.text = text
+      else m.notes.push({ id: ev.id, text })
+      break
+    }
+    case 'note_remove':
+      m.notes = m.notes.filter((x) => x.id !== ev.id)
+      break
   }
   return m
 }
 
-const isMemoryEvent = (ev: { type: string }): ev is MemoryEvent => ev.type === 'entity' || ev.type === 'summary' || ev.type === 'arc'
+const MEMORY_TYPES = new Set(['entity', 'summary', 'arc', 'entity_edit', 'entity_forget', 'summary_edit', 'note', 'note_remove'])
+export const isMemoryEvent = (ev: { type: string }): ev is MemoryEvent => MEMORY_TYPES.has(ev.type)
 
 export function projectMemory(events: ReadonlyArray<MemoryEvent | { type: string }>): Memory {
   const m = emptyMemory()

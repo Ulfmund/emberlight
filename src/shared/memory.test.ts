@@ -78,6 +78,35 @@ describe('memory from events', () => {
   })
 })
 
+describe('Journal corrections', () => {
+  it('lets the player rename, rewrite and forget, and the AI keeps finding the record', () => {
+    const m = projectMemory([
+      person('Wilth', { summary: 'innkeeper', facts: ['roof leaks', 'wrong fact'], attitude: 'neutral' }),
+      { type: 'entity_edit', id: 'person:wilth', name: 'Wilith', summary: 'innkeeper of the Goose', facts: ['roof leaks'], attitude: 'friendly' },
+      // The AI still uses the old spelling sometimes: it lands on the same record.
+      person('Wilth', { facts: ['lent the player a lantern'] })
+    ])
+    expect(m.entities).toHaveLength(1)
+    expect(m.entities[0]).toMatchObject({ name: 'Wilith', aliases: ['Wilth'], summary: 'innkeeper of the Goose', attitude: 'friendly', facts: ['roof leaks', 'lent the player a lantern'] })
+    const gone = projectMemory([person('Wilth'), { type: 'entity_forget', id: 'person:wilth' }])
+    expect(gone.entities).toHaveLength(0)
+  })
+
+  it('edits summaries and keeps pinned notes', () => {
+    const scene: Summary = { level: 'scene', title: 'S', text: 'old.', from: 'a', to: 'b', fromDay: 1, toDay: 1 }
+    const m = projectMemory([
+      { type: 'summary', summary: scene },
+      { type: 'summary_edit', level: 'scene', to: 'b', title: 'Better', text: 'new.' },
+      { type: 'note', id: 'n1', text: 'Mira is secretly the baron’s daughter.' },
+      { type: 'note', id: 'n2', text: 'temp' },
+      { type: 'note', id: 'n1', text: 'Mira is secretly the baron’s niece.' },
+      { type: 'note_remove', id: 'n2' }
+    ])
+    expect(m.scenes[0]).toMatchObject({ title: 'Better', text: 'new.' })
+    expect(m.notes).toEqual([{ id: 'n1', text: 'Mira is secretly the baron’s niece.' }])
+  })
+})
+
 describe('story so far', () => {
   const scene = (n: number): Summary => ({ level: 'scene', title: `S${n}`, text: `scene ${n}.`, from: `m${n * 10}`, to: `m${n * 10 + 9}`, fromDay: n, toDay: n })
   const events: MemoryEvent[] = [1, 2, 3].map((n) => ({ type: 'summary', summary: scene(n) }))

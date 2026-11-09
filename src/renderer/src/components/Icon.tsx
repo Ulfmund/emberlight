@@ -342,6 +342,18 @@ const paths: Record<string, React.ReactNode> = {
       <circle cx="12" cy="12" r="2.8" />
     </>
   ),
+  book: (
+    <>
+      <path d="M12 6.5c-2-1.6-4.8-2-8-1.5v13c3.2-.5 6 0 8 1.5 2-1.5 4.8-2 8-1.5V5c-3.2-.5-6-.1-8 1.5z" />
+      <path d="M12 6.5v13" />
+    </>
+  ),
+  pin: (
+    <>
+      <path d="M9 3.5h6l-1 5 3.5 3.5h-11L10 8.5z" />
+      <path d="M12 12v8.5" />
+    </>
+  ),
   upload: (
     <>
       <path d="M12 15.5V4M7.5 8.5 12 4l4.5 4.5" />

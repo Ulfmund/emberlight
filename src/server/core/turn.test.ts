@@ -286,11 +286,21 @@ describe('turn engine', () => {
     expect(fake.lastSystem).toContain('- Old Tam (also called the ferryman, friendly toward the player, last seen day 1): ferryman at Millbrook. Known: lost two fingers to the river; owes Brenna a favour.')
     expect(fake.lastSystem).toContain('- Millbrook Crossing (place')
 
+    // The player corrects him in the Journal and pins a note; then rewrites the DM's reply.
+    campaigns.journal(id, { type: 'entity_edit', id: 'person:old tam', summary: 'ferryman and smuggler', attitude: 'devoted' })
+    campaigns.journal(id, { type: 'note', id: 'n1', text: 'Tam is secretly my uncle.' })
+    await run(engine.regenerate(id, signal))
+    expect(fake.lastSystem).toContain('- Old Tam (also called the ferryman, devoted toward the player, last seen day 1): ferryman and smuggler.')
+    expect(fake.lastSystem).toContain('PINNED NOTES (the player wants you to always keep these true)\n- Tam is secretly my uncle.')
+    expect(campaigns.view(id).memory.notes).toHaveLength(1)
+
     // Rewind to before meeting him: he's gone from memory.
     campaigns.rewind(id, before)
     await run(engine.act(id, 'I sit by the fire.', signal))
     expect(fake.lastSystem).not.toContain('ferryman at Millbrook')
     expect(fake.lastSystem).not.toContain('PEOPLE AND PLACES FROM EARLIER')
+    // The player's pinned notes are theirs: they survive the rewind.
+    expect(fake.lastSystem).toContain('- Tam is secretly my uncle.')
   })
 
   it('summarizes a long campaign so a small model keeps the thread', async () => {

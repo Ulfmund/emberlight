@@ -27,7 +27,7 @@ Built in milestones. Each one ends with something playable, so the artist can te
 - Scribe job; entity registry; relationships and dispositions *(people and places with facts, status and attitude ✅ 0.3.0; factions, items and relationships between NPCs to do)*
 - In-game clock; timeline; layered summaries *(clock and scene / chapter / story-so-far summaries ✅ 0.3.0; timeline view comes with the Journal)*
 - Budget-aware prompt assembly (lean / standard / rich) + context inspector
-- Journal tab (People, Places, Timeline), all editable
+- Journal tab (People, Places, Timeline), all editable *(People, Places, Story and Pinned notes ✅ 0.4.0)*
 - Lorebooks (core features + SillyTavern import)
 - **Example world template:** a small region with a filled-in lorebook, NPC stubs and an opening scene, to copy or learn from
 - Name generators, banned-name stream filter, phrase list

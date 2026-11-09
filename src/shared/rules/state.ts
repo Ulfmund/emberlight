@@ -26,7 +26,7 @@ import {
   type SkillId
 } from './tables'
 import type { CheckResult } from './checks'
-import type { MemoryEvent } from '../memory'
+import { isMemoryEvent, type MemoryEvent } from '../memory'
 
 export type CampaignSettings = {
   sexModifiers: SexMode
@@ -154,7 +154,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 /** Returns a new state with one event applied. Pure: never mutates its input. */
 export function applyEvent(prev: GameState, ev: GameEvent, settings: CampaignSettings): GameState {
   // Memory is built separately (projectMemory in shared/memory.ts), so the game state stays small.
-  if (ev.type === 'entity' || ev.type === 'summary' || ev.type === 'arc') return prev
+  if (isMemoryEvent(ev)) return prev
   const s: GameState = structuredClone(prev)
   const c = s.character
   const d = () => derived(s, settings)

@@ -66,11 +66,12 @@ export function loreBlock(entries: CardBookEntry[]): string {
 }
 
 /** Long-term memory for the prompt: older story in summary, and people and places met. */
-export type MemoryText = { story: string; people: string }
+export type MemoryText = { story: string; people: string; notes?: string }
 
 function memoryBlock(m?: MemoryText): string {
   if (!m) return ''
   let out = ''
+  if (m.notes?.trim()) out += `\n\nPINNED NOTES (the player wants you to always keep these true)\n${m.notes.trim()}`
   if (m.story.trim()) out += `\n\nTHE STORY SO FAR (older events, in order; the conversation continues from here)\n${m.story.trim()}`
   if (m.people.trim()) out += `\n\nPEOPLE AND PLACES FROM EARLIER (keep their names, facts and feelings consistent; people who are dead stay dead)\n${m.people.trim()}`
   return out

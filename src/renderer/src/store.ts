@@ -3,6 +3,7 @@ import type { SettingsView } from '@shared/types'
 import type { Attr, CampaignSettings, CharacterBuild, CheckResult } from '@shared/rules'
 import type { CampaignSummary, CampaignView, MessageView, TurnEvent } from '@shared/view'
 import { api, type CreateOptions } from './api'
+import type { MemoryEvent } from '@shared/memory'
 
 export type Screen = 'title' | 'connect' | 'creator' | 'play' | 'load'
 
@@ -53,6 +54,8 @@ type State = {
   swipe(messageId: string): Promise<void>
   rewind(messageId: string): Promise<void>
   spend(attr: Attr): Promise<void>
+  /** A correction or note from the Journal. */
+  journal(edit: MemoryEvent): Promise<void>
   saveSlot(name: string): Promise<void>
   loadSlot(saveId: string): Promise<void>
   deleteSlot(saveId: string): Promise<void>
@@ -232,6 +235,14 @@ export const useGame = create<State>((set, get) => {
       const v = get().view
       if (!v) return
       set({ view: await api.spend(v.id, attr) })
+    },
+    journal: async (edit) => {
+      const v = get().view
+      if (!v) return
+      const view = await api.journal(v.id, edit)
+      // A turn may be streaming; its own final view will include this change too.
+      if (!get().busy) set({ view })
+      else set({ view: { ...get().view!, memory: view.memory } })
     },
     saveSlot: async (name) => {
       const v = get().view

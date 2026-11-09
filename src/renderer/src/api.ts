@@ -2,6 +2,7 @@ import type { Connection, SettingsView, TestResult, UpdateStatus } from '@shared
 import type { CampaignSettings, CharacterBuild, Attr } from '@shared/rules'
 import type { CampaignSummary, CampaignView, TurnEvent } from '@shared/view'
 import type { CardDetail, CardSummary } from '@shared/cards'
+import type { MemoryEvent } from '@shared/memory'
 
 export type CreateOptions = { playerCard?: string; companions?: string[]; useGreeting?: boolean }
 
@@ -52,6 +53,7 @@ export const api = {
   swipe: (id: string, messageId: string) => post(`/api/campaigns/${id}/swipe`, { messageId }).then((r) => json<CampaignView>(r)),
   rewind: (id: string, messageId: string) => post(`/api/campaigns/${id}/rewind`, { messageId }).then((r) => json<CampaignView>(r)),
   spend: (id: string, attr: Attr) => post(`/api/campaigns/${id}/spend`, { attr }).then((r) => json<CampaignView>(r)),
+  journal: (id: string, edit: MemoryEvent) => post(`/api/campaigns/${id}/journal`, { edit }).then((r) => json<CampaignView>(r)),
   addSave: (id: string, name: string) => post(`/api/campaigns/${id}/saves`, { name }).then((r) => json<CampaignView>(r)),
   loadSave: (id: string, saveId: string) => post(`/api/campaigns/${id}/saves/${saveId}/load`).then((r) => json<CampaignView>(r)),
   deleteSave: (id: string, saveId: string) =>

@@ -42,7 +42,9 @@ Click **Save connection**, then **Begin**.
 
 ### The DM's memory
 
-The DM keeps a record of the people and places you meet (what they're like, what they owe you, how they feel about you) and, in long adventures, writes summaries of older events. So even on a small local model it remembers what happened long after those messages stop fitting. On the **Connect** screen, under **Advanced**, you can set the model's context size; for Claude, a lower number costs less per turn.
+The DM keeps a record of the people and places you meet (what they're like, what they owe you, how they feel about you) and, in long adventures, writes summaries of older events. So even on a small local model it remembers what happened long after those messages stop fitting.
+
+Open the **Journal** (left panel) to see all of it: **People**, **Places** and the **Story** so far. If the DM got something wrong, click **Edit** on it and fix it; the DM goes by the Journal. Under **Pinned**, write anything the DM must never forget or contradict ("Mira is secretly the baron's daughter"). Pinned notes and corrections stay even if you rewind. On the **Connect** screen, under **Advanced**, you can set the model's context size; for Claude, a lower number costs less per turn.
 
 ### Character cards (from SillyTavern, Chub…)
 

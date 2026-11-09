@@ -18,6 +18,7 @@ import type { Campaigns } from '../core/campaigns'
 import type { TurnEngine } from '../core/turn'
 import type { CardLibrary } from '../cards/library'
 import { MAX_COMPANIONS, type CastMember } from '@shared/cards'
+import { MAX_FACTS, type MemoryEvent } from '@shared/memory'
 
 const tuple = <T extends string>(xs: readonly T[]) => xs as unknown as [T, ...T[]]
 
@@ -44,6 +45,25 @@ const SettingsSchema = z.object({
   tone: z.enum(['grim', 'grounded', 'heroic', 'whimsical', 'horror']),
   length: z.enum(['short', 'medium', 'long'])
 })
+
+const short = (n: number) => z.string().max(n)
+const JournalEditSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('entity_edit'),
+    id: short(200),
+    name: short(80).optional(),
+    aliases: z.array(short(80)).max(8).optional(),
+    summary: short(400).optional(),
+    facts: z.array(short(300)).max(MAX_FACTS).optional(),
+    status: z.enum(['alive', 'dead', 'missing', 'unknown']).optional(),
+    attitude: z.enum(['hostile', 'unfriendly', 'neutral', 'friendly', 'devoted']).nullable().optional()
+  }),
+  z.object({ type: z.literal('entity_forget'), id: short(200) }),
+  z.object({ type: z.literal('summary_edit'), level: z.enum(['scene', 'chapter']), to: short(80), title: short(120), text: short(4000) }),
+  z.object({ type: z.literal('arc'), text: short(4000) }),
+  z.object({ type: z.literal('note'), id: short(80), text: short(500) }),
+  z.object({ type: z.literal('note_remove'), id: short(80) })
+])
 
 /** Campaign and turn endpoints (the interface's whole view of the game). */
 export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnEngine, library: CardLibrary) {
@@ -190,6 +210,18 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
     if (!b) return c.json({ error: 'Missing attribute.' }, 400)
     const r = guard(() => {
       turns.spend(c.req.param('id'), b.attr as Attr)
+      return campaigns.view(c.req.param('id'))
+    })
+    return r.ok ? c.json(r.value) : c.json({ error: r.error }, 400)
+  })
+
+  // ---- journal (correcting the DM's memory) ------------------------------------------------
+
+  app.post('/api/campaigns/:id/journal', async (c) => {
+    const b = await body(c, z.object({ edit: JournalEditSchema }))
+    if (!b) return c.json({ error: 'That change could not be read.' }, 400)
+    const r = guard(() => {
+      campaigns.journal(c.req.param('id'), b.edit as MemoryEvent)
       return campaigns.view(c.req.param('id'))
     })
     return r.ok ? c.json(r.value) : c.json({ error: r.error }, 400)

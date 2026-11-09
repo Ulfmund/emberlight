@@ -21,7 +21,7 @@ import {
 } from '@shared/rules'
 import type { CampaignSummary, CampaignView, ChangeLine, MessageView } from '@shared/view'
 import type { CastMember } from '@shared/cards'
-import { projectMemory } from '@shared/memory'
+import { projectMemory, type MemoryEvent } from '@shared/memory'
 import { GameDb, newId, type CampaignRow, type EventRow, type MessageRow } from '../store/db'
 
 export const OPENING_TEXT = '((Begin the adventure: set an opening scene for my character.))'
@@ -222,6 +222,18 @@ export class Campaigns {
 
   rename(id: string, name: string) {
     this.db.updateCampaign(id, { name })
+  }
+
+  /**
+   * A correction or note from the Journal. It's tied to the very start of the story, so it
+   * survives rerolls, rewrites and rewinds: the Journal is the player's. A correction to
+   * someone who doesn't exist on the branch being played simply does nothing there.
+   */
+  journal(id: string, edit: MemoryEvent) {
+    const c = this.get(id)
+    const anchor = this.path(c)[0]
+    if (!anchor) throw new Error('This adventure has no story yet.')
+    this.db.addEvents(id, anchor.id, newId('jrnl'), 'player', [edit])
   }
 }
 

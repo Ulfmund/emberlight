@@ -9,10 +9,12 @@ import { SidePanel, type Tab } from './play/SidePanel'
 import { Story } from './play/Story'
 import { DiceTray } from './play/DiceTray'
 import { DeathScreen, Toasts } from './play/Overlays'
+import { Journal } from './play/Journal'
 
 export function PlayScreen() {
   const { view, busy, act, stop, live } = useGame()
   const [tab, setTab] = useState<Tab>('sheet')
+  const [journal, setJournal] = useState(false)
   const portraits = useMemo(() => (view ? portraitMap(view) : {}), [view])
   if (!view) return null
   const dead = view.state.character.status === 'dead'
@@ -22,7 +24,7 @@ export function PlayScreen() {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgb(255_150_60/0.07),transparent_70%)]" />
       <EmberField density={0.15} className="opacity-40" />
 
-      <CharacterPanel view={view} onOpenSheet={() => setTab('sheet')} />
+      <CharacterPanel view={view} onOpenSheet={() => setTab('sheet')} onOpenJournal={() => setJournal(true)} />
 
       <main className="relative flex min-w-0 flex-1 flex-col">
         <PortraitContext.Provider value={portraits}>
@@ -36,6 +38,7 @@ export function PlayScreen() {
         <SidePanel view={view} tab={tab} setTab={setTab} />
       </div>
 
+      <Journal view={view} open={journal} onClose={() => setJournal(false)} />
       <Toasts />
       <DeathScreen view={view} />
     </div>
