@@ -22,3 +22,6 @@ Thumbs.db
 
 # Blender render output (copies live in resources/ and src/renderer/src/assets/)
 art/out/
+
+# Worktrees made for helper agents (never part of the app)
+.claude/worktrees/
