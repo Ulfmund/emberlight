@@ -13,14 +13,32 @@ import {
 import type { ChatMessage, Connection } from '@shared/types'
 import type { MessageView, TurnEvent } from '@shared/view'
 import { activeLore } from '@shared/cards'
+import { entityLine, projectMemory, relevantEntities, storySoFar, type Summary } from '@shared/memory'
+import { summarizeChapter, summarizeScene, updateArc } from '../ai/jobs/summarizer'
 import { createProvider, type Provider } from '../ai/providers'
 import { runReferee } from '../ai/jobs/referee'
 import { runScribe } from '../ai/jobs/scribe'
 import { engineNotes, extractRollRequest, fitHistory, NameFilter, narratorSystem, pastRollNote } from '../ai/narrator'
-import { newId, type MessageRow } from '../store/db'
+import { newId, type EventRow, type MessageRow } from '../store/db'
 import type { Campaigns } from './campaigns'
 
 type Ctx = { provider: Provider; model: string; contextChars: number }
+
+/** How much the prompt can hold, by the model's context size (docs/spec/07-memory-and-lore.md#prompt-assembly). */
+function memoryTier(contextChars: number) {
+  if (contextChars < 40_000) return { people: 6, facts: 2, storyShare: 0.18 } // lean: ≤ ~12k tokens
+  if (contextChars < 120_000) return { people: 10, facts: 4, storyShare: 0.15 }
+  return { people: 14, facts: 6, storyShare: 0.12 }
+}
+
+/** Summaries: a scene covers 10–16 story messages; a chapter covers 6 scenes. */
+export const SCENE_MIN = 10
+export const SCENE_MAX = 16
+export const SCENES_PER_CHAPTER = 6
+/** Messages at the end that are never summarized yet: the live moment. */
+const KEEP_LIVE = 2
+/** Start summarizing once the story fills this share of the model's context. */
+const SUMMARIZE_AT = 0.4
 
 /**
  * Plays out turns (docs/spec/06-ai-dm.md#the-turn-loop). Each public method is an async
@@ -36,11 +54,20 @@ export class TurnEngine {
     private rng: () => number = Math.random
   ) {}
 
+  /** Background memory work per campaign (summaries), so turns never wait for it. */
+  private jobs = new Map<string, Promise<void>>()
+
+  /** Resolves when background memory work for a campaign is done (for tests and shutdown). */
+  settled(id: string): Promise<void> {
+    return this.jobs.get(id) ?? Promise.resolve()
+  }
+
   private async ctx(): Promise<Ctx> {
     const conn = this.connection()
     if (!conn?.model) throw new Error('No model is connected yet. Open Connect a Model first.')
     const provider = this.makeProvider(conn, await this.keyFor(conn.presetId))
-    const tokens = conn.kind === 'anthropic' ? 60_000 : conn.contextSize || (conn.kind === 'ollama' ? 16384 : 8192)
+    // A context size set on the Connect screen wins (for Claude it caps cost); otherwise a safe default.
+    const tokens = conn.contextSize || (conn.kind === 'anthropic' ? 60_000 : conn.kind === 'ollama' ? 16384 : 8192)
     return { provider, model: conn.model, contextChars: tokens * 3 }
   }
 
@@ -232,8 +259,24 @@ export class TurnEngine {
     // Lorebook entries wake up when the last few messages mention their keywords.
     const recent = path.slice(-4).map((m) => m.content).join('\n')
     const lore = activeLore(c.cast.flatMap((m) => m.book), recent)
-    const system = narratorSystem(after, c.settings, nameSuggestions(this.rng), c.cast, lore)
-    const messages = fitHistory(history, Math.max(4000, ctx.contextChars - system.length - 6000))
+
+    // Long-term memory: people and places from earlier, and summaries of whatever no longer
+    // fits word for word. Summaries are dropped while their messages are still shown in full.
+    const memory = projectMemory(events.map((e) => e.event))
+    const tier = memoryTier(ctx.contextChars)
+    const people = relevantEntities(memory, path.slice(-6).map((m) => m.content).join('\n'), after.location, tier.people, [c.build.name])
+      .map((e) => entityLine(e, tier.facts))
+      .join('\n')
+    const index = new Map(path.map((m, i) => [m.id, i]))
+    const budget = (sys: string) => Math.max(4000, ctx.contextChars - sys.length - 6000)
+    const names = nameSuggestions(this.rng)
+    const build = (story: string) => narratorSystem(after, c.settings, names, c.cast, lore, { story, people })
+    const storyBudget = Math.round(ctx.contextChars * tier.storyShare)
+    let system = build(storySoFar(memory, storyBudget, () => false))
+    let messages = fitHistory(history, budget(system))
+    const shownFrom = path.length - messages.length
+    system = build(storySoFar(memory, storyBudget, (s) => (index.get(s.from) ?? -1) >= shownFrom))
+    messages = fitHistory(history, budget(system))
 
     const dm = this.campaigns.db.addMessage({
       id: newId('msg'),
@@ -289,13 +332,93 @@ export class TurnEngine {
     // The Scribe records what the story changed (time, rest, loot, deeds…).
     if (clean && !error && !signal.aborted) {
       try {
-        const scribed = await runScribe(ctx.provider, ctx.model, after, player.meta.hidden ? '(no action)' : player.content, notes ?? '', clean)
+        const scribed = await runScribe(ctx.provider, ctx.model, after, player.meta.hidden ? '(no action)' : player.content, notes ?? '', clean, memory)
         if (scribed.length) this.campaigns.db.addEvents(id, dm.id, newId('grp'), 'ai', scribed)
       } catch {
         // Bookkeeping failing must never break the story; the next turn tries again.
       }
+      this.remember(id, ctx)
     }
     yield { type: 'view', view: this.campaigns.view(id) }
+  }
+
+  // ---- long-term memory ------------------------------------------------------------------
+
+  /** Starts summarizing in the background, unless it's already running for this campaign. */
+  private remember(id: string, ctx: Ctx) {
+    if (this.jobs.has(id)) return
+    const job = (async () => {
+      // Catch up a few steps at a time; the rest waits for the next turn.
+      for (let i = 0; i < 3; i++) if (!(await this.summarizeStep(id, ctx))) break
+    })()
+      .catch(() => {
+        /* memory failing must never break the game; the next turn tries again */
+      })
+      .finally(() => this.jobs.delete(id))
+    this.jobs.set(id, job)
+  }
+
+  /** Writes one chapter or scene summary if one is due. Returns whether it wrote anything. */
+  private async summarizeStep(id: string, ctx: Ctx): Promise<boolean> {
+    const c = this.campaigns.get(id)
+    const path = this.campaigns.path(c)
+    const all = this.campaigns.activeEvents(c, path)
+    const memory = projectMemory(all.map((e) => e.event))
+    const index = new Map(path.map((m, i) => [m.id, i]))
+    const at = (msgId: string) => index.get(msgId) ?? -1
+    const player = c.build.name
+
+    // A chapter, once enough scenes have piled up since the last one.
+    const lastChapterTo = memory.chapters.length ? Math.max(...memory.chapters.map((s) => at(s.to))) : -1
+    const loose = memory.scenes.filter((s) => at(s.to) > lastChapterTo).sort((a, b) => at(a.to) - at(b.to))
+    if (loose.length >= SCENES_PER_CHAPTER) {
+      const group = loose.slice(0, SCENES_PER_CHAPTER)
+      const out = await summarizeChapter(ctx.provider, ctx.model, player, group)
+      const chapter: Summary = {
+        level: 'chapter',
+        title: out.title.trim().slice(0, 80) || 'A chapter',
+        text: out.summary.trim(),
+        from: group[0].from,
+        to: group[group.length - 1].to,
+        fromDay: group[0].fromDay,
+        toDay: group[group.length - 1].toDay
+      }
+      const arc = await updateArc(ctx.provider, ctx.model, player, memory.arc, chapter).catch(() => null)
+      const evs: EventRow['event'][] = [{ type: 'summary', summary: chapter }]
+      if (arc?.storySoFar.trim()) evs.push({ type: 'arc', text: arc.storySoFar.trim() })
+      this.campaigns.db.addEvents(id, chapter.to, newId('mem'), 'ai', evs)
+      return true
+    }
+
+    // A scene, once the story is long enough that it will soon stop fitting word for word.
+    const total = path.reduce((n, m) => n + m.content.length, 0)
+    if (total < ctx.contextChars * SUMMARIZE_AT) return false
+    const lastSceneTo = memory.scenes.length ? Math.max(...memory.scenes.map((s) => at(s.to))) : -1
+    const visible = path.slice(lastSceneTo + 1).filter((m) => !m.meta.hidden && m.content.trim() && !m.meta.error)
+    if (visible.length < SCENE_MIN + KEEP_LIVE) return false
+    let chunk = visible.slice(0, Math.min(visible.length - KEEP_LIVE, SCENE_MAX))
+    // End the scene before the character arrives somewhere new, if that happens partway through.
+    const arrivals = new Set(all.filter((e) => e.event.type === 'location').map((e) => e.message_id))
+    const cut = chunk.findIndex((m, i) => i >= 6 && arrivals.has(m.id))
+    if (cut > 0) chunk = chunk.slice(0, chunk[cut - 1].role === 'user' ? cut - 1 : cut)
+    if (chunk.length < 4) return false
+
+    const out = await summarizeScene(ctx.provider, ctx.model, player, chunk.map((m) => ({ role: m.role, content: m.content })))
+    const first = chunk[0]
+    const last = chunk[chunk.length - 1]
+    const dayAt = (m: MessageRow) => this.campaigns.state(c, { path: path.slice(0, at(m.id) + 1) }).time.day
+    const scene: Summary = {
+      level: 'scene',
+      title: out.title.trim().slice(0, 80) || 'A scene',
+      text: out.summary.trim(),
+      from: first.id,
+      to: last.id,
+      fromDay: dayAt(first),
+      toDay: dayAt(last)
+    }
+    if (!scene.text) return false
+    this.campaigns.db.addEvents(id, last.id, newId('mem'), 'ai', [{ type: 'summary', summary: scene }])
+    return true
   }
 }
 

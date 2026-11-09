@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { CONDITION_IDS, type ConditionId, type GameEvent, type GameState } from '@shared/rules'
 import type { Provider } from '../providers'
+import { entityLine, findEntity, relevantEntities, sameName, samePlace, type Memory } from '@shared/memory'
 
 const conditionEnum = z.enum(CONDITION_IDS as [ConditionId, ...ConditionId[]])
 
@@ -16,7 +17,28 @@ export const ScribeSchema = z.object({
   milestoneXp: z.number().int().describe('0 to 50: XP for finishing a quest or a major story moment, otherwise 0'),
   healing: z.number().int().describe('Health restored by the story (a potion, bandaging, a healer), otherwise 0'),
   conditionsOn: z.array(conditionEnum),
-  conditionsOff: z.array(conditionEnum)
+  conditionsOff: z.array(conditionEnum),
+  people: z
+    .array(
+      z.object({
+        name: z.string().describe('Their name as the story gives it. If they have none yet, how the story refers to them ("the barmaid")'),
+        otherNames: z.array(z.string()).describe('Other names or descriptions used for them. If someone recorded in KNOWN under a description now gives their real name, put the real name in name and the old description here'),
+        who: z.string().describe('One short line: who they are. Empty if already known and unchanged'),
+        newFacts: z.array(z.string()).describe('At most 2 short, lasting facts the story states about them. Usually empty'),
+        status: z.enum(['alive', 'dead', 'missing', 'unknown']).describe('missing only if the story says so; unknown if not stated'),
+        attitude: z.enum(['hostile', 'unfriendly', 'neutral', 'friendly', 'devoted', 'unknown']).describe('How they now feel about the player character')
+      })
+    )
+    .describe('Named characters (not the player character) who appear or are talked about in this exchange. At most 4'),
+  places: z
+    .array(
+      z.object({
+        name: z.string().describe('A named place: village, inn, ruin, road, forest… Each place separately: an inn is not its village'),
+        what: z.string().describe('One short line: what it is. Empty if already known'),
+        newFacts: z.array(z.string()).describe('At most 1 short, lasting fact the story states about it. Usually empty')
+      })
+    )
+    .describe('Named places visited or talked about in this exchange. At most 2')
 })
 export type ScribeOutput = z.infer<typeof ScribeSchema>
 
@@ -27,7 +49,10 @@ const SYSTEM = `You are the Scribe for a fantasy roleplaying game. You keep the 
 - deed: only for genuinely notable acts other people would hear about. Most turns have none.
 - items and coins: only things the character clearly picked up, was given, bought, sold, used up or lost.
 - healing: only for clear healing (potion, bandage, healer). Never for "you feel better".
-- conditions: bleeding, poisoned, exhausted, hungry, frightened, captured, well_fed, inspired, hidden, wounded. Turn them on when the story clearly causes them; off when clearly resolved (freed from captivity, ate, cured).`
+- conditions: bleeding, poisoned, exhausted, hungry, frightened, captured, well_fed, inspired, hidden, wounded. Turn them on when the story clearly causes them; off when clearly resolved (freed from captivity, ate, cured).
+- people and places: these are the game's long-term memory, so keep names spelled exactly as the story does. Record people who matter to the story even if they only appear briefly.
+- Facts are what someone would still need to know a month later: "owes the player 5 silver", "lost two fingers to the river-thing", "is secretly the baron's son", "took the player prisoner". Never moods, gestures, smells, what a room looks like, or a blow-by-blow of a fight. Never guesses ("possibly", "seems to"): only what the story states. For someone already in KNOWN, add only what's new, and most turns add nothing.
+- When someone recorded under a description ("grey-bearded man") gives their name, record them under the name and put the description in otherNames, so the record is renamed rather than duplicated.`
 
 /** Upper bounds so a confused model can't hand out a fortune. */
 function limits(state: GameState) {
@@ -41,11 +66,13 @@ export async function runScribe(
   state: GameState,
   playerText: string,
   engineNotes: string,
-  narration: string
+  narration: string,
+  memory?: Memory
 ): Promise<GameEvent[]> {
   const c = state.character
+  const known = memory ? relevantEntities(memory, `${playerText}\n${narration}`, state.location, 10, [c.build.name]) : []
   const prompt = `Character: ${c.build.name}. Carrying: ${c.inventory.map((i) => `${i.name}${i.qty > 1 ? ` ×${i.qty}` : ''}`).join(', ') || 'nothing'}. Conditions: ${c.conditions.join(', ') || 'none'}. Location: ${state.location ?? 'unknown'}.
-
+${known.length ? `\nKNOWN (already recorded):\n${known.map((e) => entityLine(e, 4)).join('\n')}\n` : ''}
 PLAYER: ${playerText}
 ${engineNotes ? `\nGAME ENGINE: ${engineNotes}\n` : ''}
 DM: ${narration}
@@ -58,10 +85,10 @@ Record what changed.`
     schema: ScribeSchema,
     name: 'scribe'
   })
-  return scribeToEvents(out, state)
+  return scribeToEvents(out, state, memory)
 }
 
-export function scribeToEvents(out: ScribeOutput, state: GameState): GameEvent[] {
+export function scribeToEvents(out: ScribeOutput, state: GameState, memory?: Memory): GameEvent[] {
   const lim = limits(state)
   const events: GameEvent[] = []
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.round(v)))
@@ -100,5 +127,41 @@ export function scribeToEvents(out: ScribeOutput, state: GameState): GameEvent[]
   const has = new Set(state.character.conditions)
   for (const id of new Set(out.conditionsOn)) if (!has.has(id)) events.push({ type: 'condition', id, on: true })
   for (const id of new Set(out.conditionsOff)) if (has.has(id)) events.push({ type: 'condition', id, on: false })
+
+  // Long-term memory: people and places. Never the player character themself.
+  const day = state.time.day
+  const line = (t: string, max: number) => t.replace(/\s+/g, ' ').trim().slice(0, max)
+  const facts = (xs: string[], n: number) =>
+    xs
+      .map((f) => line(f, 160))
+      .filter((f) => f.length > 3 && !/\b(possibly|perhaps|probably|maybe|seems to|appears to|might be)\b/i.test(f))
+      .slice(0, n)
+  for (const p of (out.people ?? []).slice(0, 4)) {
+    const name = line(p.name, 50)
+    // Skip the player character, and descriptions posing as names ("the tall guard").
+    if (!name || sameName(name, state.character.build.name) || (/^(a|an|the|some)\s/i.test(name) && /^[a-z]/.test(name.split(' ').at(-1)!))) continue
+    const known = memory ? findEntity(memory, 'person', name, p.otherNames) : undefined
+    events.push({
+      type: 'entity',
+      kind: 'person',
+      name,
+      aliases: p.otherNames.map((a) => line(a, 50)).filter(Boolean).slice(0, 3),
+      summary: line(p.who, 140) || undefined,
+      facts: facts(p.newFacts, 2),
+      status: p.status === 'unknown' ? (known ? undefined : 'alive') : p.status,
+      attitude: p.attitude === 'unknown' ? undefined : p.attitude,
+      day
+    })
+  }
+  for (const pl of (out.places ?? []).slice(0, 2)) {
+    const name = line(pl.name, 60)
+    if (!name) continue
+    events.push({ type: 'entity', kind: 'place', name, summary: line(pl.what, 140) || undefined, facts: facts(pl.newFacts, 1), day })
+  }
+  // The place the character is now at is always on record.
+  const at = events.find((e) => e.type === 'location') as { name: string } | undefined
+  if (at && !events.some((e) => e.type === 'entity' && e.kind === 'place' && samePlace(e.name, at.name))) {
+    events.push({ type: 'entity', kind: 'place', name: at.name, day })
+  }
   return events
 }

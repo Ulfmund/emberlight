@@ -4,7 +4,7 @@ A roleplaying app with an AI Dungeon Master that works with local models (LM Stu
 
 > **Just want to play?** Follow [docs/INSTALL.md](docs/INSTALL.md): download the installer from **Releases** and double-click it. No command line needed.
 
-The full design is in [docs/spec/](docs/spec/README.md). **Current state: Milestone 1** (playable core): character creator, rules engine, dice, an AI Referee/Narrator/Scribe turn loop, saving with rewinds and rerolls, and SillyTavern-style character card import. Memory, lorebooks and combat depth come in Milestones 2 and 3.
+The full design is in [docs/spec/](docs/spec/README.md). **Current state: Milestone 1** (playable core): character creator, rules engine, dice, an AI Referee/Narrator/Scribe turn loop, saving with rewinds and rerolls, and SillyTavern-style character card import. **Milestone 2 (memory) is under way:** people and places are remembered, and long stories are summarized in layers. The Journal, full lorebooks and combat depth come next.
 
 ## Running it (development)
 

@@ -1,4 +1,5 @@
 import type { CampaignSettings, CharacterBuild, CheckResult, GameState, SkillId } from './rules'
+import type { Memory } from './memory'
 
 /** What the interface gets for one campaign. Built by the server from the save file. */
 
@@ -40,6 +41,8 @@ export type CampaignView = {
   }
   /** Cards in this story: the player's own (for the portrait) and companions the DM plays. */
   cast: { cardId: string; role: 'player' | 'companion'; name: string; hasImage: boolean }[]
+  /** People, places and summaries remembered on this branch of the story. */
+  memory: Memory
   messages: MessageView[]
   /** The newest message is the player's and the DM hasn't answered yet. */
   awaitingNarration: boolean

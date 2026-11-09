@@ -244,8 +244,14 @@ export function ConnectScreen() {
               >
                 <div className="mt-5 grid gap-5 border-t border-gold-500/15 pt-5 md:grid-cols-2">
                   <Field
-                    label="Context size (Ollama)"
-                    hint="0 = automatic (up to 16k). Bigger remembers more but uses more memory."
+                    label={preset.kind === 'anthropic' ? 'Context limit (tokens)' : 'Context size (tokens)'}
+                    hint={
+                      preset.kind === 'ollama'
+                        ? '0 = automatic (up to 16k). Bigger remembers more but uses more memory.'
+                        : preset.kind === 'anthropic'
+                          ? "0 = 60k. Lower sends less of the story word for word each turn, so it costs less; the app's summaries fill the gap."
+                          : "0 = 8k. Set it to the context length your model is loaded with, so the app knows how much story fits."
+                    }
                   >
                     <input
                       type="number"
@@ -253,7 +259,6 @@ export function ConnectScreen() {
                       step={1024}
                       value={contextSize}
                       onChange={(e) => setContextSize(Math.max(0, Number(e.target.value) || 0))}
-                      disabled={preset.kind !== 'ollama'}
                       className="input"
                     />
                   </Field>

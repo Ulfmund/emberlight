@@ -71,6 +71,8 @@ type Relationship = {
 }
 ```
 
+**Built (0.3.0):** people and places (`kind: person | place`; factions and items come later). Records are events (`entity`), so they follow the branch being played: rewinding past a meeting forgets it. The Scribe sends name, other names, a one-line summary, up to 2 new facts, status and attitude (hostile → devoted, instead of a −100..100 number for now). Matching: people by name or alias, with titles ignored ("Tam" = "Old Tam"); places by exact name ("Hollin's Ford" ≠ "Hollin's Ford inn"). When a stranger recorded under a description gives their name, the record is renamed and the description kept as another name. At most 12 facts per record (newest kept); guesses ("possibly…") are never stored. Code: `src/shared/memory.ts`, Scribe in `src/server/ai/jobs/scribe.ts`.
+
 **Name consistency:**
 - The registry holds the **canonical spelling**. Every prompt includes "Names in this scene" with the correct spellings.
 - The Scribe checks names in new responses against the registry with fuzzy matching ("Brena" vs. "Brenna") and corrects misspellings in the displayed text.
@@ -87,6 +89,13 @@ type Relationship = {
   - **Chapter:** a paragraph made from about 5–10 scenes.
   - **Arc / "Story so far":** a short running summary of the whole campaign.
 - Summaries can be edited by the player. The edited version becomes the truth.
+
+**Built (0.3.0):** scene, chapter and story-so-far summaries (`src/server/ai/jobs/summarizer.ts`), written in the background after a turn so play never waits:
+- Summarizing starts once the story fills 40% of the model's context (so short campaigns on big models never pay for it).
+- A **scene** covers 10–16 story messages, ending early when the character arrives somewhere new; the newest 2 messages are never summarized yet.
+- A **chapter** is made from 6 scenes, and the **story so far** is rewritten after each chapter.
+- Each summary is an event on the last message it covers, so it survives rerolls and swipes of later messages and disappears with a rewind past it.
+- Editing summaries comes with the Journal.
 
 ---
 
@@ -113,6 +122,8 @@ Each turn, `core/memory/assemble.ts` builds the prompt to fit the model's **actu
 1. **Keyword and alias matching** against the registry and lorebooks (always on, works with every model).
 2. **Recency and presence:** characters in the scene and the current place are always relevant.
 3. **Semantic search** (optional): if the server provides embeddings (LM Studio and Ollama both do), memories are also matched by meaning.
+
+**Built so far (0.3.0):** the narrator prompt gets "THE STORY SO FAR" (the arc, then chapters, then scenes after the last chapter, newest first when space is short; 12–18% of the context) and "PEOPLE AND PLACES FROM EARLIER" (the current place, anyone mentioned in the last 6 messages, then the most recently seen; 6 / 10 / 14 records with 2 / 4 / 6 facts for lean / standard / rich). A summary is left out while its messages still fit word for word, so nothing is said twice. The full block-by-block budgeter and the inspector are still to do. The context size set on the Connect screen is now honoured for every model, including Claude (to cap cost).
 
 **Context inspector** (Advanced): shows exactly what went into the last prompt, block by block, with token counts. It's essential for debugging "why did the DM forget X?".
 

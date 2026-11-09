@@ -21,6 +21,7 @@ import {
 } from '@shared/rules'
 import type { CampaignSummary, CampaignView, ChangeLine, MessageView } from '@shared/view'
 import type { CastMember } from '@shared/cards'
+import { projectMemory } from '@shared/memory'
 import { GameDb, newId, type CampaignRow, type EventRow, type MessageRow } from '../store/db'
 
 export const OPENING_TEXT = '((Begin the adventure: set an opening scene for my character.))'
@@ -183,6 +184,7 @@ export class Campaigns {
         xpForNext: charXpForLevel(level + 1) - charXpForLevel(level)
       },
       cast: c.cast.map((m) => ({ cardId: m.cardId, role: m.role, name: m.name, hasImage: m.hasImage })),
+      memory: projectMemory(events.map((e) => e.event)),
       messages,
       awaitingNarration: last?.role === 'user',
       saves: this.db.savesFor(id).map((s) => ({ id: s.id, name: s.name, messageId: s.message_id, createdAt: s.created_at }))
@@ -284,6 +286,9 @@ export function describeEvents(events: GameEvent[]): ChangeLine[] {
         out.push({ text: `${SKILLS[ev.check.skill].label}: ${TIER_INFO[ev.check.tier].label}`, tone: TIER_INFO[ev.check.tier].success ? 'good' : 'bad', icon: 'd20' })
         break
       case 'trait_used':
+      case 'entity':
+      case 'summary':
+      case 'arc':
         break
     }
   }

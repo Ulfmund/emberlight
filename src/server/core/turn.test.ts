@@ -26,8 +26,13 @@ class FakeProvider implements Provider {
   async inspectContext() {
     return {}
   }
+  summaries = 0
   async complete<T>(_m: string, opts: CompleteOptions<T>): Promise<T> {
     this.calls.push(opts.name)
+    const n = ++this.summaries
+    if (opts.name === 'summarize_scene') return opts.schema.parse({ title: `Scene ${n}`, summary: `Things happened (${n}).` })
+    if (opts.name === 'summarize_chapter') return opts.schema.parse({ title: `Chapter ${n}`, summary: `A chapter passed (${n}).` })
+    if (opts.name === 'story_so_far') return opts.schema.parse({ storySoFar: `The tale so far (${n}).` })
     return opts.schema.parse(opts.name === 'referee' ? this.referee : this.scribe)
   }
   async *chat(_m: string, opts: { system: string; messages: { role: string; content: string }[] }): AsyncIterable<StreamEvent> {
@@ -54,7 +59,9 @@ function blankScribe() {
     milestoneXp: 0,
     healing: 0,
     conditionsOn: [],
-    conditionsOff: []
+    conditionsOff: [],
+    people: [] as unknown[],
+    places: [] as unknown[]
   }
 }
 
@@ -258,5 +265,59 @@ describe('turn engine', () => {
     // Deleting the card from the library doesn't break the story.
     library.delete(summary.id)
     expect(campaigns.view(id).cast[0].name).toBe('Elara')
+  })
+  it('remembers people across turns, and forgets them on a rewind', async () => {
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    const before = campaigns.view(id).messages.at(-1)!.id
+    fake.scribe = {
+      ...blankScribe(),
+      location: 'Millbrook Crossing',
+      people: [{ name: 'Old Tam', otherNames: ['the ferryman'], who: 'ferryman at Millbrook', newFacts: ['lost two fingers to the river'], status: 'alive', attitude: 'unfriendly' }],
+      places: []
+    }
+    await run(engine.act(id, 'I ask the ferryman about the river.', signal))
+    fake.scribe = { ...blankScribe(), people: [{ name: 'Tam', otherNames: [], who: '', newFacts: ['owes Brenna a favour'], status: 'alive', attitude: 'friendly' }], places: [] }
+    await run(engine.act(id, 'I help Tam haul the rope.', signal))
+    fake.scribe = blankScribe()
+    await run(engine.act(id, 'I wave goodbye to Tam.', signal))
+    // The DM is reminded of Tam, with everything learned so far, under one name.
+    expect(fake.lastSystem).toContain('PEOPLE AND PLACES FROM EARLIER')
+    expect(fake.lastSystem).toContain('- Old Tam (also called the ferryman, friendly toward the player, last seen day 1): ferryman at Millbrook. Known: lost two fingers to the river; owes Brenna a favour.')
+    expect(fake.lastSystem).toContain('- Millbrook Crossing (place')
+
+    // Rewind to before meeting him: he's gone from memory.
+    campaigns.rewind(id, before)
+    await run(engine.act(id, 'I sit by the fire.', signal))
+    expect(fake.lastSystem).not.toContain('ferryman at Millbrook')
+    expect(fake.lastSystem).not.toContain('PEOPLE AND PLACES FROM EARLIER')
+  })
+
+  it('summarizes a long campaign so a small model keeps the thread', async () => {
+    // An 8k-token local model: about 24,000 characters for everything.
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    const long = (n: number) => `Turn ${n}: ` + 'The road winds on through the wet hills and the rain keeps falling on the hood of your cloak. '.repeat(12)
+    for (let n = 1; n <= 70; n++) {
+      fake.narration = long(n)
+      await run(engine.act(id, `I keep walking (${n}).`, signal))
+      await engine.settled(id)
+    }
+    const all = db.eventsFor(id).map((e) => e.event)
+    const scenes = all.filter((e) => e.type === 'summary' && e.summary.level === 'scene')
+    const chapters = all.filter((e) => e.type === 'summary' && e.summary.level === 'chapter')
+    expect(scenes.length).toBeGreaterThanOrEqual(6)
+    expect(chapters.length).toBeGreaterThanOrEqual(1)
+    expect(all.some((e) => e.type === 'arc')).toBe(true)
+
+    // The prompt fits the model: early turns are gone word for word but present in summary.
+    const sent = fake.lastSystem.length + fake.lastMessages.reduce((n, m) => n + m.content.length, 0)
+    expect(sent).toBeLessThan(24_576)
+    expect(fake.lastMessages.some((m) => m.content.includes('Turn 1:'))).toBe(false)
+    expect(fake.lastSystem).toContain('THE STORY SO FAR')
+    expect(fake.lastSystem).toContain('Overall: The tale so far')
+    expect(fake.lastSystem).toMatch(/Chapter, day 1: Chapter \d+\. A chapter passed/)
+    // Summaries never repeat what's still shown in full: the latest scene isn't summarized yet.
+    expect(fake.lastMessages.at(-1)!.content).toContain('(70)')
   })
 })

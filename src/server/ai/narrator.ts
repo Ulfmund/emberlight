@@ -65,7 +65,25 @@ export function loreBlock(entries: CardBookEntry[]): string {
   return `\n\nWORLD NOTES (background facts; use them when they matter)\n${entries.map((e) => `- ${e.content.trim()}`).join('\n')}`
 }
 
-export function narratorSystem(state: GameState, settings: CampaignSettings, names: string[], cast: CastMember[] = [], lore: CardBookEntry[] = []): string {
+/** Long-term memory for the prompt: older story in summary, and people and places met. */
+export type MemoryText = { story: string; people: string }
+
+function memoryBlock(m?: MemoryText): string {
+  if (!m) return ''
+  let out = ''
+  if (m.story.trim()) out += `\n\nTHE STORY SO FAR (older events, in order; the conversation continues from here)\n${m.story.trim()}`
+  if (m.people.trim()) out += `\n\nPEOPLE AND PLACES FROM EARLIER (keep their names, facts and feelings consistent; people who are dead stay dead)\n${m.people.trim()}`
+  return out
+}
+
+export function narratorSystem(
+  state: GameState,
+  settings: CampaignSettings,
+  names: string[],
+  cast: CastMember[] = [],
+  lore: CardBookEntry[] = [],
+  memory?: MemoryText
+): string {
   const c = state.character
   const b = c.build
   const d = derived(state, settings)
@@ -111,7 +129,7 @@ Renown: ${tier}${deeds ? `, known for: ${deeds}` : ''}. ${renownGuide(tier, b.se
 Carrying: ${c.inventory.map((i) => `${i.name}${i.qty > 1 ? ` ×${i.qty}` : ''}`).join(', ') || 'nothing'}; ${formatCoins(c.coins)}.
 ${c.status === 'downed' ? 'STATUS: DOWNED: unconscious and dying.\n' : c.status === 'dead' ? 'STATUS: DEAD.\n' : ''}
 WHERE AND WHEN
-Day ${state.time.day}, ${timeOfDay}${state.location ? `, at ${state.location}` : ''}.${companionBlock(cast)}${loreBlock(lore)}`
+Day ${state.time.day}, ${timeOfDay}${state.location ? `, at ${state.location}` : ''}.${memoryBlock(memory)}${companionBlock(cast)}${loreBlock(lore)}`
 }
 
 function renownGuide(tier: string, sex: 'male' | 'female', settings: CampaignSettings) {
