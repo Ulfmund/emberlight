@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { fillMacros, storyName, tagline, type CardDetail, type CardSummary, type CastMember } from '@shared/cards'
 import { newId, type CardRow, type GameDb } from '../store/db'
 import { CardError, parseCardFile } from './parse'
+import { cardJson, fileName, isPng, writeCardPng } from './export'
 
 export const MAX_CARD_FILE = 40 * 1024 * 1024
 
@@ -38,6 +39,22 @@ export class CardLibrary {
 
   image(id: string) {
     return this.db.cardImage(id)
+  }
+
+  /** The card as a file to share: a PNG card if it has a PNG portrait, otherwise JSON. */
+  exportFile(id: string): { name: string; bytes: Uint8Array; type: string } | null {
+    const r = this.db.getCard(id)
+    if (!r) return null
+    let raw: unknown
+    try {
+      raw = JSON.parse(r.raw)
+    } catch {
+      raw = null
+    }
+    const json = cardJson(raw, r.data)
+    const img = this.db.cardImage(id)
+    if (img && isPng(img.bytes)) return { name: fileName(r.name, 'png'), bytes: writeCardPng(img.bytes, json), type: 'image/png' }
+    return { name: fileName(r.name, 'json'), bytes: Buffer.from(JSON.stringify(json.v3 ?? json.v2, null, 2), 'utf8'), type: 'application/json' }
   }
 
   delete(id: string) {

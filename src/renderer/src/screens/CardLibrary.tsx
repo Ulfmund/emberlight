@@ -266,6 +266,16 @@ function CardTile({
             {isPlayer ? 'You' : 'Companion'}
           </span>
         )}
+        <a
+          href={api.cardExportUrl(card.id)}
+          download
+          onClick={(e) => e.stopPropagation()}
+          className="no-drag absolute top-2 right-11 flex items-center rounded-full bg-ink-950/70 px-2 py-1 text-xs text-parchment-300 opacity-0 transition touch:opacity-100 group-hover:opacity-100 hover:text-gold-200"
+          title="Save this card as a file (PNG card, or JSON), to use in other apps or share"
+          aria-label={`Export ${card.name}`}
+        >
+          <Icon name="download" size={14} />
+        </a>
         <button
           onClick={onDelete}
           className={`no-drag absolute top-2 right-2 flex cursor-pointer items-center gap-1 rounded-full px-2 py-1 text-xs transition ${

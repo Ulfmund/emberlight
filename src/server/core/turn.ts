@@ -40,6 +40,7 @@ import { createProvider, type Provider } from '../ai/providers'
 import { runCombatReferee, runReferee } from '../ai/jobs/referee'
 import { runScribe } from '../ai/jobs/scribe'
 import { writeEpitaph } from '../ai/jobs/epitaph'
+import { ghostText, suggestActions, type Suggestion } from '../ai/jobs/suggest'
 import { engineNotes, extractFight, extractRollRequest, fitHistory, NameFilter, narratorSystem, pastRollNote, type PersonaText } from '../ai/narrator'
 import { newId, type CampaignRow, type EventRow, type MessageRow } from '../store/db'
 import type { Campaigns } from './campaigns'
@@ -214,6 +215,26 @@ export class TurnEngine {
     this.campaigns.db.updateMessage(lastUser.id, { meta })
     yield { type: 'checks', checks: [...out.checks, ...out.fightRolls], deathRoll }
     yield* this.narrate(id, { ...lastUser, meta }, signal, notes)
+  }
+
+  /** Three things the character could do now (the Ideas button). */
+  async suggest(id: string, signal?: AbortSignal): Promise<Suggestion[]> {
+    const ctx = await this.ctx()
+    const c = this.campaigns.get(id)
+    const path = this.campaigns.path(c)
+    const state = this.campaigns.state(c, { path })
+    const recent = path.filter((m) => !m.meta.hidden).slice(-4).map((m) => ({ role: m.role, content: m.content }))
+    return suggestActions(ctx.provider, ctx.model, state, recent, signal)
+  }
+
+  /** The rest of the sentence the player is typing (ghost text). */
+  async ghost(id: string, typed: string, signal?: AbortSignal): Promise<string> {
+    const ctx = await this.ctx()
+    const c = this.campaigns.get(id)
+    const path = this.campaigns.path(c)
+    const state = this.campaigns.state(c, { path })
+    const recent = path.filter((m) => !m.meta.hidden).slice(-2).map((m) => ({ role: m.role, content: m.content }))
+    return ghostText(ctx.provider, ctx.model, state, recent, typed, signal)
   }
 
   /** Spend an unspent attribute point from a level-up. */

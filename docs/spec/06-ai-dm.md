@@ -117,6 +117,8 @@ Every update is an event with `source: "ai"`, shown in the change log with undo.
 - **💡 Suggest** button: three options in different flavors (e.g. *bold action*, *careful action*, *something to say*). Clicking one puts it in the input box to edit or send.
 - **Ghost text** (optional): while typing, a pause shows a greyed-out continuation. **Tab** (desktop) or a tap (mobile) accepts it. It's on by default only if the model is fast enough (from the capability profile).
 
+*Built (0.11.0)* (`src/server/ai/jobs/suggest.ts`): the **Ideas** button (a lightbulb beside Act) asks for one bold action, one careful one and one thing to say, written in the player's voice from the last few messages, the character's gear and any fight. Picking one puts it in the box to edit. **Ghost text** is off by default, because every pause is a small request to the model: a switch under the box turns it on for that device. After 0.9 seconds without typing (at least four characters, cursor at the end), the model continues the sentence (at most twelve words); echoes of what's typed are trimmed. Tab or a tap on "add the grey words" accepts it; Escape or more typing clears it.
+
 ---
 
 ## Out-of-character instructions and commands

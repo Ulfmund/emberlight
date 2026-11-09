@@ -366,6 +366,18 @@ const paths: Record<string, React.ReactNode> = {
       <path d="M4.5 14.5v4a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-4" />
     </>
   ),
+  download: (
+    <>
+      <path d="M12 4v11.5M7.5 11 12 15.5l4.5-4.5" />
+      <path d="M4.5 14.5v4a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-4" />
+    </>
+  ),
+  idea: (
+    <>
+      <path d="M9 18h6M10 21h4" />
+      <path d="M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1.1 2V16h5v-.2c.1-.8.5-1.5 1.1-2A6 6 0 0 0 12 3z" />
+    </>
+  ),
   party: (
     <>
       <circle cx="9" cy="8.5" r="3.2" />

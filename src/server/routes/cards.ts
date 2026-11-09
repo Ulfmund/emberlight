@@ -2,6 +2,9 @@ import type { Hono } from 'hono'
 import { CardError } from '../cards/parse'
 import { MAX_CARD_FILE, type CardLibrary } from '../cards/library'
 
+/** A download, with the file's real name (and an ASCII fallback for old browsers). */
+export const attachment = (name: string) => `attachment; filename="${name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '')}"; filename*=UTF-8''${encodeURIComponent(name)}`
+
 /** The character library: import, list, look at, delete. */
 export function registerCardRoutes(app: Hono, library: CardLibrary) {
   app.get('/api/cards', (c) => c.json(library.list()))
@@ -34,6 +37,13 @@ export function registerCardRoutes(app: Hono, library: CardLibrary) {
       'Cache-Control': 'private, max-age=31536000, immutable',
       'X-Content-Type-Options': 'nosniff'
     })
+  })
+
+  /** The card as a file to share (a PNG card, or JSON). */
+  app.get('/api/cards/:id/export', (c) => {
+    const f = library.exportFile(c.req.param('id'))
+    if (!f) return c.json({ error: 'That character is no longer in your library.' }, 404)
+    return c.body(f.bytes as Uint8Array<ArrayBuffer>, 200, { 'Content-Type': f.type, 'Content-Disposition': attachment(f.name), 'X-Content-Type-Options': 'nosniff' })
   })
 
   app.delete('/api/cards/:id', (c) => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { RaceId } from '@shared/rules'
 import { useGame } from '../store'
@@ -7,6 +7,7 @@ import { Icon } from '../components/Icon'
 import { Medallion } from '../components/Medallion'
 import { cardImageUrl } from '@shared/cards'
 import { EmberField } from '../components/EmberField'
+import { api } from '../api'
 
 const RACE_BY_LABEL: Record<string, RaceId> = { Human: 'human', Dwarf: 'dwarf', Elf: 'elf', Halfling: 'halfling', Orc: 'orc' }
 
@@ -23,14 +24,44 @@ function ago(t: number) {
 export function LoadScreen() {
   const { campaigns, loadCampaigns, open, remove, go } = useGame()
   const [confirm, setConfirm] = useState<string | null>(null)
+  const [note, setNote] = useState<{ text: string; bad?: boolean } | null>(null)
+  const [importing, setImporting] = useState(false)
+  const picker = useRef<HTMLInputElement>(null)
+
+  /** An adventure file from a friend, or a backup: it comes in as a new adventure. */
+  const bring = async (file: File | undefined) => {
+    if (!file) return
+    setImporting(true)
+    setNote(null)
+    try {
+      await api.importCampaign(file)
+      await loadCampaigns()
+      setNote({ text: `Imported "${file.name.replace(/\.rpcampaign$/i, '')}". It's at the top of the list.` })
+    } catch (err) {
+      setNote({ text: (err as Error).message, bad: true })
+    } finally {
+      setImporting(false)
+    }
+  }
 
   useEffect(() => {
     void loadCampaigns()
   }, [loadCampaigns])
 
   return (
-    <div className="relative flex-1 overflow-y-auto">
+    <div
+      className="relative flex-1 overflow-y-auto"
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes('Files')) e.preventDefault()
+      }}
+      onDrop={(e) => {
+        if (!e.dataTransfer.files.length) return
+        e.preventDefault()
+        void bring(e.dataTransfer.files[0])
+      }}
+    >
       <EmberField density={0.3} className="opacity-50" />
+      <input ref={picker} type="file" accept=".rpcampaign,.zip" className="hidden" onChange={(e) => void bring(e.target.files?.[0]).then(() => (e.target.value = ''))} />
       <div className="relative z-10 mx-auto max-w-4xl px-4 pt-5 pb-16 md:px-8 md:pt-8">
         <div className="mb-6 flex items-center gap-3 md:mb-8 md:gap-4">
           <Button variant="ghost" icon="back" size="sm" onClick={() => go('title')} aria-label="Back" className="shrink-0 px-2 md:px-3">
@@ -40,10 +71,14 @@ export function LoadScreen() {
             <h2 className="font-display text-2xl tracking-wider text-gold-300 md:text-3xl">Your Adventures</h2>
             <p className="mt-1 hidden text-parchment-400 sm:block">Every tale is saved as you play.</p>
           </div>
-          <Button variant="primary" icon="d20" className="ml-auto shrink-0" onClick={() => go('creator')} aria-label="New adventure">
+          <Button variant="ghost" icon="upload" className="ml-auto shrink-0" disabled={importing} onClick={() => picker.current?.click()} title="Bring in an adventure file (.rpcampaign), or drop one here" aria-label="Import an adventure">
+            <span className="hidden sm:inline">{importing ? 'Importing…' : 'Import'}</span>
+          </Button>
+          <Button variant="primary" icon="d20" className="shrink-0" onClick={() => go('creator')} aria-label="New adventure">
             <span className="hidden sm:inline">New adventure</span>
           </Button>
         </div>
+        {note && <p className={`-mt-3 mb-5 text-sm ${note.bad ? 'text-blood-400' : 'text-moss-400'}`}>{note.text}</p>}
 
         {campaigns.length === 0 && (
           <div className="panel rounded-2xl p-10 text-center text-parchment-400">
@@ -83,9 +118,20 @@ export function LoadScreen() {
                     </Button>
                   </div>
                 ) : (
-                  <button onClick={() => setConfirm(c.id)} className="no-drag cursor-pointer rounded-md p-2 text-parchment-500 opacity-0 touch:opacity-100 transition group-hover:opacity-100 hover:text-blood-400" title="Delete this adventure">
-                    <Icon name="trash" size={16} />
-                  </button>
+                  <div className="flex shrink-0 flex-col items-center gap-0.5 sm:flex-row">
+                    <a
+                      href={api.campaignExportUrl(c.id)}
+                      download
+                      className="no-drag rounded-md p-2 text-parchment-500 opacity-0 touch:opacity-100 transition group-hover:opacity-100 hover:text-gold-200"
+                      title="Save this adventure as a file (.rpcampaign), to keep or to send to a friend"
+                      aria-label="Export this adventure"
+                    >
+                      <Icon name="download" size={16} />
+                    </a>
+                    <button onClick={() => setConfirm(c.id)} className="no-drag cursor-pointer rounded-md p-2 text-parchment-500 opacity-0 touch:opacity-100 transition group-hover:opacity-100 hover:text-blood-400" title="Delete this adventure">
+                      <Icon name="trash" size={16} />
+                    </button>
+                  </div>
                 )}
               </motion.div>
             ))}

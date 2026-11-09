@@ -351,6 +351,14 @@ export class GameDb {
     }))
   }
 
+  /** Events with their history kept (an imported adventure). */
+  addEventRows(campaignId: string, rows: Omit<EventRow, 'id' | 'campaign_id'>[]) {
+    const stmt = this.db.prepare(
+      'INSERT INTO events (campaign_id, message_id, group_id, type, payload, source, superseded, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    )
+    for (const r of rows) stmt.run(campaignId, r.message_id, r.group_id, r.event.type, JSON.stringify(r.event), r.source, r.superseded ? 1 : 0, r.created_at)
+  }
+
   supersedeGroup(groupId: string) {
     this.db.prepare('UPDATE events SET superseded = 1 WHERE group_id = ?').run(groupId)
   }

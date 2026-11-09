@@ -21,6 +21,10 @@ import { applyRename, previewRename } from '../core/rename'
 import { MAX_COMPANIONS, type CastMember } from '@shared/cards'
 import { MAX_FACTS, type MemoryEvent } from '@shared/memory'
 import { findWorld } from '@shared/worlds'
+import { AGES, BACKGROUNDS, RACES, SEXES } from '@shared/rules'
+import { attachment } from './cards'
+import { campaignFileName, exportCampaign, importCampaign, MAX_CAMPAIGN_FILE, PortableError } from '../core/portable'
+import { fileName, isPng, v2Data, writeCardPng } from '../cards/export'
 
 const tuple = <T extends string>(xs: readonly T[]) => xs as unknown as [T, ...T[]]
 
@@ -177,6 +181,69 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
     if (!s) return c.json({ error: 'Invalid name.' }, 400)
     campaigns.rename(c.req.param('id'), s.name)
     return c.json(campaigns.view(c.req.param('id')))
+  })
+
+  // ---- adventures as files ---------------------------------------------------------------
+
+  app.get('/api/campaigns/:id/export', (c) => {
+    try {
+      const { name, bytes } = exportCampaign(campaigns.db, c.req.param('id'))
+      return c.body(bytes as unknown as Uint8Array<ArrayBuffer>, 200, { 'Content-Type': 'application/zip', 'Content-Disposition': attachment(campaignFileName(name)) })
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 404)
+    }
+  })
+
+  /** The file's bytes are the request body. */
+  app.post('/api/campaigns/import', async (c) => {
+    const size = Number(c.req.header('content-length') ?? 0)
+    if (size > MAX_CAMPAIGN_FILE) return c.json({ error: 'This file is too large (over 200 MB).' }, 413)
+    const bytes = new Uint8Array(await c.req.arrayBuffer())
+    if (!bytes.length) return c.json({ error: 'That file is empty.' }, 400)
+    try {
+      return c.json({ id: importCampaign(campaigns.db, bytes) })
+    } catch (err) {
+      return c.json({ error: err instanceof PortableError ? err.message : `This adventure couldn't be read (${(err as Error).message}).` }, 400)
+    }
+  })
+
+  /** The character now playing, as a character card to share or to use elsewhere. */
+  app.get('/api/campaigns/:id/character-card', (c) => {
+    const r = guard(() => {
+      const view = campaigns.view(c.req.param('id'))
+      const b = view.state.character.build
+      const sex = SEXES[view.settings.sexModifiers][b.sex].label.toLowerCase()
+      const who = `${b.name} is a ${AGES[b.age].label.toLowerCase()} ${sex} ${RACES[b.race].label.toLowerCase()}, a ${BACKGROUNDS[b.background].label.toLowerCase()} by trade.`
+      const data = v2Data({ name: b.name, description: [who, b.appearance.trim()].filter(Boolean).join('\n\n'), personality: b.personality, creator: 'Emberlight', tags: ['emberlight'] })
+      // Their portrait, if it came from a card (and they're still the one it was for).
+      const own = view.state.fallen.length ? undefined : view.cast.find((m) => m.role === 'player' && m.hasImage)
+      const img = own ? library.image(own.cardId) : null
+      if (img && isPng(img.bytes)) return { name: fileName(b.name, 'png'), bytes: writeCardPng(img.bytes, { v2: { spec: 'chara_card_v2', spec_version: '2.0', data } }) as Uint8Array, type: 'image/png' }
+      return { name: fileName(b.name, 'json'), bytes: Buffer.from(JSON.stringify({ spec: 'chara_card_v2', spec_version: '2.0', data }, null, 2), 'utf8') as Uint8Array, type: 'application/json' }
+    })
+    if (!r.ok) return c.json({ error: r.error }, 404)
+    return c.body(r.value.bytes as Uint8Array<ArrayBuffer>, 200, { 'Content-Type': r.value.type, 'Content-Disposition': attachment(r.value.name), 'X-Content-Type-Options': 'nosniff' })
+  })
+
+  // ---- help with what to do ------------------------------------------------------------------
+
+  app.post('/api/campaigns/:id/suggest', async (c) => {
+    try {
+      return c.json({ suggestions: await turns.suggest(c.req.param('id'), c.req.raw.signal) })
+    } catch (err) {
+      return c.json({ error: `No ideas this time (${(err as Error).message}).` }, 502)
+    }
+  })
+
+  app.post('/api/campaigns/:id/ghost', async (c) => {
+    const b = await body(c, z.object({ text: z.string().min(1).max(2000) }))
+    if (!b) return c.json({ continuation: '' })
+    try {
+      return c.json({ continuation: await turns.ghost(c.req.param('id'), b.text, c.req.raw.signal) })
+    } catch {
+      // Ghost text is a nicety: a failure just means no suggestion.
+      return c.json({ continuation: '' })
+    }
   })
 
   // ---- turns (streamed) ------------------------------------------------------------------

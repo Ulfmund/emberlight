@@ -23,6 +23,7 @@ import { Icon } from '../../components/Icon'
 import { Tip } from '../../components/Tip'
 import { Button } from '../../components/Button'
 import { CraftList } from './Crafting'
+import { api } from '../../api'
 
 export type Tab = 'sheet' | 'bag' | 'log' | 'saves'
 const TABS: { id: Tab; label: string; icon: string }[] = [
@@ -142,6 +143,15 @@ function SheetTab({ view }: { view: CampaignView }) {
           })}
         </section>
       ))}
+      <a
+        href={api.characterCardUrl(view.id)}
+        download
+        className="no-drag flex items-center justify-center gap-2 rounded-lg border border-gold-500/20 px-3 py-2 text-xs text-parchment-300 hover:border-gold-400/50 hover:text-gold-200"
+        title="A character card (V2) of who you're playing, for other apps or to start a new story with"
+      >
+        <Icon name="download" size={14} />
+        Save {view.build.name.split(' ')[0]} as a character card
+      </a>
     </div>
   )
 }

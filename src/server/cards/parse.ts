@@ -196,7 +196,8 @@ export function zipRead(b: Uint8Array, e: ZipEntry): Uint8Array {
   const start = e.offset + 30 + nameLen + extraLen
   const data = b.subarray(start, start + e.compressedSize)
   if (e.method === 0) return data
-  if (e.method === 8) return inflateRawSync(data)
+  // A cap on what a file may unpack to, so a hostile zip can't fill the memory.
+  if (e.method === 8) return inflateRawSync(data, { maxOutputLength: 256 * 1024 * 1024 })
   throw new CardError('This .charx file uses a kind of compression the app can’t read.')
 }
 

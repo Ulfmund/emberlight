@@ -66,6 +66,15 @@ export const api = {
     }).then((r) => json<Lorebook>(r)),
   deleteLorebook: (id: string) => fetch(`/api/lorebooks/${encodeURIComponent(id)}`, { method: 'DELETE' }).then((r) => json<LorebookSummary[]>(r)),
   lorebookExportUrl: (id: string) => `/api/lorebooks/${encodeURIComponent(id)}/export`,
+  campaignExportUrl: (id: string) => `/api/campaigns/${encodeURIComponent(id)}/export`,
+  cardExportUrl: (id: string) => `/api/cards/${encodeURIComponent(id)}/export`,
+  characterCardUrl: (id: string) => `/api/campaigns/${encodeURIComponent(id)}/character-card`,
+  importCampaign: (file: File) =>
+    fetch('/api/campaigns/import', { method: 'POST', body: file, headers: { 'Content-Type': 'application/octet-stream' } }).then((r) => json<{ id: string }>(r)),
+  suggest: (id: string, signal?: AbortSignal) =>
+    fetch(`/api/campaigns/${encodeURIComponent(id)}/suggest`, { method: 'POST', signal }).then((r) => json<{ suggestions: { kind: 'bold' | 'careful' | 'say'; text: string }[] }>(r)),
+  ghost: (id: string, text: string, signal?: AbortSignal) =>
+    fetch(`/api/campaigns/${encodeURIComponent(id)}/ghost`, { method: 'POST', signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) }).then((r) => json<{ continuation: string }>(r)),
   setCampaignLorebooks: (id: string, ids: string[]) => put(`/api/campaigns/${id}/lorebooks`, { ids }).then((r) => json<CampaignView>(r)),
 
   // ---- character library
