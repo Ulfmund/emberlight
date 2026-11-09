@@ -39,10 +39,17 @@ Click **Save connection**, then **Begin**.
 
 ## How to play
 
-- Type what your character does. Put anything they **say** in "quotation marks". You can do both in one turn:
-  `"Stay back," I warn, drawing my sword.`
-- To tell the Dungeon Master something directly, out of character, use double brackets: `((make it start raining))`.
-- **Reroll response** writes the DM's last reply again. **New** (top right) starts a fresh adventure.
+1. **New Adventure** opens the character creator. Pick a race, sex, age and calling, spread your attribute points and starting skill levels, and name your character. Or press **🎲 Roll a New Adventurer** to have it all chosen for you. The **ember line** on each bar is that attribute's lifetime limit for this character.
+2. Choose how the Dungeon Master runs things (tone, how deadly, when you throw the dice), then **Begin the Adventure**.
+3. Type what your character does. Put anything they **say** in "quotation marks"; you can do both in one turn: `"Stay back," I warn, drawing my sword.` To tell the DM something out of character, use double brackets: `((make it start raining))`.
+4. When an action is risky, the game asks for a roll. For big moments the **dice tray** appears: click to throw. The result (from Critical failure to Critical success) decides what happens, and the DM writes it that way. Failures can hurt, and your character can die.
+5. Your adventure saves itself after every turn. **Continue** on the title screen picks up where you left off; **Load Adventure** lists them all.
+
+Handy buttons:
+- **↻ on a roll card**: a free reroll (rewrites the DM's response to match).
+- **Rewrite**: the DM writes its last response again; **‹ 1/2 ›** flips between versions.
+- **Return here** (on older DM messages) or **undo** (on your own turns): go back in the story. The other branch is kept.
+- **Sheet / Bag / Log / Saves** on the right: your skills and caps, your items, everything that's changed, and save slots plus campaign settings.
 
 ## Updating
 

@@ -48,7 +48,7 @@ Risk: "none" when failure just means it doesn't work. "light" for scrapes, bruis
 
 Combat: an attack, parry or dodge is a check. Use melee, ranged or spellcasting for attacking, defense for blocking or enduring blows.
 
-Speech in "quotes" is what the character says; social checks only when they are trying to change someone's mind (persuade, lie, threaten, haggle).`
+Speech in "quotes" is what the character says; social checks only when they are trying to change someone's mind (persuade, lie, threaten, haggle). Social checks normally have risk "none": a failed persuasion means they aren't convinced. Only give a social check risk if failing means violence breaks out at that very moment, and then the harm comes from the people present (riskSource "sentient").`
 
 export async function runReferee(
   provider: Provider,

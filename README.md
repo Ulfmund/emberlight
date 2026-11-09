@@ -4,7 +4,7 @@ A roleplaying app with an AI Dungeon Master that works with local models (LM Stu
 
 > **Just want to play?** Follow [docs/INSTALL.md](docs/INSTALL.md): download the installer from **Releases** and double-click it. No command line needed.
 
-The full design is in [docs/spec/](docs/spec/README.md). **Current state: Milestone 0** (skeleton): title screen, model connection, and a streaming story chat with a basic DM prompt. Rules, dice, characters and memory start in Milestone 1.
+The full design is in [docs/spec/](docs/spec/README.md). **Current state: Milestone 1** (playable core): character creator, rules engine, dice, an AI Referee/Narrator/Scribe turn loop, saving with rewinds and rerolls. Memory, lorebooks and combat depth come in Milestones 2 and 3.
 
 ## Running it (development)
 
@@ -24,6 +24,7 @@ This opens the app window. Changes to the interface reload instantly; changes un
 | Command | What it does |
 |---|---|
 | `npm run typecheck` | Checks the code for type errors |
+| `npm test` | Runs the rules and game tests |
 | `npm run build` | Builds the app into `out/` |
 | `npm start` | Runs the built app (like the finished version) |
 | `npm run package` | Builds a Windows installer into `release/` |

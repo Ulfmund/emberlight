@@ -9,19 +9,19 @@ Built in milestones. Each one ends with something playable, so the artist can te
 - `.env` for dev keys, encrypted key storage in the app
 - Local server only accepts requests from the app's own pages
 
-## Milestone 1 — Playable core (the MVP)
+## Milestone 1 — Playable core (the MVP) ✅ (2026-11-09, except card import)
 *The smallest version that's fun:*
 - Description → action turn structure; free input with **"quoted speech" + action in the same turn**
 - Referee → dice → resolve → narrate loop, with **result tiers** (nat 20 vs. 15 vs. 10 read differently)
 - Dice on screen: auto / dramatic only / always ask; free rerolls
 - **Character creator** with race, sex, age and background caps across all attributes and skills; point-buy; quick random roll
 - **Sheet** panel with cap markers and tooltips
-- **Skill XP by use, character XP, level-up** with point allocation
+- **Skills grow only by use (OSRS-style); level-ups give +1 attribute point and Renown** (see [04](04-rules-system.md#renown))
 - HP / stamina / mana, basic damage and death (Harsh mercy)
 - Dialogue bubbles with portraits, separate from narration
 - Event log tied to messages: swipes, regenerate, edit, rewind all keep state correct
 - Autosave, multiple campaigns, save slots
-- Character Card V2/V3 import
+- Character Card V2/V3 import *(moved to the next update)*
 
 ## Milestone 2 — Memory
 - Scribe job; entity registry; relationships and dispositions

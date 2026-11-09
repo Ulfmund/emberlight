@@ -22,7 +22,7 @@ export type ScribeOutput = z.infer<typeof ScribeSchema>
 
 const SYSTEM = `You are the Scribe for a fantasy roleplaying game. You keep the books. Read the latest exchange and record only what actually happened in it, conservatively. Do not invent anything. When in doubt, record nothing.
 
-- minutesPassed: how long the scene took (a conversation ~10, a search ~30, travelling to the next village ~240).
+- minutesPassed: how long the scene took. Every scene takes some time: a quick exchange or a fight ~5, a conversation ~10, a search ~30, a meal ~45, travelling to the next village ~240. Never 0.
 - rest: only if the character clearly rested or slept.
 - deed: only for genuinely notable acts other people would hear about. Most turns have none.
 - items and coins: only things the character clearly picked up, was given, bought, sold, used up or lost.
@@ -66,7 +66,7 @@ export function scribeToEvents(out: ScribeOutput, state: GameState): GameEvent[]
   const events: GameEvent[] = []
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.round(v)))
 
-  const minutes = clamp(out.minutesPassed, 0, 24 * 60 * 3)
+  const minutes = clamp(out.minutesPassed, 5, 24 * 60 * 3)
   if (out.rest === 'long') {
     events.push({ type: 'rest', kind: 'long' })
     events.push({ type: 'time', minutes: Math.max(minutes, 8 * 60) })
