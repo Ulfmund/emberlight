@@ -26,7 +26,13 @@ export type MessageMeta = {
   plan?: TurnPlan
   /** Player turns: what the game engine told the narrator (so the DM can rewrite its reply). */
   notes?: string
+  /** A picture the player showed with this message (media id), and what it shows, in words. */
+  image?: string
+  imageText?: string
 }
+
+/** What a stored picture is for. */
+export type MediaKind = 'portrait' | 'story' | 'generated'
 
 export type MessageRow = {
   id: string
@@ -137,6 +143,15 @@ CREATE TABLE IF NOT EXISTS cards (
   image_mime TEXT,
   created_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS media (
+  id TEXT PRIMARY KEY,
+  campaign_id TEXT,
+  kind TEXT NOT NULL,
+  mime TEXT NOT NULL,
+  data BLOB NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS media_campaign ON media(campaign_id);
 `
 
 export const newId = (prefix: string) =>
@@ -161,7 +176,7 @@ export class GameDb {
     const cols = (this.db.prepare('PRAGMA table_info(campaigns)').all() as { name: string }[]).map((c) => c.name)
     if (!cols.includes('cast_json')) this.db.exec("ALTER TABLE campaigns ADD COLUMN cast_json TEXT NOT NULL DEFAULT '[]'")
     if (!cols.includes('lore_json')) this.db.exec("ALTER TABLE campaigns ADD COLUMN lore_json TEXT NOT NULL DEFAULT '[]'")
-    this.db.prepare("UPDATE meta SET value = '3' WHERE key = 'schema_version' AND CAST(value AS INTEGER) < 3").run()
+    this.db.prepare("UPDATE meta SET value = '4' WHERE key = 'schema_version' AND CAST(value AS INTEGER) < 4").run()
   }
 
   /** Keeps one backup per day for the last 7 days (docs/spec/05-game-state-and-saves.md). */
@@ -235,6 +250,7 @@ export class GameDb {
       this.db.prepare('DELETE FROM events WHERE campaign_id = ?').run(id)
       this.db.prepare('DELETE FROM messages WHERE campaign_id = ?').run(id)
       this.db.prepare('DELETE FROM saves WHERE campaign_id = ?').run(id)
+      this.db.prepare('DELETE FROM media WHERE campaign_id = ?').run(id)
       this.db.prepare('DELETE FROM campaigns WHERE id = ?').run(id)
     })
   }
@@ -295,6 +311,28 @@ export class GameDb {
 
   deleteCard(id: string) {
     this.db.prepare('DELETE FROM cards WHERE id = ?').run(id)
+  }
+
+  // ---- pictures (portraits, images shown in the story, generated art) --------------------
+
+  addMedia(m: { campaignId: string | null; kind: MediaKind; mime: string; data: Uint8Array }): string {
+    const id = newId('img')
+    this.db.prepare('INSERT INTO media (id, campaign_id, kind, mime, data, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(id, m.campaignId, m.kind, m.mime, m.data, Date.now())
+    return id
+  }
+
+  getMedia(id: string): { mime: string; data: Uint8Array; campaignId: string | null; kind: MediaKind } | null {
+    const r = this.db.prepare('SELECT mime, data, campaign_id, kind FROM media WHERE id = ?').get(id) as { mime: string; data: Uint8Array; campaign_id: string | null; kind: MediaKind } | undefined
+    return r ? { mime: r.mime, data: r.data, campaignId: r.campaign_id, kind: r.kind } : null
+  }
+
+  mediaFor(campaignId: string): { id: string; kind: MediaKind; mime: string; data: Uint8Array }[] {
+    return this.db.prepare('SELECT id, kind, mime, data FROM media WHERE campaign_id = ? ORDER BY created_at').all(campaignId) as { id: string; kind: MediaKind; mime: string; data: Uint8Array }[]
+  }
+
+  /** An imported adventure's pictures keep their ids (events refer to them). */
+  putMedia(id: string, m: { campaignId: string; kind: MediaKind; mime: string; data: Uint8Array }) {
+    this.db.prepare('INSERT OR IGNORE INTO media (id, campaign_id, kind, mime, data, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(id, m.campaignId, m.kind, m.mime, m.data, Date.now())
   }
 
   // ---- messages -----------------------------------------------------------------------

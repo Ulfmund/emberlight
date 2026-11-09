@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { ImageSettingsPanel } from './ImageSettingsPanel'
 import { AnimatePresence, motion } from 'motion/react'
 import { PRESETS, findPreset, type Preset } from '@shared/presets'
 import type { Connection, TestResult } from '@shared/types'
@@ -315,6 +316,7 @@ export function ConnectScreen() {
             </Button>
           </div>
         </motion.div>
+        {!settings?.remote && <ImageSettingsPanel />}
       </div>
     </div>
   )

@@ -15,6 +15,8 @@ export type CompleteOptions<T> = {
   /** Short name for the schema (some servers require one). */
   name: string
   signal?: AbortSignal
+  /** Pictures for the model to look at, with the last message (vision models only). */
+  images?: { mime: string; data: string }[]
 }
 
 /**

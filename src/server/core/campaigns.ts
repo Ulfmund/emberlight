@@ -199,7 +199,8 @@ export class Campaigns {
         swipe: m.role === 'assistant' && sibs.length > 1 ? { index: sibs.findIndex((s) => s.id === m.id), count: sibs.length, ids: sibs.map((s) => s.id) } : undefined,
         checks: mine.filter((e) => e.event.type === 'roll').map((e) => (e.event as { check: CheckResult }).check),
         changes: describeEvents(shown.map((e) => e.event)),
-        createdAt: m.created_at
+        createdAt: m.created_at,
+        image: m.meta.image
       }
     })
 
@@ -325,6 +326,20 @@ export class Campaigns {
     })
     this.db.addEvents(id, opening.id, newId('grp'), 'player', events as GameEvent[])
     this.db.setHead(id, opening.id)
+  }
+
+  /** The character's picture: kept with the newest message, so a successor starts without one. */
+  setPortrait(id: string, media: string | null) {
+    const c = this.get(id)
+    if (!c.head_id) throw new Error('This story has no messages yet.')
+    this.db.addEvents(id, c.head_id, newId('grp'), 'player', [{ type: 'portrait', media }])
+  }
+
+  /** New words for the character's appearance (the DM uses them from now on). */
+  setAppearance(id: string, appearance: string) {
+    const c = this.get(id)
+    if (!c.head_id) throw new Error('This story has no messages yet.')
+    this.db.addEvents(id, c.head_id, newId('grp'), 'player', [{ type: 'build_edit', appearance }])
   }
 
   /** Show a different version of a DM message (and whatever came after it on that branch). */

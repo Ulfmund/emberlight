@@ -54,7 +54,7 @@ export function PlayScreen() {
           <Story view={view} onInspect={() => setInspector(true)} />
         </PortraitContext.Provider>
         <CombatTracker view={view} />
-        <Composer campaignId={view.id} disabled={dead} busy={busy} holding={live.hold} onSend={(t) => void act(t)} onStop={stop} />
+        <Composer campaignId={view.id} disabled={dead} busy={busy} holding={live.hold} onSend={(t, image) => void act(t, image ? { image } : undefined)} onStop={stop} />
         <DiceTray />
       </main>
 
@@ -87,10 +87,28 @@ function Composer({
   disabled: boolean
   busy: boolean
   holding: boolean
-  onSend: (t: string) => void
+  onSend: (t: string, image?: string) => void
   onStop: () => void
 }) {
   const [text, setText] = useState('')
+  // A picture to show the DM with the next message.
+  const [pic, setPic] = useState<{ id: string; url: string } | null>(null)
+  const [picError, setPicError] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const picker = useRef<HTMLInputElement>(null)
+  const attach = async (file: File | undefined) => {
+    if (!file) return
+    setUploading(true)
+    setPicError('')
+    try {
+      const { id } = await api.uploadMedia(campaignId, file, 'story')
+      setPic({ id, url: URL.createObjectURL(file) })
+      if (!text.trim()) setText('I show them this.')
+    } catch (err) {
+      setPicError((err as Error).message)
+    }
+    setUploading(false)
+  }
   const [focused, setFocused] = useState(false)
   const ta = useRef<HTMLTextAreaElement>(null)
   // Ideas: three things the character could do now.
@@ -179,8 +197,9 @@ function Composer({
   const submit = () => {
     const t = text.trim()
     if (!t || busy || disabled) return
-    onSend(t)
+    onSend(t, pic?.id)
     setText('')
+    setPic(null)
     setGhost('')
     setIdeas((x) => ({ ...x, open: false }))
   }
@@ -219,6 +238,19 @@ function Composer({
             </motion.div>
           )}
         </AnimatePresence>
+        {(pic || picError) && (
+          <div className="mb-2 flex items-center gap-2 px-1">
+            {pic && (
+              <span className="relative">
+                <img src={pic.url} alt="The picture you'll show" className="h-14 w-14 rounded-lg border border-gold-500/30 object-cover" />
+                <button onClick={() => setPic(null)} className="no-drag absolute -top-1.5 -right-1.5 grid h-5 w-5 cursor-pointer place-items-center rounded-full bg-ink-900 text-parchment-300 ring-1 ring-gold-500/40 hover:text-blood-400" aria-label="Don't show the picture">
+                  <Icon name="x" size={11} />
+                </button>
+              </span>
+            )}
+            <span className={`text-xs ${picError ? 'text-blood-400' : 'text-parchment-400'}`}>{picError || 'The DM sees this picture with your next message.'}</span>
+          </div>
+        )}
         <motion.div
           animate={{ boxShadow: focused ? '0 0 0 1px rgba(232,181,77,0.55), 0 0 40px -8px rgba(255,140,40,0.45)' : '0 0 0 1px rgba(201,143,44,0.22), 0 0 0 0 rgba(0,0,0,0)' }}
           transition={{ duration: 0.25 }}
@@ -282,6 +314,19 @@ function Composer({
               className="relative block max-h-[220px] w-full resize-none bg-transparent py-2.5 font-story text-[1.12rem] text-parchment-50 outline-none placeholder:text-parchment-500 placeholder:italic disabled:opacity-50"
             />
           </div>
+          {!disabled && (
+            <Tip content="Show the DM a picture">
+              <button
+                onClick={() => picker.current?.click()}
+                disabled={uploading || (busy && !holding)}
+                aria-label="Show a picture"
+                className="no-drag mb-1 grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-xl border border-gold-500/20 text-gold-300 transition-colors hover:border-gold-400/50 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Icon name="upload" size={17} />
+              </button>
+            </Tip>
+          )}
+          <input ref={picker} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={(e) => void attach(e.target.files?.[0]).then(() => (e.target.value = ''))} />
           {!disabled && (
             <Tip content="Ideas: three things you could do now">
               <button

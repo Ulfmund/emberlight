@@ -59,7 +59,7 @@ type State = {
   takeUp(build: CharacterBuild): Promise<void>
 
   /** Free text, or a move picked on the combat tracker, or a recipe from the Bag. */
-  act(text: string, picked?: { combat?: CombatAction; work?: Work; spell?: string }): Promise<void>
+  act(text: string, picked?: { combat?: CombatAction; work?: Work; spell?: string; image?: string }): Promise<void>
   answer(messageId: string): Promise<void>
   regenerate(): Promise<void>
   reroll(checkId: string): Promise<void>

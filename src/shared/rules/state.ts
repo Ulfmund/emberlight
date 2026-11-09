@@ -124,6 +124,8 @@ export type CharacterState = {
   epitaph?: string
   /** Spells known (ids from spells.ts). */
   spells: string[]
+  /** Their own picture (a media id), if one was given or made for them. */
+  portrait?: string
 }
 
 /** A character who died, remembered in the Hall of the Fallen. */
@@ -205,6 +207,8 @@ export type GameEvent =
   | { type: 'new_character'; build: CharacterBuild; days: number; fallen: Fallen; inherit?: { coins: number; renown: number; items: { name: string; qty: number; icon?: string }[] } }
   /** The player renamed or redescribed a character who took over the tale. */
   | { type: 'build_edit'; name?: string; appearance?: string; personality?: string }
+  /** The character's picture: uploaded, or made by the image generator (null takes it away). */
+  | { type: 'portrait'; media: string | null }
   /** A spell learned (from a tome, a teacher, a revelation). */
   | { type: 'learn_spell'; id: string; name?: string }
   /** Magic in a fight: a ward for the rest of it, or a curse on a foe. */
@@ -488,6 +492,9 @@ export function applyEvent(prev: GameState, ev: GameEvent, settings: CampaignSet
       break
     case 'epitaph':
       c.epitaph = ev.text.trim().slice(0, 600)
+      break
+    case 'portrait':
+      c.portrait = ev.media ?? undefined
       break
     case 'learn_spell':
       c.spells = [...new Set([...(c.spells ?? []), ev.id])]

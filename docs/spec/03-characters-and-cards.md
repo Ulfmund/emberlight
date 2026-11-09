@@ -89,9 +89,13 @@ Optional. Configured once under *Settings → Images*.
 - Used for: player portraits, NPC portraits (optional auto-generate when an NPC is promoted), and later location art and item icons.
 - Generated images are saved to the campaign's media folder and attached to the entity.
 
+*Built (0.14.0)* (`src/server/images/generate.ts`, `src/shared/images.ts`): an **Images** section on the Connect screen (on the computer only, like API keys): the generator, its address, a model (a checkpoint for SD or ComfyUI, e.g. `gpt-image-1` for an images API), an API key for images APIs (encrypted with the other keys), the **art style** added to every portrait, what to leave out, size and steps, and for ComfyUI an optional workflow of your own in API format with `{{prompt}}`, `{{negative}}`, `{{seed}}`, `{{width}}`, `{{height}}`, `{{steps}}` and `{{model}}` placeholders (otherwise a basic checkpoint text-to-image graph). **Test** paints a sample. Portraits are made from the **picture dialog**: tap your character's portrait (character panel) or a person's circle in the Journal; the prompt (style + what the sheet or the Journal says about them) can be edited first. Pictures live in the save file (a `media` table) and travel with an exported adventure.
+
 ## Image input (show the AI a picture)
 
 Drag an image into the chat or onto an entity:
 - **On a character:** "This is what they look like." The image becomes the portrait, and a text description is saved to the entity so even text-only models know the appearance.
 - **In the chat:** "I hand the merchant this amulet." The DM and characters react to it. The image can be saved as an **item** or **location** with its description.
 - If the narrator model can see images, the image is sent directly. If not, the **Vision job** (see [02](02-models-and-backends.md)) describes it first and that text is sent instead.
+
+*Built (0.14.0)*: always through the **Vision job** (`src/server/ai/jobs/vision.ts`), using the connected model when it can see pictures (Claude; local vision models through LM Studio, Ollama and other OpenAI-compatible servers). **Your portrait:** upload one in the picture dialog and the DM describes how your character looks, with **Use as my appearance** to make that the character's description (a `build_edit` event). People in the Journal can be given pictures the same way, and those pictures appear in their speech bubbles. **In the story:** the picture button beside the message box attaches one to your next message; it shows in your message, and the DM gets it in words ("(The player shows a picture: …)"), as does the Referee. A model that can't see pictures just gets your words, with a note saying so.

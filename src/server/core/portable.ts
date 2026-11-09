@@ -76,7 +76,9 @@ const FileSchema = z.object({
       image: z.string().optional(),
       imageMime: z.string().optional()
     })
-  )
+  ),
+  /** The adventure's own pictures (portraits, things shown in the story); older files have none. */
+  media: z.array(z.object({ id: z.string(), kind: z.enum(['portrait', 'story', 'generated']), mime: z.string(), path: z.string() })).default([])
 })
 type CampaignFile = z.infer<typeof FileSchema>
 
@@ -123,7 +125,14 @@ export function exportCampaign(db: GameDb, id: string, app?: string): { name: st
     events: db.eventsFor(id).map((e) => ({ message_id: e.message_id, group_id: e.group_id, source: e.source, event: e.event as unknown as { type: string }, superseded: e.superseded, created_at: e.created_at })),
     saves: db.savesFor(id).map((s) => ({ name: s.name, message_id: s.message_id, created_at: s.created_at })),
     lorebooks,
-    cards
+    cards,
+    media: []
+  }
+  for (const m of db.mediaFor(id)) {
+    const ext = IMAGE_EXT[m.mime]
+    if (!ext) continue
+    files.push({ name: `media/${m.id}.${ext}`, data: m.data })
+    file.media.push({ id: m.id, kind: m.kind, mime: m.mime, path: `media/${m.id}.${ext}` })
   }
   files.unshift({ name: 'campaign.json', data: Buffer.from(JSON.stringify(file), 'utf8') })
   return { name: c.name, bytes: makeZip(files) }
@@ -154,7 +163,8 @@ export function importCampaign(db: GameDb, bytes: Uint8Array): string {
   const f = parsed.data
   if (f.campaign.headId && !f.messages.some((m) => m.id === f.campaign.headId)) throw new PortableError('This adventure file is damaged or incomplete.')
 
-  const msgIds = new Map(f.messages.map((m) => [m.id, newId('msg')]))
+  // Messages and pictures get new ids; every mention of the old ones (events, meta) follows.
+  const msgIds = new Map<string, string>([...f.messages.map((m) => [m.id, newId('msg')] as [string, string]), ...f.media.map((m) => [m.id, newId('img')] as [string, string])])
   const groupIds = new Map<string, string>()
   const group = (g: string) => groupIds.get(g) ?? (groupIds.set(g, newId('grp')), groupIds.get(g)!)
   /** Message ids inside events and meta (summaries, answered rolls) follow the messages. */
@@ -222,6 +232,11 @@ export function importCampaign(db: GameDb, bytes: Uint8Array): string {
         .map((e) => ({ message_id: msgIds.get(e.message_id)!, group_id: group(e.group_id), source: e.source, event: remap(e.event) as GameEvent, superseded: e.superseded, created_at: e.created_at }))
     )
     for (const s of f.saves) if (msgIds.has(s.message_id)) db.addSave(id, s.name, msgIds.get(s.message_id)!)
+    for (const m of f.media) {
+      const entry = entries.find((e) => e.name === m.path)
+      if (!entry || !IMAGE_EXT[m.mime]) continue
+      db.putMedia(msgIds.get(m.id)!, { campaignId: id, kind: m.kind, mime: m.mime, data: zipRead(bytes, entry) })
+    }
   })
   return id
 }

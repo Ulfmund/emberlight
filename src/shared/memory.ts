@@ -44,6 +44,8 @@ export type Entity = {
   attitude?: Attitude
   /** People only: how they're tied to the player character. */
   relation?: Relation
+  /** A picture of them (a media id). */
+  image?: string
   firstSeenDay: number
   lastSeenDay: number
   /** Bigger = seen more recently (an update counter, for sorting). */
@@ -105,6 +107,7 @@ export type JournalEdit =
       /** null clears it. */
       attitude?: Attitude | null
       relation?: Relation | null
+      image?: string | null
     }
   | { type: 'entity_forget'; id: string }
   | { type: 'summary_edit'; level: Summary['level']; to: string; title: string; text: string }
@@ -260,6 +263,7 @@ export function applyMemoryEvent(m: Memory, ev: MemoryEvent, counter: { n: numbe
       if (ev.status) e.status = ev.status
       if (ev.attitude !== undefined && e.kind === 'person') e.attitude = ev.attitude ?? undefined
       if (ev.relation !== undefined && e.kind === 'person') e.relation = ev.relation && ev.relation !== 'none' ? ev.relation : undefined
+      if (ev.image !== undefined) e.image = ev.image ?? undefined
       break
     }
     case 'entity_forget':

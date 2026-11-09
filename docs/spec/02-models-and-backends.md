@@ -26,7 +26,7 @@ Each AI task is a separate job. **By default all jobs use the one selected model
 | **Scribe** | After each turn, extracts facts: new characters and places, relationship changes, time passed, items, rest/sleep, scene tags | Structured JSON |
 | **Suggester** | Proposes 3 things the player could do or say | Structured JSON |
 | **Summarizer** | Compresses old chapters into the memory timeline | Prose + JSON |
-| **Vision** | Describes an uploaded image when the main model can't see images | Text |
+| **Vision** | Describes an uploaded image when the main model can't see images | Text (*built 0.14.0*: portraits and pictures shown in the story, always in words) |
 
 Splitting the jobs means each prompt is small and focused, which is much easier for weak models than one huge "do everything" prompt. A strong model can run the Referee and Scribe in one combined call to save time (a capability-profile setting).
 

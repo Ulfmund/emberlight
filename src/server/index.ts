@@ -14,6 +14,7 @@ import { createProvider } from './ai/providers'
 import { Campaigns } from './core/campaigns'
 import { TurnEngine } from './core/turn'
 import { registerGameRoutes } from './routes/game'
+import { registerMediaRoutes } from './routes/media'
 import { registerCardRoutes } from './routes/cards'
 import { CardLibrary } from './cards/library'
 import { LoreLibrary } from './lore/library'
@@ -72,7 +73,7 @@ export async function startServer(opts: ServerOptions): Promise<{ port: number; 
   // ---- Settings & keys -----------------------------------------------------------------
   const settingsView = async (c?: Parameters<typeof isRemote>[0]): Promise<SettingsView> => {
     const savedKeys: Record<string, boolean> = {}
-    for (const id of ['openrouter', 'claude', 'custom', 'lmstudio', 'strata', 'koboldcpp']) savedKeys[id] = await secrets.has(id)
+    for (const id of ['openrouter', 'claude', 'custom', 'lmstudio', 'strata', 'koboldcpp', 'images']) savedKeys[id] = await secrets.has(id)
     return { connection: settings.connection, savedKeys, secureStorage: secrets.secure, remote: c ? isRemote(c, ports) : false }
   }
 
@@ -224,6 +225,7 @@ export async function startServer(opts: ServerOptions): Promise<{ port: number; 
   registerCardRoutes(app, library)
   registerLoreRoutes(app, new LoreLibrary(db))
   registerGameRoutes(app, campaigns, turns, library)
+  registerMediaRoutes(app, campaigns, turns, settings, secrets)
 
   // ---- The UI itself (production) ------------------------------------------------------
   if (opts.staticDir) {

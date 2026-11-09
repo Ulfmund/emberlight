@@ -100,6 +100,10 @@ describe('playing from other devices', () => {
     expect((await call(link, '/api/update/install', { method: 'POST', headers: h })).status).toBe(403)
     expect((await call(link, '/api/remote', { headers: h })).status).toBe(403)
     expect((await call(link, '/api/remote/new-key', { method: 'POST', headers: h })).status).toBe(403)
+    // The image generator's settings (its address, its key) are the computer's alone too.
+    expect((await call(link, '/api/images/settings', { method: 'PUT', headers: h, body: { backend: 'openai', baseUrl: 'https://evil.example', model: '', style: '', negative: '', size: 768, steps: 28, workflow: '' } })).status).toBe(403)
+    expect((await call(link, '/api/images/settings/test', { method: 'POST', headers: h })).status).toBe(403)
+    expect((await call(link, '/api/keys/images', { method: 'PUT', headers: h, body: { key: 'sk-evil' } })).status).toBe(403)
   })
 
   it("can change the model, but can't send the saved key to a new address", async () => {

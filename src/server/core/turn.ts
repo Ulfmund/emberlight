@@ -43,6 +43,7 @@ import { runCombatReferee, runReferee } from '../ai/jobs/referee'
 import { runScribe } from '../ai/jobs/scribe'
 import { writeEpitaph } from '../ai/jobs/epitaph'
 import { ghostText, suggestActions, type Suggestion } from '../ai/jobs/suggest'
+import { describeImage } from '../ai/jobs/vision'
 import { engineNotes, extractFight, extractRollRequest, fitHistory, NameFilter, narratorSystem, pastRollNote, type PersonaText } from '../ai/narrator'
 import { newId, type CampaignRow, type EventRow, type MessageRow } from '../store/db'
 import type { Campaigns } from './campaigns'
@@ -138,7 +139,7 @@ export class TurnEngine {
   // ---- public actions ------------------------------------------------------------------
 
   /** The player acts (free text; or a move picked on the tracker, or "Make" in the Bag). */
-  async *act(id: string, text: string, signal: AbortSignal, picked: { combat?: CombatAction; work?: Work; spell?: string } = {}): AsyncGenerator<TurnEvent> {
+  async *act(id: string, text: string, signal: AbortSignal, picked: { combat?: CombatAction; work?: Work; spell?: string; image?: string } = {}): AsyncGenerator<TurnEvent> {
     yield* this.playTurn(id, { text, kind: 'action', ...picked }, signal)
   }
 
@@ -217,6 +218,15 @@ export class TurnEngine {
     this.campaigns.db.updateMessage(lastUser.id, { meta })
     yield { type: 'checks', checks: [...out.checks, ...out.fightRolls], deathRoll }
     yield* this.narrate(id, { ...lastUser, meta }, signal, notes)
+  }
+
+  /** A picture, in words: a portrait of the player character, or something shown in the story. */
+  async describeMedia(id: string, mediaId: string, purpose: 'portrait' | 'story', signal?: AbortSignal, said = ''): Promise<string> {
+    const m = this.campaigns.db.getMedia(mediaId)
+    if (!m || m.campaignId !== id) throw new Error('That picture is no longer there.')
+    const ctx = await this.ctx()
+    const who = this.campaigns.state(this.campaigns.get(id)).character.build.name
+    return describeImage(ctx.provider, ctx.model, { mime: m.mime, data: Buffer.from(m.data).toString('base64') }, purpose === 'portrait' ? { kind: 'portrait', who } : { kind: 'story', said }, signal)
   }
 
   /** Three things the character could do now (the Ideas button). */
@@ -380,7 +390,7 @@ export class TurnEngine {
 
   private async *playTurn(
     id: string,
-    input: { text: string; kind: 'action' | 'roll_response'; hidden?: boolean; forced?: CheckRequest; answers?: string; combat?: CombatAction; work?: Work; spell?: string },
+    input: { text: string; kind: 'action' | 'roll_response'; hidden?: boolean; forced?: CheckRequest; answers?: string; combat?: CombatAction; work?: Work; spell?: string; image?: string },
     signal: AbortSignal
   ): AsyncGenerator<TurnEvent> {
     let ctx: Ctx
@@ -397,6 +407,18 @@ export class TurnEngine {
     const head = path[path.length - 1]
     if (head?.role === 'user') return yield { type: 'error', message: 'The DM is still answering the last turn.' }
 
+    // A picture the player shows: put into words first, so any model (and the Referee) knows what it is.
+    let imageText: string | undefined
+    if (input.image) {
+      const m = this.campaigns.db.getMedia(input.image)
+      if (!m || m.campaignId !== id) return yield { type: 'error', message: 'That picture is no longer there. Attach it again.' }
+      try {
+        imageText = await this.describeMedia(id, input.image, 'story', signal, input.text)
+      } catch (err) {
+        yield { type: 'notice', message: `The DM couldn't look at the picture (${(err as Error).message}), so only your words go to the story.` }
+      }
+    }
+
     const msg = this.campaigns.db.addMessage({
       id: newId('msg'),
       campaign_id: id,
@@ -404,7 +426,7 @@ export class TurnEngine {
       role: 'user',
       content: input.text,
       thinking: '',
-      meta: { kind: input.kind, hidden: input.hidden, answers: input.answers }
+      meta: { kind: input.kind, hidden: input.hidden, answers: input.answers, image: input.image, imageText }
     })
     this.campaigns.db.setHead(id, msg.id)
     yield { type: 'player', message: toView(msg) }
@@ -432,7 +454,7 @@ export class TurnEngine {
       plan.combat = input.combat
       if (!plan.combat) {
         try {
-          plan.combat = await runCombatReferee(ctx.provider, ctx.model, working, recent, input.text)
+          plan.combat = await runCombatReferee(ctx.provider, ctx.model, working, recent, withPicture(input.text, imageText))
         } catch (err) {
           plan.combat = guessCombatAction(input.text)
           yield { type: 'notice', message: `The referee couldn't read that move (${(err as Error).message}), so it counts as ${actionLabel(plan.combat, working)}.` }
@@ -440,7 +462,7 @@ export class TurnEngine {
       }
     } else if (working.character.status === 'alive') {
       try {
-        plan.ref = await runReferee(ctx.provider, ctx.model, working, recent, input.text, settings.rolls)
+        plan.ref = await runReferee(ctx.provider, ctx.model, working, recent, withPicture(input.text, imageText), settings.rolls)
       } catch (err) {
         plan.ref = null
         yield { type: 'notice', message: `The referee couldn't decide on a roll (${(err as Error).message}), so the story continues without one.` }
@@ -483,7 +505,7 @@ export class TurnEngine {
       if (m.role === 'assistant') return { role: 'assistant', content: m.content || '(…)' }
       const checks = events.filter((e) => e.message_id === m.id && e.event.type === 'roll').map((e) => (e.event as { check: CheckResult }).check)
       const extra = isLast ? (notes ? `\n\n[GAME ENGINE]\n${notes}` : '') : pastRollNote(checks)
-      return { role: 'user', content: m.content + extra }
+      return { role: 'user', content: withPicture(m.content, m.meta.imageText) + extra }
     })
 
     // Long-term memory: people and places from earlier, and summaries of whatever no longer
@@ -710,6 +732,9 @@ function requestOf(c: CheckResult): CheckRequest {
   }
 }
 
+/** What the player said, and in words what they showed. */
+const withPicture = (text: string, picture?: string) => (picture ? `${text}\n\n(The player shows a picture: ${picture})` : text)
+
 function toView(m: MessageRow): MessageView {
   return {
     id: m.id,
@@ -720,6 +745,7 @@ function toView(m: MessageRow): MessageView {
     kind: m.meta.kind,
     checks: [],
     changes: [],
-    createdAt: m.created_at
+    createdAt: m.created_at,
+    image: m.meta.image
   }
 }

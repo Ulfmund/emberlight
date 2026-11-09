@@ -10,6 +10,8 @@ import { Icon } from '../../components/Icon'
 import { speakerColor } from '../../components/StoryText'
 import { LoreEditor } from '../LoreEditor'
 import { RenameDialog } from './RenameDialog'
+import { PortraitDialog } from './PortraitDialog'
+import { mediaUrl } from '@shared/images'
 
 /**
  * The Journal (docs/spec/07-memory-and-lore.md#journal-what-the-player-sees): everything the
@@ -206,6 +208,7 @@ function EntityList({ view, items, kind }: { view: CampaignView; items: Entity[]
 
 function EntityCard({ entity: e, view }: { entity: Entity; view: CampaignView }) {
   const [editing, setEditing] = useState(false)
+  const [picturing, setPicturing] = useState(false)
   const companion = view.cast.find((m) => m.role === 'companion' && m.hasImage && sameName(m.name, e.name))
   const color = speakerColor(e.name)
   const dead = e.status === 'dead'
@@ -221,22 +224,29 @@ function EntityCard({ entity: e, view }: { entity: Entity; view: CampaignView })
         <EntityEditor entity={e} onDone={() => setEditing(false)} />
       ) : (
         <div className="flex gap-4">
-          <div
-            className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full border-2 font-display text-base font-bold text-ink-950"
+          <button
+            type="button"
+            onClick={() => e.kind === 'person' && setPicturing(true)}
+            disabled={e.kind !== 'person'}
+            title={e.kind === 'person' ? `A picture of ${e.name}` : undefined}
+            className="no-drag grid h-12 w-12 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-full border-2 font-display text-base font-bold text-ink-950 disabled:cursor-default"
             style={{
               borderColor: color,
               background: e.kind === 'place' ? 'var(--color-ink-800)' : `radial-gradient(circle at 35% 30%, ${color}, color-mix(in oklab, ${color} 40%, #120d10))`,
               filter: dead ? 'grayscale(1) brightness(0.65)' : undefined
             }}
           >
-            {companion ? (
+            {e.image ? (
+              <img src={mediaUrl(e.image)} alt="" className="h-full w-full object-cover" style={{ objectPosition: 'center 18%' }} />
+            ) : companion ? (
               <img src={cardImageUrl(companion.cardId)} alt="" className="h-full w-full object-cover" style={{ objectPosition: 'center 18%' }} />
             ) : e.kind === 'place' ? (
               <Icon name="map" size={22} style={{ color }} />
             ) : (
               initials(e.name)
             )}
-          </div>
+          </button>
+          {e.kind === 'person' && <PortraitDialog open={picturing} onClose={() => setPicturing(false)} entity={{ id: e.id, name: e.name }} />}
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 pr-16">
               <span className={`font-display text-lg tracking-wide ${dead ? 'text-parchment-400 line-through decoration-blood-400/60' : 'text-parchment-50'}`}>{e.name}</span>

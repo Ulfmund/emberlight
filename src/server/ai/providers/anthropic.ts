@@ -40,7 +40,17 @@ export class AnthropicProvider implements Provider {
   }
 
   async complete<T>(model: string, opts: CompleteOptions<T>): Promise<T> {
-    const messages: Anthropic.MessageParam[] = opts.messages.map((m) => ({ role: m.role, content: m.content }))
+    const messages: Anthropic.MessageParam[] = opts.messages.map((m, i) =>
+      i === opts.messages.length - 1 && opts.images?.length
+        ? {
+            role: m.role,
+            content: [
+              ...opts.images.map((img) => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: img.mime as 'image/png', data: img.data } })),
+              { type: 'text' as const, text: m.content }
+            ]
+          }
+        : { role: m.role, content: m.content }
+    )
     if (messages[0]?.role !== 'user') messages.unshift({ role: 'user', content: '(Begin.)' })
     const params: Record<string, unknown> = {
       model,

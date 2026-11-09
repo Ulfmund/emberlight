@@ -19,6 +19,9 @@ class FakeProvider implements Provider {
   referee: unknown = { checks: [] }
   combatReferee: unknown = { action: 'attack', target: '', item: '', checks: [] }
   epitaph = 'She never looked back, and the river never gave her up.'
+  /** What the Vision job "sees" (null: a model that can't see pictures). */
+  vision: string | null = 'A silver amulet shaped like a coiled serpent.'
+  images: unknown[] = []
   scribe: unknown = blankScribe()
   narration = 'The rain keeps falling. [[ROLL: perception | hard | something moves in the reeds]]'
   calls: string[] = []
@@ -40,6 +43,11 @@ class FakeProvider implements Provider {
     if (opts.name === 'story_so_far') return opts.schema.parse({ storySoFar: `The tale so far (${n}).` })
     if (opts.name === 'combat_referee') return opts.schema.parse(this.combatReferee)
     if (opts.name === 'epitaph') return opts.schema.parse({ epitaph: this.epitaph })
+    if (opts.name === 'describe_image') {
+      if (this.vision === null) throw new Error('This model cannot see images')
+      this.images.push(...(opts.images ?? []))
+      return opts.schema.parse({ description: this.vision })
+    }
     return opts.schema.parse(opts.name === 'referee' ? this.referee : this.scribe)
   }
   async *chat(_m: string, opts: { system: string; messages: { role: string; content: string }[] }): AsyncIterable<StreamEvent> {
@@ -685,6 +693,27 @@ describe('turn engine', () => {
     const out = await run(engine.act(id, 'I mutter a hex at the crow on the fence.', signal))
     expect((out.find((e) => e.type === 'checks') as { checks: { reason: string }[] }).checks.map((c) => c.reason)).toEqual(['casting Hex'])
     expect(lastNotes()).toMatch(/MAGIC: Hex works/)
+  })
+
+  it('shows the DM a picture: put into words first, for the Referee and the story', async () => {
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    const pic = db.addMedia({ campaignId: id, kind: 'story', mime: 'image/png', data: new Uint8Array([0x89, 0x50, 0x4e, 0x47]) })
+    await run(engine.act(id, 'I show the merchant this amulet.', signal, { image: pic }))
+    const v = campaigns.view(id)
+    expect(v.messages.at(-2)!.image).toBe(pic)
+    expect(fake.images).toEqual([{ mime: 'image/png', data: Buffer.from([0x89, 0x50, 0x4e, 0x47]).toString('base64') }])
+    expect(fake.lastMessages.at(-1)!.content).toContain('I show the merchant this amulet.\n\n(The player shows a picture: A silver amulet shaped like a coiled serpent.)')
+    // A model that can't see: the story goes on with the words alone.
+    fake.vision = null
+    const out = await run(engine.act(id, 'And this one.', signal, { image: pic }))
+    expect(out.some((e) => e.type === 'notice' && /couldn't look at the picture/.test(e.message))).toBe(true)
+    expect(fake.lastMessages.at(-1)!.content).not.toContain('(The player shows a picture')
+    // Someone else's picture can't be used.
+    const other = campaigns.create(build, DEFAULT_SETTINGS)
+    const theirs = db.addMedia({ campaignId: other, kind: 'story', mime: 'image/png', data: new Uint8Array([1]) })
+    const bad = await run(engine.act(id, 'Look.', signal, { image: theirs }))
+    expect(bad.find((e) => e.type === 'error')).toMatchObject({ message: expect.stringMatching(/no longer there/) })
   })
 
   it('brings random events now and then, and not one after another', async () => {

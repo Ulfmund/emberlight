@@ -20,6 +20,8 @@ export type MessageView = {
   checks: CheckResult[]
   changes: ChangeLine[]
   createdAt: number
+  /** A picture the player showed with this message (media id). */
+  image?: string
 }
 
 export type CampaignView = {

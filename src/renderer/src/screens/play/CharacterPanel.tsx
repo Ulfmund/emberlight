@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { RenameDialog } from './RenameDialog'
+import { PortraitDialog } from './PortraitDialog'
 import { AGES, BACKGROUNDS, CONDITIONS, RACES, SEXES } from '@shared/rules'
 import type { CampaignView } from '@shared/view'
 import { Medallion } from '../../components/Medallion'
@@ -61,6 +62,7 @@ export function CharacterPanel({
   className?: string
 }) {
   const [renaming, setRenaming] = useState(false)
+  const [picturing, setPicturing] = useState(false)
   const c = view.state.character
   const b = view.build
   const d = view.derived
@@ -70,7 +72,13 @@ export function CharacterPanel({
   return (
     <aside className={`relative z-10 flex shrink-0 flex-col gap-5 overflow-y-auto p-5 ${className}`}>
       <div className="flex flex-col items-center text-center">
-        <Medallion name={b.name} race={b.race} size={92} dead={c.status === 'dead'} image={playerPortrait(view)} />
+        <button onClick={() => setPicturing(true)} className="no-drag group/portrait relative cursor-pointer rounded-full" title="Change your character's picture" aria-label="Change your character's picture">
+          <Medallion name={b.name} race={b.race} size={92} dead={c.status === 'dead'} image={playerPortrait(view)} />
+          <span className="absolute -right-1 -bottom-1 grid h-7 w-7 place-items-center rounded-full border border-gold-500/40 bg-ink-900 text-gold-300 opacity-0 transition group-hover/portrait:opacity-100 touch:opacity-100">
+            <Icon name="upload" size={13} />
+          </span>
+        </button>
+        <PortraitDialog open={picturing} onClose={() => setPicturing(false)} />
         <div className="group mt-3 flex items-center justify-center gap-1.5">
           <span className="font-display text-lg tracking-wide text-gold-200">{b.name}</span>
           <button onClick={() => setRenaming(true)} className="no-drag cursor-pointer rounded p-1 text-parchment-500 opacity-0 transition group-hover:opacity-100 touch:opacity-100 hover:text-gold-200" title="Rename your character" aria-label="Rename your character">

@@ -82,7 +82,10 @@ export class OllamaProvider implements Provider {
           stream: false,
           // Ollama constrains the output to this JSON Schema.
           format: toJsonSchema(opts.schema),
-          messages: [{ role: 'system', content: opts.system + JSON_ONLY }, ...opts.messages],
+          messages: [
+            { role: 'system', content: opts.system + JSON_ONLY },
+            ...opts.messages.map((m, i) => (i === opts.messages.length - 1 && opts.images?.length ? { ...m, images: opts.images.map((img) => img.data) } : m))
+          ],
           options: { num_ctx: await this.numCtx(model), temperature: 0.3, num_predict: 1500 }
         })
       })

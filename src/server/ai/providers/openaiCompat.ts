@@ -175,6 +175,16 @@ export class OpenAICompatProvider implements Provider {
 /** Remembers servers that rejected `response_format`, so we don't keep asking. */
 const noSchemaSupport = new Set<string>()
 
+/** The last message with the pictures attached, the way OpenAI-style servers take them. */
+function withImages<T>(opts: CompleteOptions<T>): unknown[] {
+  if (!opts.images?.length) return opts.messages
+  return opts.messages.map((m, i) =>
+    i === opts.messages.length - 1
+      ? { role: m.role, content: [{ type: 'text', text: m.content }, ...opts.images!.map((img) => ({ type: 'image_url', image_url: { url: `data:${img.mime};base64,${img.data}` } }))] }
+      : m
+  )
+}
+
 export async function openAiComplete<T>(
   baseUrl: string,
   headers: Record<string, string>,
@@ -189,7 +199,7 @@ export async function openAiComplete<T>(
       stream: false,
       temperature: 0.3,
       max_tokens: 1500,
-      messages: [{ role: 'system', content: opts.system + JSON_ONLY }, ...opts.messages],
+      messages: [{ role: 'system', content: opts.system + JSON_ONLY }, ...withImages(opts)],
       ...(withSchema
         ? { response_format: { type: 'json_schema', json_schema: { name: opts.name, schema: toJsonSchema(opts.schema) } } }
         : {})

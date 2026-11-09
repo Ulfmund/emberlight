@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
+import { mediaUrl } from '@shared/images'
 import { AnimatePresence, motion } from 'motion/react'
 import { DIFFICULTY_LABEL, SKILLS, TIER_INFO, type CheckResult, type Tier } from '@shared/rules'
 import type { CampaignView, MessageView } from '@shared/view'
@@ -165,6 +166,7 @@ function PlayerTurn({ m, onUndo }: { m: MessageView; onUndo?: () => void }) {
           )}
           <span className="font-display text-[0.7rem] tracking-[0.2em] text-gold-400">YOU</span>
         </div>
+        {m.image && <img src={mediaUrl(m.image)} alt="A picture you showed" className="mb-2 max-h-56 rounded-lg border border-gold-500/25 object-contain" />}
         <PlayerText text={m.content} />
       </div>
     </div>

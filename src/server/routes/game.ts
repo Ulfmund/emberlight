@@ -263,10 +263,10 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
   const WorkSchema = z.object({ kind: z.literal('craft'), what: z.string().min(1).max(60) })
 
   app.post('/api/campaigns/:id/act', async (c) => {
-    const b = await body(c, z.object({ text: z.string().min(1).max(4000), combat: CombatMoveSchema.optional(), work: WorkSchema.optional(), spell: z.string().max(40).optional() }))
+    const b = await body(c, z.object({ text: z.string().min(1).max(4000), combat: CombatMoveSchema.optional(), work: WorkSchema.optional(), spell: z.string().max(40).optional(), image: z.string().max(80).optional() }))
     const id = c.req.param('id')
     return stream(c, (signal) =>
-      b ? turns.act(id, b.text, signal, { combat: b.combat, work: b.work, spell: b.spell }) : (async function* () { yield { type: 'error', message: 'Write something first.' } as TurnEvent })()
+      b ? turns.act(id, b.text, signal, { combat: b.combat, work: b.work, spell: b.spell, image: b.image }) : (async function* () { yield { type: 'error', message: 'Write something first.' } as TurnEvent })()
     )
   })
 

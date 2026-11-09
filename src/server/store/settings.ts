@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { Connection } from '@shared/types'
+import { normalizeImageSettings, type ImageSettings } from '@shared/images'
 
 /** Playing from other devices: a phone on the same Wi-Fi, or through a tunnel link. */
 export type RemoteSettings = {
@@ -12,7 +13,7 @@ export type RemoteSettings = {
 }
 
 /** App settings, saved as JSON in the app's user-data folder. */
-type SettingsFile = { version: 1; connection: Connection | null; remote: RemoteSettings }
+type SettingsFile = { version: 1; connection: Connection | null; remote: RemoteSettings; images: ImageSettings }
 
 export const newRemoteKey = () => randomBytes(24).toString('base64url')
 
@@ -46,7 +47,8 @@ export class SettingsStore {
         key: typeof r.key === 'string' && r.key.length >= 24 ? r.key : newRemoteKey(),
         wifi: r.wifi === true,
         link: r.link === true
-      }
+      },
+      images: normalizeImageSettings(raw.images)
     }
   }
 
@@ -73,6 +75,15 @@ export class SettingsStore {
 
   setRemote(patch: Partial<RemoteSettings>) {
     this.data.remote = { ...this.data.remote, ...patch }
+    this.save()
+  }
+
+  get images(): ImageSettings {
+    return this.data.images
+  }
+
+  setImages(s: ImageSettings) {
+    this.data.images = s
     this.save()
   }
 }

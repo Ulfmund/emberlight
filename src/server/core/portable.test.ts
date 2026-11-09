@@ -101,6 +101,8 @@ describe('files that travel', () => {
     db.addEvents(id, 'msg_a', 'mem_1', 'ai', [{ type: 'summary', summary: { level: 'scene', title: 'Rain', text: 'It rained.', from: opening, to: 'msg_a', fromDay: 1, toDay: 1 } }])
     db.setHead(id, 'msg_b')
     db.addSave(id, 'Before the wait', 'msg_a')
+    const face = db.addMedia({ campaignId: id, kind: 'portrait', mime: 'image/png', data: tinyPng() })
+    campaigns.setPortrait(id, face)
     const before = campaigns.view(id)
 
     const { bytes, name } = exportCampaign(db, id)
@@ -109,7 +111,11 @@ describe('files that travel', () => {
     const after = campaigns.view(copy)
     expect(copy).not.toBe(id)
     expect(after.name).toBe('Export test (imported)')
-    expect(after.state).toEqual(before.state)
+    // The portrait comes along as a picture of its own (a new id, the same bytes).
+    const copied = after.state.character.portrait!
+    expect(copied).not.toBe(face)
+    expect(Buffer.from(db.getMedia(copied)!.data)).toEqual(tinyPng())
+    expect({ ...after.state, character: { ...after.state.character, portrait: face } }).toEqual(before.state)
     expect(after.state.character.coins).toBe(50 + 25)
     expect(after.messages.map((m) => m.content)).toEqual(before.messages.map((m) => m.content))
     expect(after.messages.some((m) => before.messages.some((b) => b.id === m.id))).toBe(false)
@@ -133,7 +139,8 @@ describe('files that travel', () => {
     expect(v2.cast[0].cardId).not.toBe(card.id)
     expect(db2.cardImage(v2.cast[0].cardId)?.mime).toBe('image/png')
     expect(v2.lorebooks).toEqual([{ id: 'lb_test', name: 'Test lore', entries: 0 }])
-    expect(v2.state).toEqual(before.state)
+    expect(db2.getMedia(v2.state.character.portrait!)?.mime).toBe('image/png')
+    expect({ ...v2.state, character: { ...v2.state.character, portrait: face } }).toEqual(before.state)
     db2.close()
   })
 

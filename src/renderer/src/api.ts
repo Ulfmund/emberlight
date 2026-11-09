@@ -4,6 +4,7 @@ import type { CampaignSummary, CampaignView, TurnEvent } from '@shared/view'
 import type { CardDetail, CardSummary } from '@shared/cards'
 import type { MemoryEvent } from '@shared/memory'
 import type { Lorebook, LorebookSummary } from '@shared/lore'
+import type { ImageSettings } from '@shared/images'
 
 export type CreateOptions = { playerCard?: string; companions?: string[]; useGreeting?: boolean; lorebooks?: string[]; world?: string }
 
@@ -67,6 +68,25 @@ export const api = {
   deleteLorebook: (id: string) => fetch(`/api/lorebooks/${encodeURIComponent(id)}`, { method: 'DELETE' }).then((r) => json<LorebookSummary[]>(r)),
   lorebookExportUrl: (id: string) => `/api/lorebooks/${encodeURIComponent(id)}/export`,
   campaignExportUrl: (id: string) => `/api/campaigns/${encodeURIComponent(id)}/export`,
+  // ---- pictures
+  uploadMedia: (id: string, file: File, kind: 'portrait' | 'story') =>
+    fetch(`/api/campaigns/${encodeURIComponent(id)}/media?kind=${kind}`, { method: 'POST', body: file, headers: { 'Content-Type': file.type || 'application/octet-stream' } }).then((r) => json<{ id: string }>(r)),
+  setPortrait: (id: string, media: string | null, describe = false) =>
+    post(`/api/campaigns/${encodeURIComponent(id)}/portrait`, { media, describe }).then((r) => json<{ view: CampaignView; description?: string; note?: string }>(r)),
+  setAppearance: (id: string, appearance: string) => post(`/api/campaigns/${encodeURIComponent(id)}/appearance`, { appearance }).then((r) => json<CampaignView>(r)),
+  entityImage: (id: string, entity: string, media: string | null) => post(`/api/campaigns/${encodeURIComponent(id)}/entity-image`, { entity, media }).then((r) => json<CampaignView>(r)),
+  imagePrompt: (id: string, entity?: string) =>
+    fetch(`/api/campaigns/${encodeURIComponent(id)}/images/prompt${entity ? `?entity=${encodeURIComponent(entity)}` : ''}`).then((r) => json<{ prompt: string; ready: boolean }>(r)),
+  generateImage: (id: string, prompt: string, entity?: string, signal?: AbortSignal) =>
+    fetch(`/api/campaigns/${encodeURIComponent(id)}/images/generate`, { method: 'POST', signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, entity }) }).then((r) => json<{ media: string; view: CampaignView }>(r)),
+  imageSettings: () => fetch('/api/images/settings').then((r) => json<ImageSettings & { hasKey: boolean }>(r)),
+  saveImageSettings: (s: ImageSettings) => put('/api/images/settings', s).then((r) => json<ImageSettings & { hasKey: boolean }>(r)),
+  /** A test picture from the generator, as an object URL. */
+  testImages: async () => {
+    const r = await fetch('/api/images/settings/test', { method: 'POST' })
+    if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { error?: string }).error ?? `Request failed (${r.status})`)
+    return URL.createObjectURL(await r.blob())
+  },
   cardExportUrl: (id: string) => `/api/cards/${encodeURIComponent(id)}/export`,
   characterCardUrl: (id: string) => `/api/campaigns/${encodeURIComponent(id)}/character-card`,
   importCampaign: (file: File) =>
