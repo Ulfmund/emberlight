@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync, copyFileSync, existsSync, readdirSync, unlinkSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { normalizeSettings, type CampaignSettings, type CharacterBuild, type GameEvent } from '@shared/rules'
+import { normalizeSettings, type CampaignSettings, type CharacterBuild, type GameEvent, type TurnPlan } from '@shared/rules'
 import type { CardData, CastMember } from '@shared/cards'
 import type { Lorebook } from '@shared/lore'
 
@@ -22,6 +22,10 @@ export type MessageMeta = {
   answers?: string
   /** Facts the Scribe recorded for this narration (shown in the change log). */
   scribed?: boolean
+  /** Player turns: what was decided before the dice (so a reroll can roll the same turn again). */
+  plan?: TurnPlan
+  /** Player turns: what the game engine told the narrator (so the DM can rewrite its reply). */
+  notes?: string
 }
 
 export type MessageRow = {

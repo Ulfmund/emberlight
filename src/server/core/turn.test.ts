@@ -16,6 +16,7 @@ import { findWorld } from '@shared/worlds'
 /** A scripted stand-in for a model: the test decides what the Referee, Narrator and Scribe say. */
 class FakeProvider implements Provider {
   referee: unknown = { checks: [] }
+  combatReferee: unknown = { action: 'attack', target: '', item: '', checks: [] }
   scribe: unknown = blankScribe()
   narration = 'The rain keeps falling. [[ROLL: perception | hard | something moves in the reeds]]'
   calls: string[] = []
@@ -35,6 +36,7 @@ class FakeProvider implements Provider {
     if (opts.name === 'summarize_scene') return opts.schema.parse({ title: `Scene ${n}`, summary: `Things happened (${n}).` })
     if (opts.name === 'summarize_chapter') return opts.schema.parse({ title: `Chapter ${n}`, summary: `A chapter passed (${n}).` })
     if (opts.name === 'story_so_far') return opts.schema.parse({ storySoFar: `The tale so far (${n}).` })
+    if (opts.name === 'combat_referee') return opts.schema.parse(this.combatReferee)
     return opts.schema.parse(opts.name === 'referee' ? this.referee : this.scribe)
   }
   async *chat(_m: string, opts: { system: string; messages: { role: string; content: string }[] }): AsyncIterable<StreamEvent> {
@@ -402,5 +404,172 @@ describe('turn engine', () => {
     await run(engine.regenerate(id, signal))
     expect(fake.lastSystem).toContain('You are Grandmother Wolf, telling this story as its Dungeon Master. Grandmother Wolf is an ancient, sardonic wolf who tells stories to the player.')
     expect(fake.lastSystem).toContain('You may push back, bargain, or grant it with a twist')
+  })
+
+  // ---- fights and random events (docs/spec/04-rules-system.md#combat) ------------------------
+
+  const attackCheck = { skill: 'ranged', difficulty: 'moderate', modifier: 0, advantage: 'none', reason: 'shooting the bandit', dramatic: true, withStrangers: false, risk: 'serious', riskSource: 'sentient' }
+  const banditFight = (count: number, playerAttacks = true) => ({
+    intent: 'combat',
+    checks: [attackCheck],
+    fight: { starts: true, foes: [{ kind: 'bandits', count, tier: 'standard', name: '' }], playerAttacks, sneakAttack: false }
+  })
+  const lastNotes = () => fake.lastMessages.at(-1)!.content
+
+  it('puts a real fight on the tracker: the engine rolls every blow and tells the DM exactly what happened', async () => {
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    fake.referee = banditFight(2)
+    setRolls(0.5)
+    const out = await run(engine.act(id, 'I nock an arrow and shoot the nearer bandit.', signal))
+    let v = campaigns.view(id)
+    const cb = v.state.combat!
+    expect(cb.foes.map((f) => f.name)).toEqual(['Bandit 1', 'Bandit 2'])
+    expect(cb.round).toBe(2)
+    // The Referee's own attack check isn't rolled twice: only the engine's attack on Bandit 1 is.
+    const checks = (out.find((e) => e.type === 'checks') as { checks: { reason: string; dc: number }[] }).checks
+    expect(checks.map((c) => c.reason)).toEqual(['attacking Bandit 1'])
+    expect(checks[0].dc).toBe(cb.foes[0].defense)
+    expect(cb.foes[0].hp).toBeLessThan(cb.foes[0].maxHp)
+    expect(lastNotes()).toContain('THE FIGHT (the engine decides every blow')
+    expect(lastNotes()).toContain('A FIGHT BEGINS against Bandit 1 and Bandit 2.')
+    expect(lastNotes()).toMatch(/Bandit 2 slashes at the character: rolled 11/)
+    expect(fake.lastSystem).toContain('THE FIGHT (the game engine runs it)\nRound 2.')
+    expect(fake.lastSystem).not.toContain('ASKING FOR A ROLL')
+    expect(v.messages.at(-1)!.changes.some((c) => c.text.startsWith('Hit Bandit 1 for'))).toBe(true)
+    expect(v.messages.at(-1)!.changes[0]).toMatchObject({ text: 'A fight: Bandit 1 and Bandit 2' })
+
+    // A move picked on the tracker needs no Referee at all.
+    fake.calls = []
+    await run(engine.act(id, 'I attack Bandit 2.', signal, { kind: 'attack', target: 'f2' }))
+    expect(fake.calls).not.toContain('referee')
+    expect(fake.calls).not.toContain('combat_referee')
+    v = campaigns.view(id)
+    expect(v.state.combat!.round).toBe(3)
+    expect(v.state.combat!.foes[1].hp).toBeLessThan(v.state.combat!.foes[1].maxHp)
+
+    // Typed words in a fight become one move, read by the combat Referee.
+    fake.combatReferee = { action: 'defend', target: '', item: '', checks: [] }
+    fake.calls = []
+    await run(engine.act(id, 'I duck behind the cart and keep my head down.', signal))
+    expect(fake.calls).toContain('combat_referee')
+    expect(lastNotes()).toContain('The character fights defensively')
+
+    // Rewriting the DM's reply keeps the fight's notes.
+    await run(engine.regenerate(id, signal))
+    expect(lastNotes()).toContain('The character fights defensively')
+  })
+
+  it('rerolls the same round of a fight, and only that', async () => {
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    fake.referee = banditFight(2)
+    setRolls(0.5)
+    await run(engine.act(id, 'I shoot the nearer bandit.', signal))
+    setRolls(0.05) // a miss
+    fake.calls = []
+    await run(engine.act(id, 'I shoot Bandit 1 again.', signal, { kind: 'attack', target: 'f1' }))
+    let v = campaigns.view(id)
+    expect(v.state.combat!.round).toBe(3)
+    const miss = v.messages.at(-2)!.checks[0]
+    expect(miss.tier).toMatch(/failure/)
+    const hpBefore = v.state.combat!.foes[0].hp
+
+    setRolls(0.95)
+    await run(engine.reroll(id, miss.id, signal))
+    v = campaigns.view(id)
+    expect(fake.calls).not.toContain('combat_referee')
+    expect(v.messages.at(-2)!.checks).toHaveLength(1)
+    expect(v.messages.at(-2)!.checks[0].tier).toBe('crit_success')
+    // Still round 3: the round was played again, not a new one.
+    const cb = v.state.combat
+    if (cb) expect(cb.round).toBe(3)
+    expect(cb ? cb.foes[0].hp < hpBefore || cb.foes[0].status !== 'fighting' : true).toBe(true)
+    expect(lastNotes()).toContain('CRITICAL SUCCESS')
+  })
+
+  it('wins a fight: the foe goes down, the tracker closes, and the deed is rewarded', async () => {
+    const id = campaigns.create(build, { ...DEFAULT_SETTINGS, combat: 'turn' })
+    await run(engine.narrateHead(id, signal))
+    fake.referee = { intent: 'combat', checks: [attackCheck], fight: { starts: true, foes: [{ kind: 'giant rat', count: 1, tier: 'minion', name: '' }], playerAttacks: true, sneakAttack: false } }
+    setRolls(0.5)
+    await run(engine.act(id, 'I shoot the rat.', signal))
+    const v = campaigns.view(id)
+    expect(v.state.combat).toBeNull()
+    expect(lastNotes()).toContain('THE FIGHT IS WON.')
+    expect(v.state.character.xp).toBeGreaterThan(0)
+    expect(v.messages.at(-1)!.changes.map((c) => c.text)).toContain('Won the fight')
+  })
+
+  it('tells small fights in the story in mixed mode, and every fight in story mode', async () => {
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    // One ordinary bandit: told in prose, the attack check carries its risk as before.
+    fake.referee = banditFight(1)
+    setRolls(0.5)
+    await run(engine.act(id, 'I shoot the bandit.', signal))
+    expect(campaigns.view(id).state.combat).toBeNull()
+    expect(lastNotes()).toContain('Ranged check (shooting the bandit')
+
+    const story = campaigns.create(build, { ...DEFAULT_SETTINGS, combat: 'narrative' })
+    await run(engine.narrateHead(story, signal))
+    fake.referee = banditFight(3)
+    await run(engine.act(story, 'I shoot the bandits.', signal))
+    expect(campaigns.view(story).state.combat).toBeNull()
+    expect(fake.lastSystem).not.toContain('STARTING A FIGHT')
+  })
+
+  it('only fights if the words fail, when talking is what might start it', async () => {
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    const persuade = { skill: 'persuasion', difficulty: 'moderate', modifier: 0, advantage: 'none', reason: 'talking the bandits down', dramatic: true, withStrangers: true, risk: 'serious', riskSource: 'sentient' }
+    fake.referee = { intent: 'social', checks: [persuade], fight: { starts: true, foes: [{ kind: 'bandit', count: 2, tier: 'standard', name: '' }], playerAttacks: false, sneakAttack: false } }
+    setRolls(0.95)
+    await run(engine.act(id, '"Nobody needs to bleed today," I say.', signal))
+    let v = campaigns.view(id)
+    expect(v.state.combat).toBeNull()
+    expect(v.state.character.hp).toBe(v.derived.maxHp)
+
+    setRolls(0.05, 0.5)
+    await run(engine.act(id, '"Last chance," I say.', signal))
+    v = campaigns.view(id)
+    expect(v.state.combat?.foes).toHaveLength(2)
+    // The words failed, so the bandits attack; the failed roll itself did no harm.
+    expect(lastNotes()).toMatch(/Persuasion check \(talking the bandits down.*FAILURE/)
+    expect(lastNotes()).not.toContain('The character takes')
+    expect(lastNotes()).toContain('Bandit 1 slashes at the character')
+  })
+
+  it('lets the DM set foes on the character with a FIGHT tag', async () => {
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    fake.narration = 'Eyes glint between the trees, and then they come. [[FIGHT: 3 wolves | ambush]]'
+    await run(engine.narrateHead(id, signal))
+    expect(fake.lastSystem).toContain('[[FIGHT: 2 bandit, 1 bandit captain (elite) | ambush]]')
+    const v = campaigns.view(id)
+    expect(v.messages.at(-1)!.content).toMatch(/^Eyes glint between the trees, and then they come\. \w+ waves\.$/)
+    expect(v.messages.at(-1)!.content).not.toContain('[[')
+    expect(v.state.combat?.foes.map((f) => f.name)).toEqual(['Wolf 1', 'Wolf 2', 'Wolf 3'])
+    // Rewriting that reply takes its fight with it.
+    fake.narration = 'The night stays quiet.'
+    await run(engine.regenerate(id, signal))
+    expect(campaigns.view(id).state.combat).toBeNull()
+  })
+
+  it('brings random events now and then, and not one after another', async () => {
+    const id = campaigns.create(build, { ...DEFAULT_SETTINGS, events: 'chaos' })
+    await run(engine.narrateHead(id, signal))
+    fake.referee = { intent: 'other', checks: [] }
+    setRolls(0.5)
+    for (let t = 0; t < 3; t++) {
+      await run(engine.act(id, 'I look around.', signal))
+      expect(lastNotes()).not.toContain('RANDOM EVENT')
+    }
+    fake.referee = { intent: 'travel', checks: [] }
+    setRolls(0.3)
+    await run(engine.act(id, 'I set off down the road.', signal))
+    expect(lastNotes()).toContain('RANDOM EVENT (work it into the scene now')
+    expect(campaigns.view(id).messages.at(-1)!.changes.map((c) => c.text)).toContain('Something happens')
+    await run(engine.act(id, 'I keep walking.', signal))
+    expect(lastNotes()).not.toContain('RANDOM EVENT')
   })
 })

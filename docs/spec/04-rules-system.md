@@ -226,27 +226,52 @@ Resting in the wild rolls on the random encounter table (see [06](06-ai-dm.md#5-
 
 | Mode | Behavior |
 |---|---|
-| **Narrative** | No turn tracker. Each player action is one exchange, resolved by checks and woven into prose. |
-| **Turn-based** | Initiative order, one action per turn, a visible tracker. |
-| **Mixed** (default) | Starts narrative. Switches to turn-based when a fight has several enemies or lasts more than one exchange, or when the player taps ⚔️ **Tactical**. |
+| **Story** (narrative) | No tracker. Each player action is one exchange, resolved by checks and woven into prose. |
+| **Tracker** (turn-based) | Every fight goes on the tracker: initiative, rounds, enemy health, every blow rolled. |
+| **Mixed** (default) | A quick scuffle with one ordinary foe is told in prose. A fight with two or more foes, or any elite or boss, goes on the tracker. |
+
+*Built in 0.9.0.* The engine is `src/shared/rules/combat.ts`; enemy templates are in `enemies.ts`.
 
 ### Starting a fight
 
-- **Ambush:** whoever starts the fight rolls **Stealth vs. the other side's Perception**. The side that loses is *surprised* and loses the first round.
-- **Initiative** (turn-based): d20 + AGI mod + WIT mod.
+A fight starts three ways:
 
-### Attacks
+1. **The player attacks, or provokes an attack** that happens right away. The Referee says so (`fight.starts`) and lists who fights: what they are, how many, and how tough. If the player's own action is the attack, it's resolved as the first blow of round 1. If words might start it ("Nobody needs to bleed today"), the words are rolled first, without harm: success, and there's no fight; failure, and the foes attack.
+2. **A random event** brings foes (see [06](06-ai-dm.md#5-random-events)). The fight is set up and the narrator brings the foes in; blows start next turn.
+3. **The DM sets foes on the character** on its own, by ending its reply with `[[FIGHT: 2 bandit, 1 bandit captain (elite) | ambush]]`. The tag is removed from the text and the engine sets up the fight. Rewriting that reply takes the fight with it.
 
-- **Attack roll:** d20 + Melee/Ranged/Spellcasting bonus vs. target's **Defense = 10 + Defense skill bonus + armor + AGI mod** (armor may cap AGI mod).
-- **Damage:** weapon die + STR mod (melee) or AGI mod (ranged). A natural 20 doubles the dice.
-- **Stamina actions:** power attack (+damage), dodge (+Defense until next turn), sprint, and so on, each with a stamina cost.
-- The player still writes actions freely ("I kick the table into him and run for the door"). The Referee maps that to mechanics.
+- **Ambush:** a player striking unseen rolls **Stealth vs. 10 + the foes' best Perception**; foes ambushing the player get a hidden **Perception vs. 10 + their best Stealth**. Whoever is caught off guard loses the first round (the player striking unseen also gets advantage on that first attack).
+- **Initiative:** d20 + AGI mod + WIT mod for the player; d20 + the template's initiative for each foe. Foes faster than the player act before them each round, the rest after.
+
+### Rounds
+
+One player message is one round: the player's move and every foe's. On the tracker the player taps a move (Attack, Power, Spell, Defend, Heal, Flee, Yield, with a target picked from the foe list) or types anything; the combat Referee turns words into one move. The engine rolls everything and hands the narrator a blow-by-blow log, with the rule to narrate exactly that and add no wounds, deaths or enemies of its own.
+
+- **Attack:** d20 + Melee/Ranged/Spellcasting bonus vs. the foe's **Defense**. Damage is the weapon's dice + STR mod (melee) or AGI mod (ranged); a critical doubles the dice, an overwhelming success adds 2. A bow or sling uses one arrow, bolt or stone a shot; with none left, it's a club.
+- **Power attack:** one extra damage die, for 2 stamina.
+- **Spell:** 2 mana for 1d8 + ARC mod (Spellcasting vs. Defense). Shown to characters with some training or a strong Arcane score.
+- **Defend:** +2 Defense until the next move, for 1 stamina.
+- **Heal:** a potion or bandage from the pack; the foes still get their turn.
+- **Flee:** Athletics, moderate, or hard against beasts. Success ends the fight.
+- **Talk:** intimidation, persuasion or deception, typed. If it works against people who are beaten or not fearless, they lay down their weapons.
+- **Yield:** to people only. The character is taken prisoner.
+
+The player's attack rolls show on the roll cards and in the dice tray (elite and boss foes count as big moments). A free reroll plays the same round again from the same decisions, without asking the AI twice; the round's plan is kept with the player's message.
 
 ### Enemies
 
-The DM never invents enemy numbers. It **requests** an enemy by type, tier (minion / standard / elite / boss) and level, and the engine builds the stat block from templates. That stops the AI from quietly going easy on the player.
+The DM never invents enemy numbers. It names what attacks (in the Referee's answer or the FIGHT tag) and how tough, and the engine builds the stat block from one of 24 templates (wolves to wyrms), scaled to the player's level and the **tier**:
 
-Enemies choose actions from their stat block's action list. The engine picks (weighted by simple behavior: aggressive / cautious / cowardly, fleeing at low HP), and the narrator describes it.
+| Tier | Health | Attack | Defense | Damage | XP |
+|---|---|---|---|---|---|
+| Minion | ×0.5 | −1 | −1 | −1 | ×0.4 |
+| Standard | ×1 | | | | ×1 |
+| Elite | ×1.8 | +2 | +1 | +1 | ×2.5 |
+| Boss | ×3.5 | +3 | +2 | +2 | ×6 |
+
+That stops the AI from quietly going easy on the player. Each template has a behavior: **aggressive** foes fight on, **cautious** ones yield or flee when badly hurt, **cowardly** ones run when hurt, **fearless** ones never break, and a lone survivor of a group often gives up. Fallen foes drop loot from the template's table (rolled before narration, so the narrator says "12 copper and a dagger" rather than inventing a fortune), and each kill gives XP.
+
+Once a fight ends (won, fled, yielded, or lost), the tracker closes and the story carries on. A character who goes down or is captured in a fight ends it as a defeat.
 
 ---
 

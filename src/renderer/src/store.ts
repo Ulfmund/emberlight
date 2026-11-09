@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { SettingsView } from '@shared/types'
-import type { Attr, CampaignSettings, CharacterBuild, CheckResult } from '@shared/rules'
+import type { Attr, CampaignSettings, CharacterBuild, CheckResult, CombatAction } from '@shared/rules'
 import type { CampaignSummary, CampaignView, MessageView, TurnEvent } from '@shared/view'
 import { api, type CreateOptions } from './api'
 import type { MemoryEvent } from '@shared/memory'
@@ -45,7 +45,7 @@ type State = {
   create(build: CharacterBuild, settings: CampaignSettings, opts?: CreateOptions): Promise<void>
   remove(id: string): Promise<void>
 
-  act(text: string): Promise<void>
+  act(text: string, combat?: CombatAction): Promise<void>
   answer(messageId: string): Promise<void>
   regenerate(): Promise<void>
   reroll(checkId: string): Promise<void>
@@ -216,7 +216,7 @@ export const useGame = create<State>((set, get) => {
       await get().loadCampaigns()
     },
 
-    act: (text) => run('act', { text }),
+    act: (text, combat) => run('act', { text, combat }),
     answer: (messageId) => run('answer', { messageId }),
     regenerate: () => run('regenerate', {}),
     reroll: (checkId) => run('reroll', { checkId }),

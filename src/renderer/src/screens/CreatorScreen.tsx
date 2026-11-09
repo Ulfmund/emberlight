@@ -882,6 +882,29 @@ function AdventureStep({
             ]}
           />
         </Row>
+        <Row label="Combat" text="How fights are played">
+          <Segmented
+            value={settings.combat}
+            onChange={(combat) => set({ combat })}
+            options={[
+              { id: 'mixed', label: 'Mixed', hint: 'Quick scuffles are told in the story; real fights go on the tracker, blow by blow. (Recommended)' },
+              { id: 'turn', label: 'Tracker', hint: 'Every fight goes on the tracker: rounds, enemy health, every blow rolled.' },
+              { id: 'narrative', label: 'Story', hint: 'Fights are told in the story, with a roll or two deciding them.' }
+            ]}
+          />
+        </Row>
+        <Row label="Random events" text="How often the world interrupts">
+          <Segmented
+            value={settings.events}
+            onChange={(events) => set({ events })}
+            options={[
+              { id: 'calm', label: 'Calm', hint: 'Rarely: the story is mostly what you make it.' },
+              { id: 'normal', label: 'Normal', hint: 'Now and then: weather, strangers, trouble on the road.' },
+              { id: 'eventful', label: 'Eventful', hint: 'Often: the road is rarely quiet.' },
+              { id: 'chaos', label: 'Chaos', hint: 'Constantly. Good luck.' }
+            ]}
+          />
+        </Row>
       </div>
 
       <h3 className="mt-8 mb-3 text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">DM style</h3>

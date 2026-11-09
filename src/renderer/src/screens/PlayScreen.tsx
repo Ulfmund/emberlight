@@ -12,6 +12,7 @@ import { DeathScreen, Toasts } from './play/Overlays'
 import { Journal } from './play/Journal'
 import { Inspector } from './play/Inspector'
 import { MobileDrawer, MobileStatus } from './play/Mobile'
+import { CombatTracker } from './play/CombatTracker'
 
 export function PlayScreen() {
   const { view, busy, act, stop, live } = useGame()
@@ -38,6 +39,7 @@ export function PlayScreen() {
         <PortraitContext.Provider value={portraits}>
           <Story view={view} onInspect={() => setInspector(true)} />
         </PortraitContext.Provider>
+        <CombatTracker view={view} />
         <Composer disabled={dead} busy={busy} holding={live.hold} onSend={(t) => void act(t)} onStop={stop} />
         <DiceTray />
       </main>

@@ -12,6 +12,8 @@ import {
   SKILLS,
   TIER_INFO,
   derived,
+  ENEMY_TIERS,
+  foeHealth,
   capacityKg,
   carriedKg,
   defenseValue,
@@ -23,6 +25,8 @@ import {
   skillLevelFromXp,
   type CampaignSettings,
   type CheckResult,
+  type EnemyTier,
+  type FoeSpec,
   type GameState,
   type Rng,
   type SkillId
@@ -141,6 +145,25 @@ export function narratorSystem(
       : "Let the player lead. Offer hooks and let the world react to what they do, but don't push a plot on them."
   const limits = settings.limits.trim() ? `\n- Content to avoid, or to fade to black instead of describing: ${settings.limits.trim().replace(/\s+/g, ' ')}.` : ''
 
+  // Fights (docs/spec/04-rules-system.md#combat): on the tracker, the engine owns every blow.
+  const cb = state.combat
+  const fight = cb
+    ? `\n\nTHE FIGHT (the game engine runs it)
+Round ${cb.round}. ${cb.foes.map((f) => `${f.name}: ${foeHealth(f)}`).join('; ')}.
+Only these foes are in the fight. The [GAME ENGINE] block says what every blow did: narrate exactly that, in order. Never add attacks, wounds, deaths or enemies of your own, and never end the fight yourself; the engine says when it's over. End each reply at a moment where the character must act.`
+    : settings.combat !== 'narrative' && c.status === 'alive'
+      ? `\n\nSTARTING A FIGHT
+If enemies attack the character on their own (not because of what the player just did: the game engine handles that), end your reply with one line in this form, and stop before any blow lands:
+[[FIGHT: 2 bandit, 1 bandit captain (elite) | ambush]]
+List who attacks: how many of each and what they are. Mark a veteran or a big beast (elite), a legendary foe (boss), and weak ones (minion). Add "| ambush" if they strike from hiding. The engine then runs the fight. Never use it when the [GAME ENGINE] block says a fight has begun.`
+      : ''
+  const askRoll = cb
+    ? ''
+    : `\n\nASKING FOR A ROLL
+If something happens to the character that they might notice, resist or react to without having chosen to act (an ambush, a lie, a trap, a pickpocket), you may end your reply with exactly one line in this form, and then stop without revealing the outcome:
+[[ROLL: skill | difficulty | short reason]]
+Skills: ${SKILL_IDS.join(', ')}. Difficulty: ${DIFFICULTIES.join(', ')}. Use this sparingly, at most once every few turns.`
+
   return `You are the Dungeon Master of a ${TONE[settings.tone]} fantasy roleplaying game.${voice}
 
 HOW TO RUN THE GAME
@@ -157,12 +180,7 @@ HOW TO RUN THE GAME
   @Old Tam: "Road's not safe after dark."
   Never write speech inline like: "Road's not safe," the old man says.
 - For new characters, prefer names from this list: ${names.join(', ')}. Never use these overused names: ${BANNED_NAMES.slice(0, 10).join(', ')}.
-- Avoid stock phrases ("a shiver ran down your spine", "a testament to", "barely above a whisper").
-
-ASKING FOR A ROLL
-If something happens to the character that they might notice, resist or react to without having chosen to act (an ambush, a lie, a trap, a pickpocket), you may end your reply with exactly one line in this form, and then stop without revealing the outcome:
-[[ROLL: skill | difficulty | short reason]]
-Skills: ${SKILL_IDS.join(', ')}. Difficulty: ${DIFFICULTIES.join(', ')}. Use this sparingly, at most once every few turns.
+- Avoid stock phrases ("a shiver ran down your spine", "a testament to", "barely above a whisper").${askRoll}${fight}
 
 THE PLAYER CHARACTER
 ${b.name}: ${RACES[b.race].label.toLowerCase()}, ${sex.label.toLowerCase()}, ${AGES[b.age].label.toLowerCase()} (${AGES[b.age].years}), ${BACKGROUNDS[b.background].label.toLowerCase()}.${b.appearance ? `\nAppearance: ${b.appearance}` : ''}${b.personality ? `\nPersonality: ${b.personality}` : ''}
@@ -194,7 +212,9 @@ export function engineNotes(
   after: GameState,
   settings: CampaignSettings,
   checks: CheckResult[],
-  deathRoll?: { roll: number; success: boolean }
+  deathRoll?: { roll: number; success: boolean },
+  /** More for the narrator (a fight blow by blow, a random event), after the checks. */
+  extra: string[] = []
 ): string {
   const lines: string[] = []
   const max = derived(after, settings).maxHp
@@ -208,6 +228,7 @@ export function engineNotes(
     )
     if (ch.damage) lines.push(`The character takes ${ch.damage} damage from this. Health now ${Math.max(0, after.character.hp)}/${max}.`)
   }
+  lines.push(...extra)
   const a = after.character
   const b = before.character
   if (a.status === 'dead' && b.status !== 'dead') lines.push('THE CHARACTER IS DEAD. Narrate their death plainly. Do not undo it or offer a miraculous escape.')
@@ -270,6 +291,30 @@ export function extractRollRequest(text: string): {
       hidden: skill === 'perception'
     }
   }
+}
+
+// ---- DM-started fights --------------------------------------------------------------------
+
+const FIGHT_TAG = /\[\[\s*FIGHT\s*:\s*([^|\]]+?)\s*(?:\|\s*([^\]]*?)\s*)?\]\]/i
+const COUNT_WORDS: Record<string, number> = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, some: 2, several: 3 }
+
+/** Finds a [[FIGHT: 2 bandit, 1 wolf (elite) | ambush]] tag: who attacks, and whether from hiding. */
+export function extractFight(text: string): { text: string; fight?: { foes: FoeSpec[]; ambush: boolean } } {
+  const m = FIGHT_TAG.exec(text)
+  if (!m) return { text }
+  const cleaned = text.replace(new RegExp(`[ \t]*${FIGHT_TAG.source}`, 'i'), '').trimEnd()
+  const foes: FoeSpec[] = []
+  for (const part of m[1].split(/,|\band\b|\+/i)) {
+    const tier = /\((minion|standard|elite|boss)\)/i.exec(part)?.[1].toLowerCase() as EnemyTier | undefined
+    const rest = part.replace(/\([^)]*\)/g, '').trim()
+    const num = /^(\d+|an?|one|two|three|four|five|six|some|several)\s+(.+)$/i.exec(rest)
+    const count = num ? Number(num[1]) || COUNT_WORDS[num[1].toLowerCase()] || 1 : 1
+    const kind = (num ? num[2] : rest).trim()
+    if (!kind) continue
+    foes.push({ kind: kind.slice(0, 60), count: Math.max(1, Math.min(6, count)), tier: tier && ENEMY_TIERS.includes(tier) ? tier : undefined })
+  }
+  if (!foes.length) return { text: cleaned }
+  return { text: cleaned, fight: { foes: foes.slice(0, 6), ambush: /ambush|hidden|surprise|unseen/i.test(m[2] ?? '') } }
 }
 
 // ---- Banned-name filter -----------------------------------------------------------------

@@ -1,14 +1,28 @@
 import {
+  actionLabel,
+  buildFoes,
   deathRollEvents,
+  foeRoster,
+  guessCombatAction,
   nameSuggestions,
+  NO_FIGHT,
   project,
   resolveCheck,
+  resolveRound,
+  rollWorldEvent,
+  shouldTrack,
   SKILLS,
+  startCombat,
+  TIER_INFO,
+  WORLD_EVENTS,
   type Attr,
+  type CampaignSettings,
   type CheckRequest,
   type CheckResult,
+  type CombatAction,
   type GameEvent,
-  type GameState
+  type GameState,
+  type TurnPlan
 } from '@shared/rules'
 import type { ChatMessage, Connection } from '@shared/types'
 import type { MessageView, TurnEvent } from '@shared/view'
@@ -19,13 +33,31 @@ import { estimateTokens, promptBlocks, type PromptReport } from '@shared/inspect
 import { entityLine, projectMemory, relevantEntities, storySoFar, type Summary } from '@shared/memory'
 import { summarizeChapter, summarizeScene, updateArc } from '../ai/jobs/summarizer'
 import { createProvider, type Provider } from '../ai/providers'
-import { runReferee } from '../ai/jobs/referee'
+import { runCombatReferee, runReferee } from '../ai/jobs/referee'
 import { runScribe } from '../ai/jobs/scribe'
-import { engineNotes, extractRollRequest, fitHistory, NameFilter, narratorSystem, pastRollNote, type PersonaText } from '../ai/narrator'
-import { newId, type EventRow, type MessageRow } from '../store/db'
+import { engineNotes, extractFight, extractRollRequest, fitHistory, NameFilter, narratorSystem, pastRollNote, type PersonaText } from '../ai/narrator'
+import { newId, type CampaignRow, type EventRow, type MessageRow } from '../store/db'
 import type { Campaigns } from './campaigns'
 
 type Ctx = { provider: Provider; model: string; contextChars: number }
+
+/** What the engine worked out for a turn (see engineTurn). */
+type EngineOut = {
+  events: GameEvent[]
+  /** Rolls the narrator is told about one by one. */
+  checks: CheckResult[]
+  /** Rolls a fight made (the fight log already describes them). */
+  fightRolls: CheckResult[]
+  /** The fight blow by blow, and random events, for the narrator. */
+  log: string[]
+  fought: boolean
+  after: GameState
+  eventId: string | null
+}
+
+/** Heads the fight log in the narrator's notes. */
+const FIGHT_HEADER =
+  "THE FIGHT (the engine decides every blow: narrate exactly what follows, in order. Add no attacks, wounds, deaths or enemies of your own, and don't quote the numbers):"
 
 /** How much the prompt can hold, by the model's context size (docs/spec/07-memory-and-lore.md#prompt-assembly). */
 function memoryTier(contextChars: number) {
@@ -97,9 +129,9 @@ export class TurnEngine {
 
   // ---- public actions ------------------------------------------------------------------
 
-  /** The player acts (free text). */
-  async *act(id: string, text: string, signal: AbortSignal): AsyncGenerator<TurnEvent> {
-    yield* this.playTurn(id, { text, kind: 'action' }, signal)
+  /** The player acts (free text; in a fight, maybe a move picked on the tracker). */
+  async *act(id: string, text: string, signal: AbortSignal, combat?: CombatAction): AsyncGenerator<TurnEvent> {
+    yield* this.playTurn(id, { text, kind: 'action', combat }, signal)
   }
 
   /** The player answers a roll the DM asked for. */
@@ -156,17 +188,27 @@ export class TurnEngine {
     const lastUser = [...path].reverse().find((m) => m.role === 'user')
     if (!lastUser || lastUser.id !== rollEv.message_id) return yield { type: 'error', message: 'Only the latest roll can be rerolled.' }
 
-    const requests = all
-      .filter((e) => e.group_id === rollEv.group_id && e.event.type === 'roll')
-      .map((e) => requestOf((e.event as { check: CheckResult }).check))
     const playerPath = path.slice(0, path.findIndex((m) => m.id === lastUser.id) + 1)
     const before = this.campaigns.state(c, { path: playerPath, excludeGroup: rollEv.group_id })
+    const plan = lastUser.meta.plan
+    // Older saves have no plan: just the same checks again.
+    const legacy = all
+      .filter((e) => e.group_id === rollEv.group_id && e.event.type === 'roll')
+      .map((e) => requestOf((e.event as { check: CheckResult }).check))
     this.campaigns.db.supersedeGroup(rollEv.group_id)
-    const { events, results, after } = this.resolve(before, c.settings, requests)
-    this.campaigns.db.addEvents(id, lastUser.id, newId('grp'), 'engine', events)
+    const out = this.engineTurn(before, c.settings, plan ? { ...plan, event: plan.event ?? null } : { ref: { checks: legacy, intent: 'other', fight: NO_FIGHT }, event: null }, {
+      action: lastUser.meta.kind === 'action',
+      sinceEvent: 0
+    })
+    if (out.events.length) this.campaigns.db.addEvents(id, lastUser.id, newId('grp'), 'engine', out.events)
     this.campaigns.db.setHead(id, lastUser.id)
-    yield { type: 'checks', checks: results }
-    yield* this.narrate(id, lastUser, signal, engineNotes(before, after, c.settings, results))
+    const dr = all.find((e) => e.message_id === lastUser.id && e.event.type === 'death_roll' && !e.superseded)?.event as { roll: number; success: boolean } | undefined
+    const deathRoll = dr ? { roll: dr.roll, success: dr.success } : undefined
+    const notes = this.notesFor(before, out, c.settings, deathRoll)
+    const meta = { ...lastUser.meta, notes }
+    this.campaigns.db.updateMessage(lastUser.id, { meta })
+    yield { type: 'checks', checks: [...out.checks, ...out.fightRolls], deathRoll }
+    yield* this.narrate(id, { ...lastUser, meta }, signal, notes)
   }
 
   /** Spend an unspent attribute point from a level-up. */
@@ -192,9 +234,109 @@ export class TurnEngine {
     return { events, results, after: working }
   }
 
+  /** Player turns since the last random event or fight, so they don't pile up. */
+  private turnsSinceEvent(c: CampaignRow, path: MessageRow[]): number {
+    const rows = this.campaigns.activeEvents(c, path)
+    const last = [...rows].reverse().find((e) => e.event.type === 'world_event' || e.event.type === 'combat_start' || e.event.type === 'combat_end')
+    const from = last ? path.findIndex((m) => m.id === last.message_id) : -1
+    return path.slice(from + 1).filter((m) => m.role === 'user' && !m.meta.hidden).length
+  }
+
+  /**
+   * The engine's half of a turn: fights, checks and random events, from decisions already made
+   * (by the Referee, or by the player's button on the tracker). Rolls dice; never asks the AI.
+   */
+  private engineTurn(state: GameState, settings: CampaignSettings, plan: TurnPlan, opts: { action: boolean; sinceEvent: number }): EngineOut {
+    const events: GameEvent[] = []
+    const checks: CheckResult[] = []
+    const fightRolls: CheckResult[] = []
+    const log: string[] = []
+    let working = state
+    let fought = false
+    let eventId: string | null = null
+    const take = (evs: GameEvent[], st: GameState) => {
+      events.push(...evs)
+      working = st
+    }
+    const alive = () => working.character.status === 'alive'
+
+    if (working.combat && plan.combat && alive()) {
+      // A round of a fight on the tracker.
+      const r = resolveRound(working, settings, plan.combat, this.rng)
+      take(r.events, r.state)
+      fightRolls.push(...r.results)
+      log.push(...r.log)
+      fought = true
+    } else if (plan.ref && alive()) {
+      const ref = plan.ref
+      const foes = ref.fight.starts && !working.combat ? buildFoes(ref.fight.foes, working.character.level, this.rng) : []
+      if (foes.length && shouldTrack(settings.combat, foes)) {
+        // A fight starts on the tracker: from here on, the engine rolls every blow.
+        let starts = true
+        if (!ref.fight.playerAttacks && ref.checks.length) {
+          // Violence only if the words (or the dodge) fail. The foes are the danger, not the roll.
+          const r = this.resolve(working, settings, ref.checks.map((ch) => ({ ...ch, risk: { severity: 'none' as const, source: ch.risk.source } })))
+          take(r.events, r.after)
+          checks.push(...r.results)
+          starts = r.results.some((x) => !TIER_INFO[x.tier].success)
+        }
+        if (starts && alive()) {
+          const st = startCombat(working, settings, foes, this.rng, { playerAmbushes: ref.fight.playerAttacks && ref.fight.sneakAttack })
+          take(st.events, st.state)
+          fightRolls.push(...st.results)
+          log.push(`A FIGHT BEGINS against ${foeRoster(foes)}.`, ...st.log)
+          const spell = ref.checks.some((ch) => ch.skill === 'spellcasting')
+          const opening: CombatAction = ref.fight.playerAttacks ? { kind: spell ? 'cast' : 'attack', target: foes[0].id } : { kind: 'none' }
+          const r = resolveRound(working, settings, opening, this.rng)
+          take(r.events, r.state)
+          fightRolls.push(...r.results)
+          log.push(...r.log)
+          fought = true
+        }
+      } else {
+        // Everything else, fights told in prose included: the checks, with their risks.
+        const r = this.resolve(working, settings, ref.checks)
+        take(r.events, r.after)
+        checks.push(...r.results)
+      }
+    }
+
+    // Random events: the world doesn't wait for the player.
+    if (opts.action && !fought && !working.combat && alive() && plan.event !== null) {
+      const ev = plan.event
+        ? (WORLD_EVENTS.find((e) => e.id === plan.event) ?? null)
+        : rollWorldEvent(working, settings, { intent: plan.ref?.intent, noise: checks.some((x) => x.tier === 'crit_failure'), turnsSinceLast: opts.sinceEvent }, this.rng)
+      if (ev) {
+        eventId = ev.id
+        events.push({ type: 'world_event', id: ev.id, text: ev.text })
+        // A band met on the road is rabble for a new adventurer, and real trouble later on.
+        const specs = (ev.foes ?? []).map((f) => (working.character.level <= 3 && (f.count ?? 1) >= 2 && !f.tier ? { ...f, tier: 'minion' as const } : f))
+        const foes = specs.length ? buildFoes(specs, working.character.level, this.rng) : []
+        if (foes.length && shouldTrack(settings.combat, foes)) {
+          const st = startCombat(working, settings, foes, this.rng, { foesAmbush: ev.ambush })
+          take(st.events, st.state)
+          fightRolls.push(...st.results)
+          log.push(
+            `RANDOM EVENT, right after the character's action: ${ev.text}`,
+            `A FIGHT BEGINS against ${foeRoster(foes)}.`,
+            ...st.log,
+            'Bring the foes in and stop before any blow lands: the fight is played out from the next turn.'
+          )
+        } else log.push(`RANDOM EVENT (work it into the scene now, right after the character's action): ${ev.text}${foes.length ? ' If it comes to blows, tell the fight in prose.' : ''}`)
+      }
+    }
+    return { events, checks, fightRolls, log, fought, after: working, eventId }
+  }
+
+  /** The [GAME ENGINE] notes for the narrator. */
+  private notesFor(before: GameState, out: EngineOut, settings: CampaignSettings, deathRoll?: { roll: number; success: boolean }) {
+    const lines = out.log.length && (out.fought || out.after.combat) ? [FIGHT_HEADER, ...out.log] : out.log
+    return engineNotes(before, out.after, settings, out.checks, deathRoll, lines)
+  }
+
   private async *playTurn(
     id: string,
-    input: { text: string; kind: 'action' | 'roll_response'; hidden?: boolean; forced?: CheckRequest; answers?: string },
+    input: { text: string; kind: 'action' | 'roll_response'; hidden?: boolean; forced?: CheckRequest; answers?: string; combat?: CombatAction },
     signal: AbortSignal
   ): AsyncGenerator<TurnEvent> {
     let ctx: Ctx
@@ -204,6 +346,7 @@ export class TurnEngine {
       return yield { type: 'error', message: (err as Error).message }
     }
     const c = this.campaigns.get(id)
+    const settings = c.settings
     const path = this.campaigns.path(c)
     const state = this.campaigns.state(c, { path })
     if (state.character.status === 'dead') return yield { type: 'error', message: `${state.character.build.name} is dead. Rewind, or start a new adventure.` }
@@ -222,35 +365,51 @@ export class TurnEngine {
     this.campaigns.db.setHead(id, msg.id)
     yield { type: 'player', message: toView(msg) }
 
-    // A downed character fights for their life before anything else.
-    const events: GameEvent[] = []
+    // A downed character fights for their life before anything else. It's kept apart from the
+    // turn's other dice, so a free reroll can't undo it.
     let working = state
     let deathRoll: { roll: number; success: boolean } | undefined
     const dr = deathRollEvents(working, this.rng)
     if (dr.length) {
-      events.push(...dr)
-      working = project(working, dr, c.settings)
+      this.campaigns.db.addEvents(id, msg.id, newId('grp'), 'engine', dr)
+      working = project(working, dr, settings)
       const ev = dr[0] as { roll: number; success: boolean }
       deathRoll = { roll: ev.roll, success: ev.success }
     }
 
-    let requests: CheckRequest[] = []
-    if (input.forced) requests = [input.forced]
-    else if (working.character.status === 'alive') {
+    // What is the player doing? In a fight, one move (picked on the tracker, or read from their
+    // words); otherwise, the Referee decides on checks and whether a fight starts.
+    const recent = path.filter((m) => !m.meta.hidden).slice(-4).map((m) => ({ role: m.role, content: m.content }))
+    const plan: TurnPlan = {}
+    if (input.forced) plan.ref = { checks: [input.forced], intent: 'other', fight: NO_FIGHT }
+    else if (working.character.status === 'alive' && working.combat) {
+      plan.combat = input.combat
+      if (!plan.combat) {
+        try {
+          plan.combat = await runCombatReferee(ctx.provider, ctx.model, working, recent, input.text)
+        } catch (err) {
+          plan.combat = guessCombatAction(input.text)
+          yield { type: 'notice', message: `The referee couldn't read that move (${(err as Error).message}), so it counts as ${actionLabel(plan.combat, working)}.` }
+        }
+      }
+    } else if (working.character.status === 'alive') {
       try {
-        const recent = path.filter((m) => !m.meta.hidden).slice(-4).map((m) => ({ role: m.role, content: m.content }))
-        requests = await runReferee(ctx.provider, ctx.model, working, recent, input.text, c.settings.rolls)
+        plan.ref = await runReferee(ctx.provider, ctx.model, working, recent, input.text, settings.rolls)
       } catch (err) {
+        plan.ref = null
         yield { type: 'notice', message: `The referee couldn't decide on a roll (${(err as Error).message}), so the story continues without one.` }
       }
     }
 
-    const r = this.resolve(working, c.settings, requests)
-    events.push(...r.events)
-    if (events.length) this.campaigns.db.addEvents(id, msg.id, newId('grp'), 'engine', events)
-    yield { type: 'checks', checks: r.results, deathRoll }
+    const out = this.engineTurn(working, settings, plan, { action: input.kind === 'action', sinceEvent: this.turnsSinceEvent(c, path) })
+    plan.event = out.eventId
+    if (out.events.length) this.campaigns.db.addEvents(id, msg.id, newId('grp'), 'engine', out.events)
+    const notes = this.notesFor(state, out, settings, deathRoll)
+    const meta = { ...msg.meta, plan, notes }
+    this.campaigns.db.updateMessage(msg.id, { meta })
+    yield { type: 'checks', checks: [...out.checks, ...out.fightRolls], deathRoll }
 
-    yield* this.narrate(id, msg, signal, engineNotes(state, r.after, c.settings, r.results, deathRoll), ctx)
+    yield* this.narrate(id, { ...msg, meta }, signal, notes, ctx)
   }
 
   private async *narrate(id: string, player: MessageRow, signal: AbortSignal, notes?: string, given?: Ctx): AsyncGenerator<TurnEvent> {
@@ -266,6 +425,7 @@ export class TurnEngine {
     const path = this.campaigns.path({ ...c, head_id: player.id }, all)
     const events = this.campaigns.activeEvents(c, path)
     const after = this.campaigns.state(c, { path })
+    if (notes === undefined) notes = player.meta.notes
     if (notes === undefined) {
       const before = this.campaigns.state(c, { path: path.slice(0, -1) })
       const mine = events.filter((e) => e.message_id === player.id && e.event.type === 'roll').map((e) => (e.event as { check: CheckResult }).check)
@@ -363,17 +523,32 @@ export class TurnEngine {
     }
     if (signal.aborted && !error) error = text ? undefined : 'Stopped.'
 
-    const { text: clean, request } = extractRollRequest(text.trim())
+    const { text: noRoll, request } = extractRollRequest(text.trim())
+    const { text: clean, fight } = extractFight(noRoll)
     this.campaigns.db.updateMessage(dm.id, {
       content: clean,
       thinking,
       meta: { kind: 'narration', requestCheck: request, error, notice }
     })
 
+    // The DM set foes on the character: the engine runs the fight from the next turn.
+    if (fight && clean && !error && !after.combat && after.character.status === 'alive' && c.settings.combat !== 'narrative') {
+      const foes = buildFoes(fight.foes, after.character.level, this.rng)
+      if (shouldTrack(c.settings.combat, foes)) {
+        const st = startCombat(after, c.settings, foes, this.rng, { foesAmbush: fight.ambush })
+        this.campaigns.db.addEvents(id, dm.id, newId('grp'), 'engine', st.events)
+      }
+    }
+
     // The Scribe records what the story changed (time, rest, loot, deeds…).
     if (clean && !error && !signal.aborted) {
       try {
-        const scribed = await runScribe(ctx.provider, ctx.model, after, player.meta.hidden ? '(no action)' : player.content, notes ?? '', clean, memory)
+        let scribed = await runScribe(ctx.provider, ctx.model, after, player.meta.hidden ? '(no action)' : player.content, notes ?? '', clean, memory)
+        // A fight is still on: seconds pass, not hours, and nobody sleeps or sits down to eat.
+        if (after.combat) scribed = scribed.filter((e) => e.type !== 'rest' && e.type !== 'eat').map((e) => (e.type === 'time' ? { ...e, minutes: Math.min(e.minutes, 1) } : e))
+        // In a fight the engine decides every wound: the story's blood is not a new condition.
+        const fightTurn = after.combat || events.some((e) => e.message_id === player.id && e.event.type.startsWith('combat_'))
+        if (fightTurn) scribed = scribed.filter((e) => e.type !== 'condition')
         if (scribed.length) this.campaigns.db.addEvents(id, dm.id, newId('grp'), 'ai', scribed)
       } catch {
         // Bookkeeping failing must never break the story; the next turn tries again.

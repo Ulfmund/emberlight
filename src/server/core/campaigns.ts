@@ -20,8 +20,10 @@ import {
   mainWeapon,
   needs,
   templateOf,
+  foeRoster,
   type Slot,
   type CampaignSettings,
+  type CombatOutcome,
   type CharacterBuild,
   type CheckResult,
   type GameEvent,
@@ -166,6 +168,9 @@ export class Campaigns {
     const messages: MessageView[] = path.map((m) => {
       const sibs = children.get(m.parent_id ?? '__root') ?? [m]
       const mine = eventsByMsg.get(m.id) ?? []
+      // A DM reply also shows what a fight or a random event did on the player's turn before it.
+      const before = m.role === 'assistant' && m.parent_id ? (eventsByMsg.get(m.parent_id) ?? []) : []
+      const shown = before.some((e) => FIGHT_EVENTS.has(e.event.type)) ? [...before.filter((e) => e.event.type !== 'roll'), ...mine] : mine
       return {
         id: m.id,
         role: m.role,
@@ -179,7 +184,7 @@ export class Campaigns {
         requestCheck: m.meta.requestCheck as MessageView['requestCheck'],
         swipe: m.role === 'assistant' && sibs.length > 1 ? { index: sibs.findIndex((s) => s.id === m.id), count: sibs.length, ids: sibs.map((s) => s.id) } : undefined,
         checks: mine.filter((e) => e.event.type === 'roll').map((e) => (e.event as { check: CheckResult }).check),
-        changes: describeEvents(mine.map((e) => e.event)),
+        changes: describeEvents(shown.map((e) => e.event)),
         createdAt: m.created_at
       }
     })
@@ -311,7 +316,7 @@ export class Campaigns {
 // ---- Change log text ------------------------------------------------------------------
 
 export function describeEvents(events: GameEvent[]): ChangeLine[] {
-  const out: ChangeLine[] = []
+  const out: (ChangeLine & { spent?: string })[] = []
   for (const ev of events) {
     switch (ev.type) {
       case 'skill_xp':
@@ -350,9 +355,17 @@ export function describeEvents(events: GameEvent[]): ChangeLine[] {
       case 'coins':
         out.push({ text: `${ev.delta > 0 ? '+' : '−'}${formatCoins(Math.abs(ev.delta))}`, tone: ev.delta > 0 ? 'good' : 'neutral', icon: 'coin' })
         break
-      case 'item':
+      case 'item': {
+        if (ev.spent) {
+          // Arrows shot in a fight: one line for the turn, however many.
+          const prev = out.find((l) => l.spent === ev.name)
+          if (prev) prev.text = `−${Number(/\d+/.exec(prev.text)?.[0] ?? 1) - ev.delta} ${ev.name}`
+          else out.push({ text: `−${-ev.delta} ${ev.name}`, tone: 'neutral', icon: ev.icon ?? 'arrow', spent: ev.name })
+          break
+        }
         out.push({ text: `${ev.delta > 0 ? 'Gained' : 'Lost'} ${Math.abs(ev.delta) > 1 ? `${Math.abs(ev.delta)}× ` : ''}${ev.name}`, tone: ev.delta > 0 ? 'good' : 'neutral', icon: ev.icon ?? 'bag' })
         break
+      }
       case 'status':
         out.push({ text: ev.status === 'dead' ? `Died: ${ev.reason}` : ev.status === 'downed' ? 'Downed: making death rolls' : ev.reason, tone: ev.status === 'alive' ? 'good' : 'bad', icon: 'skull' })
         break
@@ -376,6 +389,25 @@ export function describeEvents(events: GameEvent[]): ChangeLine[] {
         break
       case 'place_kind':
         break
+      case 'combat_start':
+        out.push({ text: `A fight: ${foeRoster(ev.combat.foes)}`, tone: 'bad', icon: 'sword' })
+        break
+      case 'foe_hit':
+        out.push({ text: `Hit ${ev.name ?? 'a foe'} for ${ev.amount}`, tone: 'good', icon: 'sword' })
+        break
+      case 'foe_status':
+        out.push({ text: `${ev.name ?? 'A foe'} ${ev.status === 'fled' ? 'fled' : ev.status === 'surrendered' ? 'yielded' : ev.status === 'down' ? 'is down' : 'fights on'}`, tone: 'good', icon: ev.status === 'fled' ? 'boot' : 'sword' })
+        break
+      case 'combat_end':
+        out.push({ text: COMBAT_END_LINE[ev.outcome], tone: ev.outcome === 'defeat' ? 'bad' : 'good', icon: ev.outcome === 'defeat' ? 'skull' : ev.outcome === 'fled' ? 'boot' : 'laurel' })
+        break
+      case 'world_event':
+        out.push({ text: 'Something happens', tone: 'neutral', icon: 'signpost' })
+        break
+      case 'combat_round':
+      case 'combat_dodge':
+      case 'foe_attack':
+        break
       case 'location':
         out.push({ text: `Now at ${ev.name}`, tone: 'neutral', icon: 'map' })
         break
@@ -389,7 +421,18 @@ export function describeEvents(events: GameEvent[]): ChangeLine[] {
         break
     }
   }
-  return out
+  return out.map(({ spent: _spent, ...line }) => line)
+}
+
+/** Events from a fight or a random event (their change lines show under the DM's reply). */
+const FIGHT_EVENTS = new Set<GameEvent['type']>(['combat_start', 'combat_round', 'combat_end', 'foe_hit', 'foe_status', 'foe_attack', 'world_event'])
+
+const COMBAT_END_LINE: Record<CombatOutcome, string> = {
+  victory: 'Won the fight',
+  fled: 'Got away',
+  defeat: 'Lost the fight',
+  truce: 'The foes stood down',
+  ended: 'The fight is over'
 }
 
 export function formatCoins(copper: number): string {

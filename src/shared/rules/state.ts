@@ -28,6 +28,7 @@ import {
 import type { CheckResult } from './checks'
 import { isMemoryEvent, type MemoryEvent } from '../memory'
 import { findTemplate, itemTemplate, type ItemTemplate, type Slot } from './items'
+import type { Combat, CombatOutcome, FoeStatus } from './combat'
 
 export type CombatMode = 'narrative' | 'turn' | 'mixed'
 export type EventFrequency = 'calm' | 'normal' | 'eventful' | 'chaos'
@@ -126,6 +127,8 @@ export type GameState = {
   time: { day: number; minute: number }
   location: string | null
   placeKind: PlaceKind | null
+  /** A fight on the turn tracker, if one is going on (see combat.ts). */
+  combat: Combat | null
 }
 
 /** One recorded change. Every event belongs to the message that caused it. */
@@ -143,7 +146,7 @@ export type GameEvent =
   | { type: 'time'; minutes: number }
   | { type: 'renown'; amount: number; deed?: string }
   | { type: 'coins'; delta: number }
-  | { type: 'item'; name: string; delta: number; icon?: string }
+  | { type: 'item'; name: string; delta: number; icon?: string; spent?: boolean }
   | { type: 'status'; status: Status; reason: string }
   | { type: 'death_roll'; roll: number; success: boolean; double: boolean }
   | { type: 'attr_spend'; attr: Attr }
@@ -157,6 +160,17 @@ export type GameEvent =
   | { type: 'use_item'; name: string; heal?: number }
   /** A meal that isn't from the pack (an inn, a host's table). */
   | { type: 'eat'; hours: number; wellFed?: boolean }
+  /** Fights (combat.ts): every number in a fight is an event, so rerolls and rewinds work. */
+  | { type: 'combat_start'; combat: Combat }
+  | { type: 'combat_round'; round: number }
+  | { type: 'combat_dodge' }
+  | { type: 'combat_end'; outcome: CombatOutcome }
+  | { type: 'foe_hit'; id: string; amount: number; name?: string }
+  | { type: 'foe_status'; id: string; status: FoeStatus; name?: string }
+  /** A foe's attack on the player (for the log; the damage itself is a "damage" event). */
+  | { type: 'foe_attack'; id: string; roll: number; total: number; defense: number; hit: boolean; crit: boolean; damage: number; name?: string }
+  /** A random event happened this turn (kept so they don't pile up). */
+  | { type: 'world_event'; id: string; text: string }
   /** Long-term memory: people, places and summaries (see shared/memory.ts). */
   | MemoryEvent
 
@@ -205,7 +219,7 @@ export function initialState(build: CharacterBuild, settings: CampaignSettings):
     awakeMins: 120
   }
   for (const k of bg.kit) addItem(character, k.name, 'qty' in k && k.qty ? k.qty : 1, k.icon)
-  return { character, time: { day: 1, minute: 8 * 60 }, location: null, placeKind: null }
+  return { character, time: { day: 1, minute: 8 * 60 }, location: null, placeKind: null, combat: null }
 }
 
 /** A proper meal (12 hours of food or more) leaves you fed whatever came before; a snack takes the edge off. */
@@ -400,6 +414,37 @@ export function applyEvent(prev: GameState, ev: GameEvent, settings: CampaignSet
       break
     case 'place_kind':
       s.placeKind = ev.kind
+      break
+    case 'combat_start':
+      s.combat = structuredClone(ev.combat)
+      break
+    case 'combat_round':
+      if (s.combat) {
+        s.combat.round = ev.round
+        s.combat.dodging = false
+      }
+      break
+    case 'combat_dodge':
+      if (s.combat) s.combat.dodging = true
+      break
+    case 'combat_end':
+      s.combat = null
+      break
+    case 'foe_hit': {
+      const f = s.combat?.foes.find((x) => x.id === ev.id)
+      if (f) {
+        f.hp = Math.max(0, f.hp - ev.amount)
+        if (f.hp <= 0) f.status = 'down'
+      }
+      break
+    }
+    case 'foe_status': {
+      const f = s.combat?.foes.find((x) => x.id === ev.id)
+      if (f) f.status = ev.status
+      break
+    }
+    case 'foe_attack':
+    case 'world_event':
       break
     case 'status':
       c.status = ev.status

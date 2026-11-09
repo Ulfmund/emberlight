@@ -89,7 +89,7 @@ function Throw({ check, onDone }: { check: CheckResult; onDone: () => void }) {
       <div className="mb-6">
         <div className="font-display text-sm tracking-[0.3em] text-gold-400">{SKILLS[check.skill].label.toUpperCase()}</div>
         <div className="mt-1 font-story text-lg text-parchment-300 italic">
-          {check.hidden ? 'Something is happening…' : `${check.reason} · ${DIFFICULTY_LABEL[check.difficulty]}`}
+          {check.hidden ? 'Something is happening…' : `${check.reason} · ${check.against ? `vs ${check.against}` : DIFFICULTY_LABEL[check.difficulty]}`}
         </div>
       </div>
 

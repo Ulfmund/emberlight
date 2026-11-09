@@ -364,6 +364,8 @@ function SavesTab({ view }: { view: CampaignView }) {
         <Opt k="failForward" label="Fail forward" options={[{ id: false, label: 'Off' }, { id: true, label: 'On' }]} />
         <Opt k="ironman" label="Ironman" options={[{ id: false, label: 'Off' }, { id: true, label: 'On' }]} />
         <Opt k="survival" label="Hunger & sleep" options={[{ id: true, label: 'On' }, { id: false, label: 'Off' }]} />
+        <Opt k="combat" label="Combat" options={[{ id: 'mixed', label: 'Mixed' }, { id: 'turn', label: 'Tracker' }, { id: 'narrative', label: 'Story' }]} />
+        <Opt k="events" label="Random events" options={[{ id: 'calm', label: 'Calm' }, { id: 'normal', label: 'Normal' }, { id: 'eventful', label: 'Eventful' }, { id: 'chaos', label: 'Chaos' }]} />
       </section>
       <section>
         <h3 className="mb-1 text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">DM style</h3>

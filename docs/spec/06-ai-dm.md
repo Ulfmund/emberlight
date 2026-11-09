@@ -79,12 +79,13 @@ The engine applies results as events: damage, HP and stamina costs, loot (rolled
 
 ### 5. Random events
 
-Event tables live in `core/events/tables/`, sorted by **location type** (road, forest, town, dungeon, mountain, coast…), **time of day**, and **danger level**.
+*Built in 0.9.0* (`src/shared/rules/encounters.ts`). About 33 events, sorted by **where** (town or village, road, the wild, water, ruins and the deep, or anywhere) and **time of day**, with weights.
 
-- **Triggers:** a chance each turn based on time passing, travel, **resting in the wild**, or noise (critical failures, combat).
-- **Kinds:** encounter, weather change, wandering NPC, discovery, omen, complication, opportunity.
-- The chosen event is passed to the narrator as a directive ("introduce: a wounded courier stumbles onto the road"). An ambush event first sets up a hidden Perception check, so being alert matters.
-- **Event frequency** is a DM setting: Calm / Normal / Eventful / Chaos.
+- **Chance each turn:** by **event frequency** (a campaign setting: Calm 3%, Normal 7%, Eventful 14%, Chaos 25%), then ×2.5 when travelling, ×1.3 when exploring, ×3 when **resting in the wild** (×0.3 resting in town), ×0.7 in a settlement, ×1.3 at night in the wild, and +10% after a critical failure. At most 60%. Never in a fight, and never within three turns of the last event or fight.
+- **Kinds:** encounter, weather, wanderer, discovery, omen, complication, opportunity. Only events marked as able to happen while asleep come up on a rest.
+- The chosen event is passed to the narrator as a directive ("RANDOM EVENT: work it into the scene now"). Some ask the narrator for a DM-initiated roll (a pickpocket, a collapsing floor).
+- **Encounters** bring foes. When the campaign's combat mode would track them, the fight is set up straight away; an ambush first rolls a hidden Perception check, so being alert matters. Otherwise the narrator is told to tell any fight in prose.
+- A reroll keeps the turn's event: it rolls the dice again, not the world.
 
 ### 6. Narrate
 

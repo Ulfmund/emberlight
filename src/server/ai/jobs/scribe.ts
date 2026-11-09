@@ -63,6 +63,7 @@ const SYSTEM = `You are the Scribe for a fantasy roleplaying game. You keep the 
 - Facts are what someone would still need to know a month later: "owes the player 5 silver", "lost two fingers to the river-thing", "is secretly the baron's son", "took the player prisoner". Never moods, gestures, smells, what a room looks like, or a blow-by-blow of a fight. Never guesses ("possibly", "seems to"): only what the story states. For someone already in KNOWN, add only what's new, and most turns add nothing.
 - When someone recorded under a description ("grey-bearded man") gives their name, record them under the name and put the description in otherNames, so the record is renamed rather than duplicated.
 - relation: only ties the story makes clear. A child is the player character's own son or daughter.
+- Whatever the GAME ENGINE block lists was already recorded by the game: damage, a fight's blows, loot taken from fallen foes, spells and potions used in a fight. Never record those again.
 - Eating from the pack goes in itemsUsed ("Travel rations", 1), not in ate. Drinking a potion or using a bandage goes in itemsUsed too; the game works out the healing, so leave healing at 0 for those.`
 
 /** Upper bounds so a confused model can't hand out a fortune. */

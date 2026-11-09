@@ -272,7 +272,7 @@ export function RollCard({ check, pending, onReroll }: { check: CheckResult; pen
       <div className="min-w-0">
         <div className="text-sm text-parchment-100">
           {SKILLS[check.skill].label}
-          {!check.hidden && <span className="text-parchment-500"> · {DIFFICULTY_LABEL[check.difficulty]}</span>}
+          {!check.hidden && <span className="text-parchment-500"> · {check.against ? `vs ${check.against}` : DIFFICULTY_LABEL[check.difficulty]}</span>}
         </div>
         <div className="text-xs text-parchment-400">
           {check.kept} {check.bonus >= 0 ? '+' : '−'} {Math.abs(check.bonus)} = <b className="text-parchment-100">{check.total}</b>
