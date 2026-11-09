@@ -1,0 +1,50 @@
+# Builds the Windows installer and attaches it to a GitHub Release.
+#
+# No command line needed: on GitHub, go to Releases → "Draft a new release", type a new tag
+# such as v0.0.2, and click Publish. A few minutes later the installer appears on that release.
+name: Build installer
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to build for (e.g. v0.0.1)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set the app version from the release tag
+        shell: bash
+        run: npm version "${TAG#v}" --no-git-tag-version --allow-same-version
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Build installer
+        run: npm run package
+
+      - name: Attach installer to the release
+        shell: bash
+        run: gh release upload "$TAG" release/Emberlight-Setup-*.exe --clobber

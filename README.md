@@ -2,6 +2,8 @@
 
 A roleplaying app with an AI Dungeon Master that works with local models (LM Studio, Ollama, Strata, KoboldCpp) and cloud models (Claude, OpenRouter).
 
+> **Just want to play?** Follow [docs/INSTALL.md](docs/INSTALL.md): download the installer from **Releases** and double-click it. No command line needed.
+
 The full design is in [docs/spec/](docs/spec/README.md). **Current state: Milestone 0** (skeleton): title screen, model connection, and a streaming story chat with a basic DM prompt. Rules, dice, characters and memory start in Milestone 1.
 
 ## Running it (development)
@@ -25,6 +27,10 @@ This opens the app window. Changes to the interface reload instantly; changes un
 | `npm run build` | Builds the app into `out/` |
 | `npm start` | Runs the built app (like the finished version) |
 | `npm run package` | Builds a Windows installer into `release/` |
+
+## Making a new release (no command line)
+
+On GitHub: **Releases → Draft a new release**, type a new tag (e.g. `v0.0.2`), add a few notes, and click **Publish release**. The *Build installer* action (`.github/workflows/release.yml`) builds the Windows installer and attaches it to that release within ~10 minutes. The app's version number is taken from the tag.
 
 ## Where things live
 

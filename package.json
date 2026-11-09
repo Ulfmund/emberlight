@@ -3,6 +3,7 @@
   "productName": "Emberlight",
   "version": "0.0.1",
   "description": "A roleplaying frontend with an AI Dungeon Master.",
+  "author": "Ulfmund",
   "main": "./out/main/index.js",
   "private": true,
   "type": "module",
@@ -11,7 +12,7 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "package": "electron-vite build && electron-builder --win"
+    "package": "electron-vite build && electron-builder --win --publish never"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",

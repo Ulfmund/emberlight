@@ -9,11 +9,17 @@ files:
 asarUnpack:
   - resources/**
 win:
-  icon: resources/icon.png
+  icon: resources/icon.ico
   target:
     - nsis
 nsis:
+  # A normal "Next, Next, Install" wizard rather than a silent one-click install.
   oneClick: false
+  perMachine: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
+  createStartMenuShortcut: true
   shortcutName: Emberlight
+  artifactName: Emberlight-Setup-${version}.${ext}
+  # Keep saved settings and campaigns if the app is uninstalled or updated.
+  deleteAppDataOnUninstall: false
