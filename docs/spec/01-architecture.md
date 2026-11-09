@@ -7,14 +7,14 @@
 Why:
 - **Animations:** desktop vs. web makes no difference here. Both draw the interface with the same browser engine (Chromium), so every effect possible in one is possible in the other. What matters is the animation library and keeping effects GPU-friendly (transforms, opacity, canvas particles).
 - **Ease of use:** a desktop app installs and launches by double-click. There's no terminal and no "open localhost:3000".
-- **Phone:** the desktop app runs a small local server. Opening the app's **"Play on Phone"** button shows a QR code; scanning it opens the game in the phone's browser, and "Add to Home Screen" makes it behave like an app (PWA). Play from outside the home network (e.g. via Tailscale) is a later option.
+- **Phone:** the desktop app runs a small local server. Opening the app's **"Play on Phone"** button shows a QR code; scanning it opens the game in the phone's browser, and "Add to Home Screen" makes it behave like an app (PWA). Play from outside the home network goes through a tunnel link (0.5.0: a Cloudflare or Tailscale tunnel to a loopback-only listener, with the same pairing key).
 - **One language everywhere:** TypeScript for the interface, the server and the rules engine. That's simpler for Claude-assisted iteration than Tauri, which needs Rust for the backend. Electron's downside is a larger download (~150 MB), which is acceptable here.
 
 ## Tech stack
 
 | Layer | Choice | Notes |
 |---|---|---|
-| Shell | Electron | Window, tray, installer, auto-update later |
+| Shell | Electron | Window, tray, installer, auto-update (from GitHub releases) |
 | UI | React + Vite + TypeScript | |
 | Styling | Tailwind CSS + CSS variables for theming | Fantasy theme as the default skin |
 | Animation | Motion (formerly Framer Motion) for UI; a lightweight canvas/particle layer for effects (runes, sparks, dice) | Respect the OS "reduce motion" setting, and give every effect its own toggle |
@@ -30,7 +30,7 @@ Each module lives in its own folder, has a small public interface, and only talk
 
 ```
 src/
-  main/            Electron main process: window, starts the server, phone QR code (later)
+  main/            Electron main process: window, starts the server, phone pairing (QR code and link), updates
   renderer/        React interface (screens, panels, chat, dice, effects)
   shared/          Types, Zod schemas and presets used by both sides
   server/          The local game server (HTTP API used by the window and the phone)

@@ -5,6 +5,7 @@ import type { CampaignSummary, CampaignView, MessageView, TurnEvent } from '@sha
 import { api, type CreateOptions } from './api'
 import type { MemoryEvent } from '@shared/memory'
 import { play } from './sound'
+import { stinger } from './audio/mixer'
 import { useFx } from './fx'
 
 export type Screen = 'title' | 'connect' | 'creator' | 'play' | 'load'
@@ -96,9 +97,12 @@ export const useGame = create<State>((set, get) => {
       get().toast({ title: `Level ${a.level}!`, text: '+1 attribute point to spend · +2 Renown', tone: 'level', icon: 'star' })
       useFx.getState().celebrate(a.level)
     }
-    // What the turn did, in sound (and a jolt for a big hit).
-    if (a.status === 'dead' && b.status !== 'dead') play('death')
-    else if (a.level > b.level) play('level')
+    // What the turn did, in sound (and a jolt for a big hit): one big moment at most (a death, a
+    // level, a fight won, a quest done), else the smaller ones.
+    const seen = new Set((before.timeline ?? []).map((e) => `${e.day}|${e.minute}|${e.text}`))
+    const fresh = (after.timeline ?? []).filter((e) => !seen.has(`${e.day}|${e.minute}|${e.text}`))
+    const big = a.status === 'dead' && b.status !== 'dead' ? 'death' : a.level > b.level ? 'level' : fresh.some((e) => e.text.startsWith('Won a fight')) ? 'victory' : fresh.some((e) => e.text.startsWith('Done: ')) ? 'quest' : null
+    if (big) stinger(big)
     else if (a.hp < b.hp) {
       play('hit')
       if (b.hp - a.hp >= Math.max(5, before.derived.maxHp * 0.25)) useFx.getState().bigHit()

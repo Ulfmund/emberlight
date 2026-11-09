@@ -1,9 +1,11 @@
 import { useEffect } from 'react'
 import { create } from 'zustand'
-import { BEDS, sceneOf, soundscape, type Bed, type Soundscape, type Track } from '@shared/scene'
+import { BEDS, sceneOf, soundscape, tracksFor, type Bed, type Soundscape, type Stinger, type Track } from '@shared/scene'
 import type { CampaignView } from '@shared/view'
 import { weatherNow } from '@shared/rules'
-import { getAudio } from './context'
+import { duck, getAudio } from './context'
+import { usePrefs } from '../prefs'
+import { play } from '../sound'
 import { startBed, type Running } from './beds'
 import { Composer } from './music'
 
@@ -104,7 +106,8 @@ class Mixer {
 
     // Music: the same mood keeps playing (a track picked once stays until the mood changes),
     // unless the player has just added a track for it, or taken away the one playing.
-    const own = scape.music ? tracks.filter((t) => t.kind === 'music' && t.tags.includes(scape.music!)) : []
+    // The player's tracks for the mood, and for how hard the moment is (calm or intense).
+    const own = scape.music ? tracksFor(tracks, scape.music, scape.intensity) : []
     const current = this.music?.key.startsWith('track:') ? own.find((t) => `track:${t.id}` === this.music!.key) : undefined
     const stale = scape.music === this.musicMood && this.music && (this.music.key.startsWith('gen:') ? own.length > 0 : !current)
     if (current && this.music) setVolume(this.music, current)
@@ -160,12 +163,36 @@ class Mixer {
 
   /** Everything fades out (leaving the game). */
   silence(fade = 2) {
-    this.apply({ music: null, beds: {}, fade }, [])
+    this.apply({ music: null, beds: {}, fade, intensity: 'calm' }, [])
   }
 }
 
 let mixer: Mixer | null = null
 const theMixer = () => (mixer ??= new Mixer())
+
+/**
+ * A big moment (a fight won, a quest done, a level, a death): the player's own short sound for
+ * it, once, over the music; otherwise the one made on the spot.
+ */
+export function stinger(name: Stinger) {
+  const { muted, sound } = usePrefs.getState()
+  if (muted || !sound) return
+  const own = useTracks.getState().tracks.filter((t) => t.kind === 'stinger' && t.tags.includes(name))
+  const a = getAudio()
+  if (!own.length || !a) return play(name)
+  const t = own[Math.floor(Math.random() * own.length)]
+  bufferFor(a.ctx, t.id)
+    .then((buf) => {
+      const src = a.ctx.createBufferSource()
+      src.buffer = buf
+      const level = a.ctx.createGain()
+      level.gain.value = t.volume
+      src.connect(level).connect(a.sfx)
+      duck(Math.min(8, buf.duration + 0.4))
+      src.start()
+    })
+    .catch(() => play(name))
+}
 
 /** Keeps the soundscape in step with the story being played. */
 export function useSoundscape(view: CampaignView | null) {
@@ -176,7 +203,11 @@ export function useSoundscape(view: CampaignView | null) {
   }, [load])
   const st = view?.state
   const hour = st ? Math.floor(st.time.minute / 60) : 12
-  const key = view && st ? [st.placeKind, weatherNow(st), hour < 6 || hour >= 20, Boolean(st.combat), st.character.status, view.settings.tone].join('|') : ''
+  const fighting = st?.combat?.foes.filter((f) => f.status === 'fighting') ?? []
+  const key =
+    view && st
+      ? [st.placeKind, weatherNow(st), hour < 6 || hour >= 20, Boolean(st.combat), fighting.some((f) => f.tier === 'boss'), fighting.length >= 3, st.character.hp * 2 < view.derived.maxHp, st.character.status, view.settings.tone].join('|')
+      : ''
   useEffect(() => {
     if (!view) return
     theMixer().apply(soundscape(sceneOf(view.state, view.settings)), tracks)

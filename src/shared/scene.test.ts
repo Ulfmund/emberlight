@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BEDS, MOODS, sceneOf, soundscape, type Scene } from './scene'
+import { BEDS, MOODS, sceneOf, soundscape, tracksFor, type Scene, type Track } from './scene'
 import { applyEvent, DEFAULT_SETTINGS, initialState, PLACE_KINDS, storyMinute, weatherNow, weatherPassed, WEATHERS, type CharacterBuild } from './rules'
 import { WORLD_EVENTS } from './rules/encounters'
 
@@ -17,7 +17,8 @@ describe('the soundscape', () => {
     expect(at(22).night).toBe(true)
     expect(at(3).night).toBe(true)
     expect(at(6).night).toBe(false)
-    expect(sceneOf({ ...st, weather: 'rain' }, { tone: 'horror' })).toMatchObject({ weather: 'rain', horror: true, combat: false, dead: false })
+    expect(sceneOf({ ...st, weather: 'rain' }, { ...DEFAULT_SETTINGS, tone: 'horror' })).toMatchObject({ weather: 'rain', horror: true, combat: false, dead: false, boss: false, foes: 0, hurt: false })
+    expect(sceneOf({ ...st, character: { ...st.character, hp: 3 } }, DEFAULT_SETTINGS).hurt).toBe(true)
     expect(sceneOf({ ...st, character: { ...st.character, status: 'dead' } }, DEFAULT_SETTINGS).dead).toBe(true)
   })
 
@@ -69,6 +70,27 @@ describe('the soundscape', () => {
     // A town is still a town, even in a horror story; and a fight is still a fight.
     expect(soundscape(scene({ place: 'town', horror: true })).music).toBe('town')
     expect(soundscape(scene({ place: 'forest', horror: true, combat: true })).music).toBe('combat')
+  })
+
+  it('a boss gets its own music; the moment is calm or intense', () => {
+    expect(soundscape(scene({ place: 'ruin', combat: true, boss: true })).music).toBe('boss')
+    expect(soundscape(scene({ combat: true, foes: 1 })).intensity).toBe('calm')
+    expect(soundscape(scene({ combat: true, foes: 3 })).intensity).toBe('intense')
+    expect(soundscape(scene({ combat: true, foes: 1, hurt: true })).intensity).toBe('intense')
+    expect(soundscape(scene({ combat: true, boss: true })).intensity).toBe('intense')
+    expect(soundscape(scene({ place: 'ruin' })).intensity).toBe('intense')
+    expect(soundscape(scene({ place: 'town' })).intensity).toBe('calm')
+  })
+
+  it("picks the player's tracks that suit the moment", () => {
+    const track = (id: string, tags: Track['tags'], intensity?: Track['intensity']): Track => ({ id, name: id, kind: 'music', tags, intensity, volume: 1, mime: 'audio/ogg', size: 1 })
+    const mine = [track('skirmish', ['combat'], 'calm'), track('onslaught', ['combat'], 'intense'), track('any fight', ['combat']), track('road', ['explore'])]
+    expect(tracksFor(mine, 'combat', 'intense').map((t) => t.id)).toEqual(['onslaught', 'any fight'])
+    expect(tracksFor(mine, 'combat', 'calm').map((t) => t.id)).toEqual(['skirmish', 'any fight'])
+    // No boss tracks: the fight ones will do. Nothing that fits the moment: any for the mood.
+    expect(tracksFor(mine, 'boss', 'intense').map((t) => t.id)).toEqual(['onslaught', 'any fight'])
+    expect(tracksFor([track('lullaby', ['night'], 'calm')], 'night', 'intense').map((t) => t.id)).toEqual(['lullaby'])
+    expect(tracksFor(mine, 'sorrow', 'calm')).toEqual([])
   })
 
   it('always gives known music and sane levels, whatever the scene', () => {

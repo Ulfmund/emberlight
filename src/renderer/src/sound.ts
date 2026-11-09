@@ -6,7 +6,7 @@ import { duck, getAudio } from './audio/context'
  * each sound a little different every time. Quiet by design: the story is the main thing.
  */
 
-export type Sound = 'roll' | 'land' | 'crit' | 'fumble' | 'success' | 'fail' | 'hit' | 'heal' | 'level' | 'coin' | 'item' | 'death' | 'tick'
+export type Sound = 'roll' | 'land' | 'crit' | 'fumble' | 'success' | 'fail' | 'hit' | 'heal' | 'level' | 'coin' | 'item' | 'death' | 'tick' | 'victory' | 'quest'
 
 /** The shared context, and the effects channel (its volume follows the device's settings). */
 function audio(): { c: AudioContext; out: GainNode } | null {
@@ -117,7 +117,17 @@ const SOUNDS: Record<Sound, (c: AudioContext, out: AudioNode) => void> = {
     tone(c, out, { freq: 165, to: 82, type: 'triangle', dur: 2.4, gain: 0.08, attack: 0.4 })
     noise(c, out, { dur: 1.8, gain: 0.06, freq: 300, type: 'lowpass' })
   },
-  tick: (c, out) => noise(c, out, { dur: 0.03, gain: 0.06, freq: 4000, q: 4 })
+  tick: (c, out) => noise(c, out, { dur: 0.03, gain: 0.06, freq: 4000, q: 4 }),
+  // A short rising fanfare: the fight is won.
+  victory: (c, out) => {
+    ;[392, 523, 659].forEach((f, i) => tone(c, out, { freq: f, type: 'triangle', at: i * 0.14, dur: 0.35, gain: 0.14 }))
+    ;[784, 988, 1175].forEach((f) => tone(c, out, { freq: f, type: 'triangle', at: 0.45, dur: 1.6, gain: 0.07, attack: 0.04 }))
+  },
+  // Bells: something long sought is done.
+  quest: (c, out) => {
+    ;[880, 1319, 1760].forEach((f, i) => tone(c, out, { freq: f, at: i * 0.18, dur: 1.4, gain: 0.09 }))
+    tone(c, out, { freq: 440, type: 'triangle', dur: 1.8, gain: 0.06, attack: 0.05 })
+  }
 }
 
 export function play(s: Sound) {
@@ -127,7 +137,7 @@ export function play(s: Sound) {
   if (!a) return
   try {
     SOUNDS[s](a.c, a.out)
-    if (s === 'level' || s === 'death' || s === 'crit' || s === 'fumble') duck(s === 'death' ? 3 : 1.8)
+    if (s === 'level' || s === 'death' || s === 'crit' || s === 'fumble' || s === 'victory' || s === 'quest') duck(s === 'death' ? 3 : 1.8)
   } catch {
     /* sound is a nicety */
   }

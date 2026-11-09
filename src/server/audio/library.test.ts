@@ -34,24 +34,33 @@ describe('the music and sounds library', () => {
   })
 
   it('guesses what a file is for from its name', () => {
-    expect(guessTags('battle_theme.mp3')).toEqual({ kind: 'music', tags: ['combat'] })
-    expect(guessTags('Boss Fight 2.ogg')).toEqual({ kind: 'music', tags: ['combat'] })
+    const music = (...tags: string[]) => ({ kind: 'music', tags, intensity: 'any' })
+    const ambience = (...tags: string[]) => ({ kind: 'ambience', tags, intensity: 'any' })
+    expect(guessTags('battle_theme.mp3')).toEqual(music('combat'))
     expect(guessTags('battle2.mp3').tags).toEqual(['combat'])
-    expect(guessTags('TavernTheme.mp3')).toEqual({ kind: 'music', tags: ['town'] })
-    expect(guessTags('Tavern ambience.ogg')).toEqual({ kind: 'ambience', tags: ['tavern'] })
-    expect(guessTags('rain_loop.wav')).toEqual({ kind: 'ambience', tags: ['rain'] })
-    expect(guessTags('Campfire crackle.ogg')).toEqual({ kind: 'ambience', tags: ['fire'] })
-    expect(guessTags('Ocean Waves 10 hours.mp3')).toEqual({ kind: 'ambience', tags: ['sea'] })
-    expect(guessTags('Dark Forest Ambience.mp3')).toEqual({ kind: 'ambience', tags: ['birds'] })
-    expect(guessTags('Requiem.flac')).toEqual({ kind: 'music', tags: ['sorrow'] })
-    expect(guessTags('moonlit_road.mp3')).toEqual({ kind: 'music', tags: ['night', 'explore'] })
+    // A boss's own music, not every fight's; and it sounds intense.
+    expect(guessTags('Boss Fight 2.ogg')).toEqual({ kind: 'music', tags: ['boss'], intensity: 'intense' })
+    expect(guessTags('TavernTheme.mp3')).toEqual(music('town'))
+    expect(guessTags('Tavern ambience.ogg')).toEqual(ambience('tavern'))
+    expect(guessTags('rain_loop.wav')).toEqual(ambience('rain'))
+    expect(guessTags('Campfire crackle.ogg')).toEqual(ambience('fire'))
+    expect(guessTags('Ocean Waves 10 hours.mp3')).toEqual(ambience('sea'))
+    expect(guessTags('Dark Forest Ambience.mp3')).toEqual(ambience('birds'))
+    expect(guessTags('Requiem.flac')).toEqual(music('sorrow'))
+    expect(guessTags('moonlit_road.mp3')).toEqual(music('night', 'explore'))
+    expect(guessTags('calm_village_morning.ogg')).toEqual({ kind: 'music', tags: ['town'], intensity: 'calm' })
     // Whole words only: no sea in a season, no rain in a brain, no war in a warm hearth.
-    expect(guessTags('Season of Mist.mp3')).toEqual({ kind: 'music', tags: ['explore'] })
+    expect(guessTags('Season of Mist.mp3')).toEqual(music('explore'))
     expect(guessTags('brainwave.mp3').tags).toEqual(['explore'])
-    expect(guessTags('warm hearth.ogg')).toEqual({ kind: 'ambience', tags: ['fire'] })
+    expect(guessTags('warm hearth.ogg')).toEqual(ambience('fire'))
     // Nothing to go on: music for the road, or ambience the player tags themself.
-    expect(guessTags('Track 07.mp3')).toEqual({ kind: 'music', tags: ['explore'] })
-    expect(guessTags('ambience_01.ogg')).toEqual({ kind: 'ambience', tags: [] })
+    expect(guessTags('Track 07.mp3')).toEqual(music('explore'))
+    expect(guessTags('ambience_01.ogg')).toEqual(ambience())
+    // Short sounds for a moment.
+    expect(guessTags('victory_fanfare.wav')).toEqual({ kind: 'stinger', tags: ['victory'], intensity: 'any' })
+    expect(guessTags('Level Up Jingle.ogg')).toEqual({ kind: 'stinger', tags: ['level'], intensity: 'any' })
+    expect(guessTags('quest complete sting.mp3')).toEqual({ kind: 'stinger', tags: ['quest'], intensity: 'any' })
+    expect(guessTags('you_died.ogg')).toEqual({ kind: 'stinger', tags: ['death'], intensity: 'any' })
   })
 
   describe('on disk', () => {

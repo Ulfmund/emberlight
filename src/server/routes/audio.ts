@@ -32,7 +32,8 @@ export function registerAudioRoutes(app: Hono, library: AudioLibrary) {
     const p = z
       .object({
         name: z.string().max(80).optional(),
-        kind: z.enum(['music', 'ambience']).optional(),
+        kind: z.enum(['music', 'ambience', 'stinger']).optional(),
+        intensity: z.enum(['any', 'calm', 'intense']).optional(),
         tags: z.array(z.enum(TRACK_TAGS)).max(20).optional(),
         volume: z.number().min(0).max(1).optional()
       })

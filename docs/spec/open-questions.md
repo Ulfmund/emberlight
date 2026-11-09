@@ -11,7 +11,8 @@
 | 5 | Sex modifiers | **Realistic by default:** men physically strong but socially must prove themselves; women socially advantaged, physically fragile, magic-leaning, and more often captured than killed by human enemies. Toggle to Off per campaign ([04](04-rules-system.md#attribute-caps)). |
 | 6 | Art? | Placeholders for now, made as good as possible; replaceable through the theme system. |
 
+| 7 | Phone outside the house? | **Home Wi-Fi, plus a link for a tunnel.** Home Wi-Fi is how the artist plays; a Cloudflare (or Tailscale) tunnel link, paired with the same key, is how the game is tested away from home (0.5.0). |
+
 ## Still open
 
-7. **Phone outside the house:** home Wi-Fi only for now?
-   *Assumption: yes; remote play (e.g. Tailscale) later.*
+None right now.

@@ -1,4 +1,4 @@
-import { weatherNow, type CampaignSettings, type GameState, type PlaceKind, type Weather } from './rules'
+import { derived, weatherNow, type CampaignSettings, type GameState, type PlaceKind, type Weather } from './rules'
 
 /**
  * How the scene sounds (docs/spec/09-audio.md#how-the-scene-decides-the-mix): the place, the
@@ -6,17 +6,37 @@ import { weatherNow, type CampaignSettings, type GameState, type PlaceKind, type
  * which ambient beds are mixed in, and how loud. A plain table, so it's easy to tune.
  */
 
-export const MOODS = ['explore', 'town', 'night', 'tension', 'combat', 'sorrow', 'eerie'] as const
+export const MOODS = ['explore', 'town', 'night', 'tension', 'combat', 'boss', 'sorrow', 'eerie'] as const
 export type Mood = (typeof MOODS)[number]
 
 export const BEDS = ['wind', 'rain', 'storm', 'fire', 'crickets', 'birds', 'river', 'sea', 'drips', 'tavern', 'town', 'owl'] as const
 export type Bed = (typeof BEDS)[number]
 
-/** What the player can tag their own tracks with (moods and beds both). */
-export const TRACK_TAGS = [...MOODS, ...BEDS] as const
+/** Short one-off sounds for big moments (the player's own, or made on the spot). */
+export const STINGERS = ['victory', 'quest', 'level', 'death'] as const
+export type Stinger = (typeof STINGERS)[number]
+
+/** What the player can tag their own tracks with (moods, beds and moments). */
+export const TRACK_TAGS = [...MOODS, ...BEDS, ...STINGERS] as const
 export type TrackTag = (typeof TRACK_TAGS)[number]
 
-export type Scene = { place: PlaceKind | null; night: boolean; weather: Weather | null; combat: boolean; dead: boolean; horror: boolean }
+/** How hard a moment is: picks between the player's calm and intense tracks. */
+export type Intensity = 'calm' | 'intense'
+
+export type Scene = {
+  place: PlaceKind | null
+  night: boolean
+  weather: Weather | null
+  combat: boolean
+  dead: boolean
+  horror: boolean
+  /** A boss among the foes still fighting. */
+  boss?: boolean
+  /** Foes still fighting. */
+  foes?: number
+  /** The character is below half health. */
+  hurt?: boolean
+}
 
 export type Soundscape = {
   music: Mood | null
@@ -24,17 +44,22 @@ export type Soundscape = {
   beds: Partial<Record<Bed, number>>
   /** Seconds to fade into this (quick when a fight starts). */
   fade: number
+  intensity: Intensity
 }
 
-export function sceneOf(state: GameState, settings: Pick<CampaignSettings, 'tone'>): Scene {
+export function sceneOf(state: GameState, settings: CampaignSettings): Scene {
   const hour = Math.floor(state.time.minute / 60)
+  const fighting = (state.combat?.foes ?? []).filter((f) => f.status === 'fighting')
   return {
     place: state.placeKind,
     night: hour < 6 || hour >= 20,
     weather: weatherNow(state),
     combat: Boolean(state.combat),
     dead: state.character.status === 'dead',
-    horror: settings.tone === 'horror'
+    horror: settings.tone === 'horror',
+    boss: fighting.some((f) => f.tier === 'boss'),
+    foes: fighting.length,
+    hurt: state.character.hp * 2 < derived(state, settings).maxHp
   }
 }
 
@@ -52,7 +77,7 @@ const PLACE_BEDS: Record<PlaceKind, { day: Partial<Record<Bed, number>>; night: 
 }
 
 export function soundscape(s: Scene): Soundscape {
-  if (s.dead) return { music: 'sorrow', beds: { wind: 0.15 }, fade: 6 }
+  if (s.dead) return { music: 'sorrow', beds: { wind: 0.15 }, fade: 6, intensity: 'calm' }
   const place = s.place ? PLACE_BEDS[s.place] : PLACE_BEDS.road
   const beds: Partial<Record<Bed, number>> = { ...(s.night ? place.night : place.day) }
   const sheltered = s.place === 'indoors' || s.place === 'underground'
@@ -73,14 +98,32 @@ export function soundscape(s: Scene): Soundscape {
   let music: Mood = s.night && (place.music === 'explore' || place.music === 'town') && s.place !== 'indoors' ? 'night' : place.music
   if (s.horror && (music === 'explore' || music === 'tension' || music === 'night')) music = 'eerie'
   if (s.combat) {
-    // The fight takes over: its music, and the world half as loud.
+    // The fight takes over: its music (a boss's own), and the world half as loud. It turns
+    // intense against a boss, against three or more, or when the character is badly hurt.
     for (const k of Object.keys(beds) as Bed[]) beds[k] = (beds[k] ?? 0) * 0.5
-    return { music: 'combat', beds, fade: 1.5 }
+    const intense = Boolean(s.boss) || (s.foes ?? 0) >= 3 || Boolean(s.hurt)
+    return { music: s.boss ? 'boss' : 'combat', beds, fade: 1.5, intensity: intense ? 'intense' : 'calm' }
   }
-  return { music, beds, fade: 5 }
+  return { music, beds, fade: 5, intensity: music === 'tension' || music === 'eerie' ? 'intense' : 'calm' }
 }
 
 /** Kinds of file the player's own library takes. */
 export const AUDIO_TYPES: Record<string, string> = { mp3: 'audio/mpeg', ogg: 'audio/ogg', oga: 'audio/ogg', wav: 'audio/wav', m4a: 'audio/mp4', flac: 'audio/flac', webm: 'audio/webm' }
 
-export type Track = { id: string; name: string; kind: 'music' | 'ambience'; tags: TrackTag[]; volume: number; mime: string; size: number }
+export const TRACK_KINDS = ['music', 'ambience', 'stinger'] as const
+export type TrackKind = (typeof TRACK_KINDS)[number]
+/** Which moments a track suits: any, the calm ones, or the intense ones. */
+export type TrackIntensity = 'any' | Intensity
+
+export type Track = { id: string; name: string; kind: TrackKind; tags: TrackTag[]; intensity?: TrackIntensity; volume: number; mime: string; size: number }
+
+/**
+ * Of the player's tracks for a mood, the ones that suit the moment: those for its intensity (or
+ * for any), else all of them. A boss fight takes fight tracks when there are no boss ones.
+ */
+export function tracksFor(tracks: Track[], mood: Mood, intensity: Intensity): Track[] {
+  let own = tracks.filter((t) => t.kind === 'music' && t.tags.includes(mood))
+  if (!own.length && mood === 'boss') own = tracks.filter((t) => t.kind === 'music' && t.tags.includes('combat'))
+  const fit = own.filter((t) => !t.intensity || t.intensity === 'any' || t.intensity === intensity)
+  return fit.length ? fit : own
+}

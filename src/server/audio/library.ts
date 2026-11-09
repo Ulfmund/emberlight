@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { TRACK_TAGS, type Bed, type Mood, type Track, type TrackTag } from '@shared/scene'
+import { TRACK_TAGS, type Bed, type Mood, type Stinger, type Track, type TrackIntensity, type TrackTag } from '@shared/scene'
 import { newId } from '../store/db'
 
 /**
@@ -25,7 +25,7 @@ export function audioType(b: Uint8Array): { ext: string; mime: string } | null {
 }
 
 /** A good first guess at what a file is for, from its name ("tavern_night.ogg"). */
-export function guessTags(filename: string): { kind: Track['kind']; tags: TrackTag[] } {
+export function guessTags(filename: string): { kind: Track['kind']; tags: TrackTag[]; intensity: TrackIntensity } {
   // "TavernNight_02.ogg" -> " tavern night 02 "
   const n = ` ${filename
     .replace(/\.[a-z0-9]{2,5}$/i, '')
@@ -35,7 +35,8 @@ export function guessTags(filename: string): { kind: Track['kind']; tags: TrackT
     .replace(/(\d)([a-z])/g, '$1 $2')
     .replace(/[^a-z0-9]+/g, ' ')} `
   const moods: [RegExp, Mood][] = [
-    [/\b(battle|combat|fight|fighting|boss|war|clash|skirmish)\b/, 'combat'],
+    [/\b(battle|combat|fight|fighting|war|clash|skirmish)\b/, 'combat'],
+    [/\b(boss|showdown|final battle|final boss|nemesis)\b/, 'boss'],
     [/\b(town|city|market|village|tavern|inn)\b/, 'town'],
     [/\b(night|nocturne|moon|moonlit|moonlight)\b/, 'night'],
     [/\b(tension|tense|danger|suspense|dark|dungeon|stealth|sneak)/, 'tension'],
@@ -57,13 +58,26 @@ export function guessTags(filename: string): { kind: Track['kind']; tags: TrackT
     [/\b(tavern|inn|pub|crowd|chatter)\b/, 'tavern'],
     [/\b(town|city|market|street|streets)\b/, 'town']
   ]
+  const moments: [RegExp, Stinger][] = [
+    [/\b(victory|victorious|win|won|fanfare|triumph)\b/, 'victory'],
+    [/\b(quest|complete|completed|success|achievement)\b/, 'quest'],
+    [/\b(level|levelup|lvl)\b/, 'level'],
+    [/\b(death|died|dead|game over|defeat|you died)\b/, 'death']
+  ]
   const found = <T>(list: [RegExp, T][]) => [...new Set(list.filter(([re]) => re.test(n)).map(([, t]) => t))]
-  const m = found(moods)
+  const intensity: TrackIntensity = /\b(calm|peaceful|gentle|soft|quiet|relaxing|serene|lull)/.test(n) ? 'calm' : /\b(epic|intense|heavy|action|frantic|boss|climax)/.test(n) ? 'intense' : 'any'
+  // A moment: a short sound for one, by name ("victory_fanfare", "level up jingle").
+  if (/\b(stinger|sting|jingle|fanfare|level ?up|game over|you died)\b/.test(n)) {
+    const s = found(moments)
+    return { kind: 'stinger', tags: s.length ? s : ['victory'], intensity: 'any' }
+  }
+  let m = found(moods)
+  if (m.includes('boss')) m = m.filter((x) => x !== 'combat')
   const b = found(beds)
   const saysAmbient = /\b(ambient|ambience|ambiance|atmosphere|atmos|loop|sfx|sounds?|soundscape)\b/.test(n)
   const ambient = saysAmbient ? b.length > 0 || m.length === 0 : m.length === 0 && b.length > 0
   // Ambience with nothing recognisable gets no tags: the library asks the player to pick.
-  return ambient ? { kind: 'ambience', tags: b } : { kind: 'music', tags: m.length ? m : ['explore'] }
+  return ambient ? { kind: 'ambience', tags: b, intensity: 'any' } : { kind: 'music', tags: m.length ? m : ['explore'], intensity }
 }
 
 export class AudioLibrary {
@@ -111,13 +125,14 @@ export class AudioLibrary {
     return out
   }
 
-  update(id: string, patch: Partial<Pick<Track, 'name' | 'kind' | 'tags' | 'volume'>>): Track {
+  update(id: string, patch: Partial<Pick<Track, 'name' | 'kind' | 'tags' | 'volume' | 'intensity'>>): Track {
     const t = this.tracks.find((x) => x.id === id)
     if (!t) throw new AudioError('That sound is no longer in your library.')
     if (patch.name !== undefined) t.name = patch.name.trim().slice(0, 80) || t.name
     if (patch.kind) t.kind = patch.kind
     if (patch.tags) t.tags = [...new Set(patch.tags.filter((x) => (TRACK_TAGS as readonly string[]).includes(x)))]
     if (patch.volume !== undefined) t.volume = Math.max(0, Math.min(1, patch.volume))
+    if (patch.intensity) t.intensity = patch.intensity
     this.save()
     const { ext: _ext, ...out } = t
     return out

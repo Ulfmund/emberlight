@@ -35,6 +35,8 @@ const SPECS: Record<Mood, Spec> = {
   night: { root: 45, scale: AEOLIAN, chords: [[0, 2, 4], [5, 0, 2], [3, 5, 0], [4, 6, 1]], chordSecs: 9, pad: { type: 'triangle', cutoff: 900, gain: 0.05 }, melody: { density: 0.14, voice: 'pluck', octave: 2 }, bass: true },
   tension: { root: 40, scale: PHRYGIAN, chords: [[0, 2, 4], [1, 3, 5], [0, 2, 4], [6, 1, 3]], chordSecs: 8, pad: { type: 'sawtooth', cutoff: 650, gain: 0.035 }, melody: { density: 0.1, voice: 'pluck', octave: 2 }, bass: true },
   combat: { root: 38, scale: HARMONIC, chords: [[0, 2, 4], [5, 0, 2], [6, 1, 3], [4, 6, 1]], chordSecs: 1.875, pad: { type: 'sawtooth', cutoff: 1100, gain: 0.035 }, melody: { density: 0.3, voice: 'pluck', octave: 2 }, bass: true, drums: 128 },
+  // Lower, darker and faster than an ordinary fight.
+  boss: { root: 33, scale: PHRYGIAN, chords: [[0, 2, 4], [1, 3, 5], [0, 2, 4], [6, 1, 3], [5, 0, 2], [1, 3, 5]], chordSecs: 1.67, pad: { type: 'sawtooth', cutoff: 1500, gain: 0.045 }, melody: { density: 0.36, voice: 'pluck', octave: 2 }, bass: true, drums: 144 },
   sorrow: { root: 48, scale: AEOLIAN, chords: [[0, 2, 4], [5, 0, 2], [3, 5, 0], [4, 6, 1]], chordSecs: 10, pad: { type: 'triangle', cutoff: 1100, gain: 0.05 }, melody: { density: 0.22, voice: 'flute', octave: 1 }, bass: false },
   eerie: { root: 45, scale: WHOLE, chords: [[0, 2, 4], [1, 3, 5], [2, 4, 0]], chordSecs: 9, pad: { type: 'triangle', cutoff: 800, gain: 0.045 }, melody: { density: 0.12, voice: 'pluck', octave: 2 }, bass: true }
 }

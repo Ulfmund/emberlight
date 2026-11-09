@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { BEDS, MOODS, type Track, type TrackTag } from '@shared/scene'
+import { BEDS, MOODS, STINGERS, type Track, type TrackIntensity, type TrackKind, type TrackTag } from '@shared/scene'
 import { useTracks } from '../audio/mixer'
 import { Button } from '../components/Button'
 import { Icon } from '../components/Icon'
@@ -13,6 +13,7 @@ const LABEL: Record<TrackTag, string> = {
   night: 'Night',
   tension: 'Tension',
   combat: 'Fights',
+  boss: 'Boss fights',
   sorrow: 'Sorrow',
   eerie: 'Eerie',
   wind: 'Wind',
@@ -25,7 +26,11 @@ const LABEL: Record<TrackTag, string> = {
   sea: 'Sea',
   drips: 'Cave drips',
   tavern: 'Tavern',
-  owl: 'Owls'
+  owl: 'Owls',
+  victory: 'A fight won',
+  quest: 'A quest done',
+  level: 'A level up',
+  death: 'A death'
 }
 
 /**
@@ -70,7 +75,7 @@ export function AudioLibrary({ open, onClose }: { open: boolean; onClose: () => 
     }
     await load()
   }
-  const change = async (t: Track, patch: Partial<Pick<Track, 'name' | 'kind' | 'tags' | 'volume'>>) => {
+  const change = async (t: Track, patch: Partial<Pick<Track, 'name' | 'kind' | 'tags' | 'volume' | 'intensity'>>) => {
     await fetch(`/api/audio/${encodeURIComponent(t.id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) })
     await load()
   }
@@ -119,7 +124,7 @@ export function AudioLibrary({ open, onClose }: { open: boolean; onClose: () => 
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
               <p className="text-sm text-parchment-400">
-                Add your own tracks and say what each is for. Music plays for its mood (a fight, a town, the road at night…); ambience plays for its sound (rain, a tavern, the sea…), in place of the built-in one.{isTouch() ? '' : ' Drop files here, or:'}
+                Add your own tracks and say what each is for. Music plays for its mood (a fight, a town, the road at night…), and can be kept for calm or intense moments; ambience plays for its sound (rain, a tavern, the sea…), in place of the built-in one; a moment is a short sound played once, when a fight is won, a quest done, a level gained or a life lost.{isTouch() ? '' : ' Drop files here, or:'}
               </p>
               <input ref={picker} type="file" multiple accept="audio/*,.mp3,.ogg,.wav,.flac,.m4a,.webm" className="hidden" onChange={(e) => e.target.files && void add(e.target.files).then(() => (e.target.value = ''))} />
               <div className="mt-3 flex items-center gap-3">
@@ -131,7 +136,7 @@ export function AudioLibrary({ open, onClose }: { open: boolean; onClose: () => 
               {tracks.length === 0 && <p className="mt-8 text-center font-story text-lg text-parchment-400 italic">Nothing here yet. Until there is, the music and sounds are made on the spot.</p>}
               <div className="mt-4 space-y-2">
                 {tracks.map((t) => {
-                  const options = t.kind === 'music' ? MOODS : BEDS
+                  const options = t.kind === 'music' ? MOODS : t.kind === 'stinger' ? STINGERS : BEDS
                   return (
                     <div key={t.id} className="rounded-xl border border-gold-500/15 bg-ink-850/70 p-3">
                       <div className="flex items-center gap-2">
@@ -140,9 +145,10 @@ export function AudioLibrary({ open, onClose }: { open: boolean; onClose: () => 
                         </button>
                         <input defaultValue={t.name} onBlur={(e) => e.target.value.trim() !== t.name && void change(t, { name: e.target.value })} className="input min-w-0 flex-1 py-1 text-sm" aria-label="Name" />
                         <div className="w-32 shrink-0">
-                          <select value={t.kind} onChange={(e) => void change(t, { kind: e.target.value as Track['kind'], tags: [] })} className="input py-1 text-sm" aria-label="Kind">
+                          <select value={t.kind} onChange={(e) => void change(t, { kind: e.target.value as TrackKind, tags: [] })} className="input py-1 text-sm" aria-label="Kind">
                             <option value="music">Music</option>
                             <option value="ambience">Ambience</option>
+                            <option value="stinger">A moment</option>
                           </select>
                         </div>
                         <button onClick={() => void remove(t)} className="no-drag cursor-pointer rounded-md p-1.5 text-parchment-500 hover:text-blood-400 touch:p-2.5" aria-label="Remove">
@@ -166,6 +172,16 @@ export function AudioLibrary({ open, onClose }: { open: boolean; onClose: () => 
                       <label className="mt-2 flex items-center gap-2 text-xs text-parchment-400">
                         Volume
                         <input type="range" min={0} max={1} step={0.05} defaultValue={t.volume} onPointerUp={(e) => void change(t, { volume: Number((e.target as HTMLInputElement).value) })} onKeyUp={(e) => void change(t, { volume: Number((e.target as HTMLInputElement).value) })} className="w-40 accent-[var(--color-gold-400)]" />
+                        {t.kind === 'music' && (
+                          <span className="ml-2 w-40 shrink-0">
+                            <select value={t.intensity ?? 'any'} onChange={(e) => void change(t, { intensity: e.target.value as TrackIntensity })} className="input py-0.5 text-xs" aria-label="For which moments">
+                              <option value="any">Any moment</option>
+                              <option value="calm">Calm moments</option>
+                              <option value="intense">Intense moments</option>
+                            </select>
+                          </span>
+                        )}
+                        {t.kind === 'stinger' && <span className="text-parchment-500">Plays once, over the music</span>}
                         {!t.tags.length && <span className="ml-auto text-ember-400">Pick at least one, or it won't play</span>}
                       </label>
                     </div>
