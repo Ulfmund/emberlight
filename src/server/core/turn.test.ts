@@ -63,7 +63,11 @@ function blankScribe() {
     conditionsOn: [],
     conditionsOff: [],
     people: [] as unknown[],
-    places: [] as unknown[]
+    places: [] as unknown[],
+    placeKind: 'unknown',
+    ate: 'none',
+    itemsUsed: [] as unknown[],
+    itemsEquipped: [] as unknown[]
   }
 }
 
@@ -275,11 +279,11 @@ describe('turn engine', () => {
     fake.scribe = {
       ...blankScribe(),
       location: 'Millbrook Crossing',
-      people: [{ name: 'Old Tam', otherNames: ['the ferryman'], who: 'ferryman at Millbrook', newFacts: ['lost two fingers to the river'], status: 'alive', attitude: 'unfriendly' }],
+      people: [{ name: 'Old Tam', otherNames: ['the ferryman'], who: 'ferryman at Millbrook', newFacts: ['lost two fingers to the river'], status: 'alive', attitude: 'unfriendly', relation: 'none' }],
       places: []
     }
     await run(engine.act(id, 'I ask the ferryman about the river.', signal))
-    fake.scribe = { ...blankScribe(), people: [{ name: 'Tam', otherNames: [], who: '', newFacts: ['owes Brenna a favour'], status: 'alive', attitude: 'friendly' }], places: [] }
+    fake.scribe = { ...blankScribe(), people: [{ name: 'Tam', otherNames: [], who: '', newFacts: ['owes Brenna a favour'], status: 'alive', attitude: 'friendly', relation: 'none' }], places: [] }
     await run(engine.act(id, 'I help Tam haul the rope.', signal))
     fake.scribe = blankScribe()
     await run(engine.act(id, 'I wave goodbye to Tam.', signal))
@@ -378,5 +382,25 @@ describe('turn engine', () => {
     expect(r.history.messages).toEqual(fake.lastMessages.map((m) => ({ role: m.role, text: m.content })))
     expect(r.blocks.map((b) => b.text).join('\n').length).toBeGreaterThan(fake.lastSystem.length * 0.9)
     expect(r.totalTokens).toBeLessThan(r.contextTokens)
+  })
+  it('tells the DM its persona, the style settings, and what the character carries and needs', async () => {
+    const id = campaigns.create(build, { ...DEFAULT_SETTINGS, persona: 'old_soldier', perspective: 'third', pacing: 'guided', acting: 'light', limits: 'no spiders' })
+    await run(engine.narrateHead(id, signal))
+    const sys = fake.lastSystem
+    expect(sys).toContain('YOUR VOICE AS DM\nYou narrate like an old soldier')
+    expect(sys).toContain('Write in third person about Brenna Rook')
+    expect(sys).toContain('Keep a story moving')
+    expect(sys).toContain('small involuntary reactions')
+    expect(sys).toContain('Content to avoid, or to fade to black instead of describing: no spiders.')
+    expect(sys).toContain('Wielding: Shortbow. Wearing: ordinary clothes. Defense 12.')
+    expect(sys).toContain('Hunger: fed (last proper meal 2 hours ago). Tiredness: rested.')
+
+    // A character card as the DM: its own voice, and it may argue with out-of-character requests.
+    const lib = new CardLibrary(db)
+    const { card } = lib.import(new TextEncoder().encode(JSON.stringify({ name: 'Grandmother Wolf', description: '{{char}} is an ancient, sardonic wolf who tells stories to {{user}}.', personality: 'dry' })), 'wolf.json')
+    campaigns.updateSettings(id, { ...campaigns.get(id).settings, persona: `card:${card.id}` })
+    await run(engine.regenerate(id, signal))
+    expect(fake.lastSystem).toContain('You are Grandmother Wolf, telling this story as its Dungeon Master. Grandmother Wolf is an ancient, sardonic wolf who tells stories to the player.')
+    expect(fake.lastSystem).toContain('You may push back, bargain, or grant it with a twist')
   })
 })

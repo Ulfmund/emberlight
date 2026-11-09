@@ -35,12 +35,12 @@ Built in milestones. Each one ends with something playable, so the artist can te
 
 ## Milestone 3 — Game depth
 - Combat modes (narrative / turn-based / mixed), ambush and initiative, enemy templates
-- Inventory, equipment slots, encumbrance, money
+- Inventory, equipment slots, encumbrance, money ✅ 0.8.0
 - Gathering and crafting skills with recipes and nodes
-- Conditions, survival needs, rest rules (auto-detected sleep)
+- Conditions, survival needs, rest rules (auto-detected sleep) ✅ 0.8.0
 - Random event tables and DM-initiated rolls (hidden checks)
 - Death flow, Hall of the Fallen, quick new adventurer in the same world
-- DM style settings, DM persona cards
+- DM style settings, DM persona cards ✅ 0.8.0 (event frequency comes with random events)
 
 ## Milestone 4 — Polish and reach
 - Full "juice" pass (including the typing runes), effects settings

@@ -13,6 +13,14 @@ import {
   skillCaps,
   skillLevelFromXp,
   TIER_INFO,
+  capacityKg,
+  carriedKg,
+  defenseValue,
+  encumbrance,
+  mainWeapon,
+  needs,
+  templateOf,
+  type Slot,
   type CampaignSettings,
   type CharacterBuild,
   type CheckResult,
@@ -192,7 +200,13 @@ export class Campaigns {
         skillLevels: Object.fromEntries(SKILL_IDS.map((s) => [s, skillLevelFromXp(state.character.skillXp[s] ?? 0)])),
         renownTier: RENOWN_TIERS.find((t) => state.character.renown >= t.min)!.label,
         xpIntoLevel: state.character.xp - charXpForLevel(level),
-        xpForNext: charXpForLevel(level + 1) - charXpForLevel(level)
+        xpForNext: charXpForLevel(level + 1) - charXpForLevel(level),
+        defense: defenseValue(state.character).total,
+        weapon: mainWeapon(state.character),
+        carried: carriedKg(state.character),
+        capacity: capacityKg(state.character),
+        load: encumbrance(state.character),
+        needs: needs(state, c.settings.survival)
       },
       cast: c.cast.map((m) => ({ cardId: m.cardId, role: m.role, name: m.name, hasImage: m.hasImage })),
       memory: projectMemory(events.map((e) => e.event)),
@@ -234,6 +248,40 @@ export class Campaigns {
 
   rename(id: string, name: string) {
     this.db.updateCampaign(id, { name })
+  }
+
+  /**
+   * The player handles their gear directly (the Bag tab): equip, take off, use or drop. Tied to
+   * the newest player message, so rewriting the DM's reply keeps it.
+   */
+  inventoryAction(id: string, action: 'equip' | 'unequip' | 'use' | 'drop', name: string, slot?: Slot, rng: () => number = Math.random) {
+    const c = this.get(id)
+    const path = this.path(c)
+    const state = this.state(c, { path })
+    if (state.character.status === 'dead') throw new Error('The dead carry nothing.')
+    const item = state.character.inventory.find((i) => i.name.toLowerCase() === name.toLowerCase())
+    if (!item) throw new Error(`You don't have ${name} any more.`)
+    const tpl = templateOf(item)
+    let ev: GameEvent
+    if (action === 'equip') {
+      if (!tpl?.fit) throw new Error(`${item.name} isn't something you wear or hold.`)
+      ev = { type: 'equip', name: item.name, slot }
+    } else if (action === 'unequip') {
+      ev = { type: 'unequip', name: item.name }
+    } else if (action === 'use') {
+      if (!tpl || !(tpl.food || tpl.heal || tpl.cures?.length)) throw new Error(`${item.name} can't be used like that. Say what you do with it in the story instead.`)
+      let heal: number | undefined
+      if (tpl.heal) {
+        const [n, sides, flat] = tpl.heal
+        heal = flat
+        for (let i = 0; i < n; i++) heal += 1 + Math.floor(rng() * sides)
+      }
+      ev = { type: 'use_item', name: item.name, heal }
+    } else {
+      ev = { type: 'item', name: item.name, delta: -item.qty }
+    }
+    const anchor = [...path].reverse().find((m) => m.role === 'user') ?? path[0]
+    this.db.addEvents(id, anchor.id, newId('inv'), 'player', [ev])
   }
 
   /** Which library lorebooks this story uses. */
@@ -313,6 +361,20 @@ export function describeEvents(events: GameEvent[]): ChangeLine[] {
         break
       case 'attr_spend':
         out.push({ text: `+1 ${ev.attr}`, tone: 'good', icon: 'star' })
+        break
+      case 'equip':
+        out.push({ text: `Equipped ${ev.name}`, tone: 'neutral', icon: 'sword' })
+        break
+      case 'unequip':
+        out.push({ text: `Took off ${ev.name}`, tone: 'neutral', icon: 'bag' })
+        break
+      case 'use_item':
+        out.push({ text: `Used ${ev.name}${ev.heal ? `: +${ev.heal} HP` : ''}`, tone: 'good', icon: ev.heal ? 'heart' : 'bag' })
+        break
+      case 'eat':
+        out.push({ text: ev.wellFed ? 'Ate well' : ev.hours >= 8 ? 'Had a meal' : 'Had a bite', tone: 'good', icon: 'bread' })
+        break
+      case 'place_kind':
         break
       case 'location':
         out.push({ text: `Now at ${ev.name}`, tone: 'neutral', icon: 'map' })

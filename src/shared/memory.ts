@@ -12,6 +12,24 @@ export type EntityStatus = 'alive' | 'dead' | 'missing' | 'unknown'
 
 export const ATTITUDES: Attitude[] = ['hostile', 'unfriendly', 'neutral', 'friendly', 'devoted']
 
+/** How someone is tied to the player character (family matters: a child can carry the tale on). */
+export const RELATIONS = ['none', 'child', 'parent', 'sibling', 'spouse', 'lover', 'friend', 'ally', 'companion', 'employer', 'rival', 'enemy'] as const
+export type Relation = (typeof RELATIONS)[number]
+export const RELATION_LABEL: Record<Relation, string> = {
+  none: 'No tie',
+  child: 'your child',
+  parent: 'your parent',
+  sibling: 'your sibling',
+  spouse: 'your spouse',
+  lover: 'your lover',
+  friend: 'your friend',
+  ally: 'your ally',
+  companion: 'your companion',
+  employer: 'your employer',
+  rival: 'your rival',
+  enemy: 'your enemy'
+}
+
 export type Entity = {
   id: string
   kind: EntityKind
@@ -24,6 +42,8 @@ export type Entity = {
   status: EntityStatus
   /** People only: how they feel about the player character. */
   attitude?: Attitude
+  /** People only: how they're tied to the player character. */
+  relation?: Relation
   firstSeenDay: number
   lastSeenDay: number
   /** Bigger = seen more recently (an update counter, for sorting). */
@@ -65,6 +85,7 @@ export type MemoryEvent =
       facts?: string[]
       status?: EntityStatus
       attitude?: Attitude
+      relation?: Relation
       day: number
     }
   | { type: 'summary'; summary: Summary }
@@ -83,6 +104,7 @@ export type JournalEdit =
       status?: EntityStatus
       /** null clears it. */
       attitude?: Attitude | null
+      relation?: Relation | null
     }
   | { type: 'entity_forget'; id: string }
   | { type: 'summary_edit'; level: Summary['level']; to: string; title: string; text: string }
@@ -209,6 +231,8 @@ export function applyMemoryEvent(m: Memory, ev: MemoryEvent, counter: { n: numbe
       if (e.facts.length > MAX_FACTS) e.facts = e.facts.slice(-MAX_FACTS)
       if (ev.status) e.status = ev.status
       if (ev.attitude && e.kind === 'person') e.attitude = ev.attitude
+      // "none" from the Scribe doesn't undo a tie it recorded before; the Journal can.
+      if (ev.relation && ev.relation !== 'none' && e.kind === 'person') e.relation = ev.relation
       e.lastSeenDay = ev.day
       e.lastSeen = counter.n
       e.mentions++
@@ -235,6 +259,7 @@ export function applyMemoryEvent(m: Memory, ev: MemoryEvent, counter: { n: numbe
       if (ev.facts) e.facts = ev.facts.map((f) => f.trim()).filter(Boolean).slice(-MAX_FACTS)
       if (ev.status) e.status = ev.status
       if (ev.attitude !== undefined && e.kind === 'person') e.attitude = ev.attitude ?? undefined
+      if (ev.relation !== undefined && e.kind === 'person') e.relation = ev.relation && ev.relation !== 'none' ? ev.relation : undefined
       break
     }
     case 'entity_forget':
@@ -309,6 +334,7 @@ export function entityLine(e: Entity, facts: number): string {
   const tags = [
     e.kind === 'place' ? 'place' : null,
     e.aliases.length ? `also called ${e.aliases.slice(0, 3).join(', ')}` : null,
+    e.kind === 'person' && e.relation ? RELATION_LABEL[e.relation].replace('your', "the player's") : null,
     e.kind === 'person' && e.attitude ? `${e.attitude} toward the player` : null,
     e.status === 'dead' ? 'DEAD' : e.status === 'missing' ? 'missing' : null,
     `last seen day ${e.lastSeenDay}`

@@ -43,6 +43,7 @@ import { useGame } from '../store'
 import { api } from '../api'
 import { CardLibrary } from './CardLibrary'
 import { LoreEditor } from './LoreEditor'
+import { LimitsField, PersonaPicker } from './DmStyle'
 import { WORLDS } from '@shared/worlds'
 import type { LorebookSummary } from '@shared/lore'
 import { Button } from '../components/Button'
@@ -870,6 +871,52 @@ function AdventureStep({
         </Row>
         <Row label="Ironman" text="No rerolls and no rewinds">
           <Segmented value={settings.ironman ? 'on' : 'off'} onChange={(v) => set({ ironman: v === 'on' })} options={[{ id: 'off', label: 'Off' }, { id: 'on', label: 'On' }]} />
+        </Row>
+        <Row label="Hunger & sleep" text="Eat and rest, or pay for it">
+          <Segmented
+            value={settings.survival ? 'on' : 'off'}
+            onChange={(v) => set({ survival: v === 'on' })}
+            options={[
+              { id: 'on', label: 'On', hint: 'Go hungry or sleepless and your checks suffer. Starving, sleep heals nothing.' },
+              { id: 'off', label: 'Off', hint: 'No hunger or tiredness.' }
+            ]}
+          />
+        </Row>
+      </div>
+
+      <h3 className="mt-8 mb-3 text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">DM style</h3>
+      <div className="panel rounded-2xl px-5">
+        <Row label="Dungeon Master" text="Whose voice tells the story">
+          <PersonaPicker wide value={settings.persona} onChange={(persona) => set({ persona })} />
+        </Row>
+        <Row label="Rolls" text="How often the dice come out">
+          <Segmented value={settings.rolls} onChange={(rolls) => set({ rolls })} options={[{ id: 'fewer', label: 'Fewer' }, { id: 'normal', label: 'Normal' }, { id: 'more', label: 'More' }]} />
+        </Row>
+        <Row label="Pacing" text="Who drives the story">
+          <Segmented
+            value={settings.pacing}
+            onChange={(pacing) => set({ pacing })}
+            options={[
+              { id: 'sandbox', label: 'Sandbox', hint: 'You lead; the world reacts.' },
+              { id: 'guided', label: 'Guided story', hint: 'The DM keeps a plot moving and raises the stakes.' }
+            ]}
+          />
+        </Row>
+        <Row label="Perspective" text="How the story is told">
+          <Segmented value={settings.perspective} onChange={(perspective) => set({ perspective })} options={[{ id: 'second', label: '“You…”' }, { id: 'third', label: 'Third person' }]} />
+        </Row>
+        <Row label="Acting for you" text="May the DM describe your character?">
+          <Segmented
+            value={settings.acting}
+            onChange={(acting) => set({ acting })}
+            options={[
+              { id: 'never', label: 'Never', hint: 'The DM never decides what your character says, does, thinks or feels.' },
+              { id: 'light', label: 'Small reactions', hint: 'A flinch or a shiver, but never your choices or words.' }
+            ]}
+          />
+        </Row>
+        <Row label="Avoid" text="Things to leave out, or fade to black">
+          <LimitsField wide value={settings.limits} onSave={(limits) => set({ limits })} />
         </Row>
       </div>
     </>

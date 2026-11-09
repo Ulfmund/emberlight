@@ -80,6 +80,8 @@ export const api = {
   swipe: (id: string, messageId: string) => post(`/api/campaigns/${id}/swipe`, { messageId }).then((r) => json<CampaignView>(r)),
   rewind: (id: string, messageId: string) => post(`/api/campaigns/${id}/rewind`, { messageId }).then((r) => json<CampaignView>(r)),
   spend: (id: string, attr: Attr) => post(`/api/campaigns/${id}/spend`, { attr }).then((r) => json<CampaignView>(r)),
+  inventory: (id: string, action: 'equip' | 'unequip' | 'use' | 'drop', name: string, slot?: string) =>
+    post(`/api/campaigns/${id}/inventory`, { action, name, slot }).then((r) => json<CampaignView>(r)),
   journal: (id: string, edit: MemoryEvent) => post(`/api/campaigns/${id}/journal`, { edit }).then((r) => json<CampaignView>(r)),
   addSave: (id: string, name: string) => post(`/api/campaigns/${id}/saves`, { name }).then((r) => json<CampaignView>(r)),
   loadSave: (id: string, saveId: string) => post(`/api/campaigns/${id}/saves/${saveId}/load`).then((r) => json<CampaignView>(r)),

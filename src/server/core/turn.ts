@@ -13,13 +13,15 @@ import {
 import type { ChatMessage, Connection } from '@shared/types'
 import type { MessageView, TurnEvent } from '@shared/view'
 import { normalizeEntry, selectLore } from '@shared/lore'
+import { DEFAULT_PERSONA, findPersona, personaCardId } from '@shared/personas'
+import { fillMacros, storyName } from '@shared/cards'
 import { estimateTokens, promptBlocks, type PromptReport } from '@shared/inspect'
 import { entityLine, projectMemory, relevantEntities, storySoFar, type Summary } from '@shared/memory'
 import { summarizeChapter, summarizeScene, updateArc } from '../ai/jobs/summarizer'
 import { createProvider, type Provider } from '../ai/providers'
 import { runReferee } from '../ai/jobs/referee'
 import { runScribe } from '../ai/jobs/scribe'
-import { engineNotes, extractRollRequest, fitHistory, NameFilter, narratorSystem, pastRollNote } from '../ai/narrator'
+import { engineNotes, extractRollRequest, fitHistory, NameFilter, narratorSystem, pastRollNote, type PersonaText } from '../ai/narrator'
 import { newId, type EventRow, type MessageRow } from '../store/db'
 import type { Campaigns } from './campaigns'
 
@@ -61,6 +63,21 @@ export class TurnEngine {
   /** Resolves when background memory work for a campaign is done (for tests and shutdown). */
   settled(id: string): Promise<void> {
     return this.jobs.get(id) ?? Promise.resolve()
+  }
+
+  /** The DM's voice: a built-in persona, or a character card from the library. */
+  private personaFor(id: string): PersonaText {
+    const cardId = personaCardId(id)
+    if (cardId) {
+      const card = this.campaigns.db.getCard(cardId)
+      if (card) {
+        const text = [card.data.description, card.data.personality].map((x) => x.trim()).filter(Boolean).join('\n')
+        const name = storyName(card.data)
+        return { name, voice: fillMacros(text, name, 'the player').slice(0, 2500), ooc: 'argue', fromCard: true }
+      }
+    }
+    const p = findPersona(id) ?? DEFAULT_PERSONA
+    return { name: p.name, voice: p.voice, ooc: p.ooc }
   }
 
   /** What the DM was sent for each campaign's latest reply (kept in memory only). */
@@ -222,7 +239,7 @@ export class TurnEngine {
     else if (working.character.status === 'alive') {
       try {
         const recent = path.filter((m) => !m.meta.hidden).slice(-4).map((m) => ({ role: m.role, content: m.content }))
-        requests = await runReferee(ctx.provider, ctx.model, working, recent, input.text)
+        requests = await runReferee(ctx.provider, ctx.model, working, recent, input.text, c.settings.rolls)
       } catch (err) {
         yield { type: 'notice', message: `The referee couldn't decide on a roll (${(err as Error).message}), so the story continues without one.` }
       }
@@ -279,7 +296,8 @@ export class TurnEngine {
     const budget = (sys: string) => Math.max(4000, ctx.contextChars - sys.length - 6000)
     const names = nameSuggestions(this.rng)
     const pinned = memory.notes.map((n) => `- ${n.text}`).join('\n')
-    const build = (story: string) => narratorSystem(after, c.settings, names, c.cast, lore, { story, people, notes: pinned })
+    const persona = this.personaFor(c.settings.persona)
+    const build = (story: string) => narratorSystem(after, c.settings, names, c.cast, lore, { story, people, notes: pinned }, persona)
     const storyBudget = Math.round(ctx.contextChars * tier.storyShare)
     let system = build(storySoFar(memory, storyBudget, () => false))
     let messages = fitHistory(history, budget(system))

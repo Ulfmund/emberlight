@@ -1,5 +1,6 @@
 import { mod, skillLevelFromXp, socialModifier, xpMultiplier, type Rng } from './character'
 import { applyEvent, derived, type CampaignSettings, type GameEvent, type GameState } from './state'
+import { armor, encumbrance, hasTool, needs, TOOL_SKILLS } from './gear'
 import {
   CHECK_XP,
   DC,
@@ -28,6 +29,9 @@ export type CheckRequest = {
   risk: { severity: Severity; source: HarmSource }
   /** Hidden checks show the roll but not the DC or reason (DM-initiated). */
   hidden?: boolean
+  /** A fixed target instead of the difficulty ladder (e.g. an enemy's Defense), and what it is. */
+  dcOverride?: number
+  against?: string
 }
 
 export type CheckResult = CheckRequest & {
@@ -43,6 +47,8 @@ export type CheckResult = CheckRequest & {
   luck: boolean
   /** Harm taken from this check, if any. */
   damage: number
+  /** Why the roll had advantage or disadvantage ("No tool", "Carrying too much"…). */
+  edge?: string[]
 }
 
 const PHYSICAL = new Set<string>(['STR', 'AGI', 'END'])
@@ -74,8 +80,10 @@ export function checkBreakdown(state: GameState, settings: CampaignSettings, req
     const sm = socialModifier(c.build.sex, settings.sexModifiers, c.renown)
     if (sm) parts.push({ label: sm < 0 ? 'Must prove yourself' : 'Standing & Renown', value: sm })
   }
-  if (c.conditions.includes('exhausted')) parts.push({ label: 'Exhausted', value: -1 })
-  if (PHYSICAL.has(info.attr) && c.conditions.includes('hungry')) parts.push({ label: 'Hungry', value: -1 })
+  const n = needs(state, settings.survival)
+  if (n.exhaustion) parts.push({ label: n.exhaustion > 1 ? `Exhausted (${n.exhaustion})` : 'Exhausted', value: -n.exhaustion })
+  if (n.hunger === 'starving') parts.push({ label: 'Starving', value: -2 })
+  else if (n.hunger === 'hungry' && PHYSICAL.has(info.attr)) parts.push({ label: 'Hungry', value: -1 })
   if (PHYSICAL.has(info.attr) && c.conditions.includes('well_fed')) parts.push({ label: 'Well-fed', value: 1 })
   if (c.stamina <= 0 && PHYSICAL.has(info.attr)) parts.push({ label: 'Out of stamina', value: -2 })
   return parts.filter((p) => p.value !== 0 || p.label.includes('level'))
@@ -99,11 +107,33 @@ export function resolveCheck(
   const breakdown = checkBreakdown(state, settings, req)
   const bonus = breakdown.reduce((s, p) => s + p.value, 0)
 
-  let advantage = req.advantage
-  const poisonedPhysical = PHYSICAL.has(info.attr) && c.conditions.includes('poisoned')
+  // Advantage and disadvantage from every source cancel out one for one.
+  const edge: string[] = []
+  let up = req.advantage === 'advantage' ? 1 : 0
+  let down = req.advantage === 'disadvantage' ? 1 : 0
   const inspired = c.conditions.includes('inspired')
-  if (inspired) advantage = advantage === 'disadvantage' ? 'none' : 'advantage'
-  if (poisonedPhysical) advantage = advantage === 'advantage' ? 'none' : 'disadvantage'
+  if (inspired) {
+    up++
+    edge.push('Inspired')
+  }
+  if (PHYSICAL.has(info.attr) && c.conditions.includes('poisoned')) {
+    down++
+    edge.push('Poisoned')
+  }
+  const load = encumbrance(c)
+  if (load !== 'none' && (info.attr === 'AGI' || (load === 'overloaded' && PHYSICAL.has(info.attr)))) {
+    down++
+    edge.push(load === 'overloaded' ? 'Far too much to carry' : 'Carrying too much')
+  }
+  if (req.skill === 'stealth' && armor(c).heavy) {
+    down++
+    edge.push('Heavy armour')
+  }
+  if (TOOL_SKILLS.includes(req.skill) && !hasTool(c, req.skill)) {
+    down++
+    edge.push(`No tool for ${info.label}`)
+  }
+  const advantage = up > down ? 'advantage' : down > up ? 'disadvantage' : 'none'
 
   const d20s = advantage === 'none' ? [d(rng, 20)] : [d(rng, 20), d(rng, 20)]
   let kept = advantage === 'advantage' ? Math.max(...d20s) : advantage === 'disadvantage' ? Math.min(...d20s) : d20s[0]
@@ -118,13 +148,13 @@ export function resolveCheck(
     events.push({ type: 'trait_used' })
   }
 
-  const dc = DC[req.difficulty]
+  const dc = req.dcOverride ?? DC[req.difficulty]
   const total = kept + bonus
   const margin = total - dc
   const tier = tierFor(kept, margin)
   const success = TIER_INFO[tier].success
 
-  const result: CheckResult = { ...req, id: newId(), dc, d20s, kept, bonus, breakdown, total, margin, tier, luck, damage: 0 }
+  const result: CheckResult = { ...req, advantage, id: newId(), dc, d20s, kept, bonus, breakdown, total, margin, tier, luck, damage: 0, edge }
   events.unshift({ type: 'roll', check: result })
   if (inspired) events.push({ type: 'condition', id: 'inspired', on: false })
 

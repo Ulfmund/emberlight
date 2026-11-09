@@ -56,6 +56,8 @@ type State = {
   spend(attr: Attr): Promise<void>
   /** A correction or note from the Journal. */
   journal(edit: MemoryEvent): Promise<void>
+  /** Handle gear from the Bag tab. */
+  inventory(action: 'equip' | 'unequip' | 'use' | 'drop', name: string, slot?: string): Promise<void>
   /** Which library lorebooks the open story uses. */
   setLorebooks(ids: string[]): Promise<void>
   saveSlot(name: string): Promise<void>
@@ -237,6 +239,11 @@ export const useGame = create<State>((set, get) => {
       const v = get().view
       if (!v) return
       set({ view: await api.spend(v.id, attr) })
+    },
+    inventory: async (action, name, slot) => {
+      const v = get().view
+      if (!v || get().busy) return
+      set({ view: await api.inventory(v.id, action, name, slot) })
     },
     journal: async (edit) => {
       const v = get().view

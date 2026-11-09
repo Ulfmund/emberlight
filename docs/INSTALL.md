@@ -48,6 +48,16 @@ On the **Adventure** step of the character creator:
 
 During an adventure, **Journal → Lore** adds or removes lorebooks; changes apply from the next turn.
 
+### Gear, food and sleep
+
+The **Bag** tab shows what you wear and hold (with your **Defense**), what you carry and how heavy it is. Tap an item to **equip** it, **eat** or **use** it, or **drop** it. Carry more than your strength allows and you're slowed down.
+
+With **Hunger & sleep** on (it is by default), your character needs to eat and sleep: go hungry or stay awake too long and your rolls suffer, and a starving body doesn't heal in its sleep. Eat from your pack, or at an inn; the game notices.
+
+### The DM's style
+
+On the **Adventure** step (and later under **Saves**), pick the **Dungeon Master**: the even-handed Chronicler, the Grim Bard, the Old Soldier, the Hearthkeeper, the Trickster (who argues with your out-of-character requests), or any of your character cards. You can also choose how often the dice come out, whether the DM keeps a plot moving, first or third person, and anything to leave out.
+
 ### The DM's memory
 
 The DM keeps a record of the people and places you meet (what they're like, what they owe you, how they feel about you) and, in long adventures, writes summaries of older events. So even on a small local model it remembers what happened long after those messages stop fitting.

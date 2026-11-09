@@ -20,6 +20,8 @@ When the Scribe notices a new named character in the story, it creates a lightwe
 
 The DM persona card controls the narrator's voice and attitude. The default is a fair, vivid, neutral DM. Alternative DM cards can change tone, harshness, or even allow refusal (e.g. "the bratty DM who argues with you"). DM cards don't have sheets.
 
+*Built (0.8.0)* (`src/shared/personas.ts`): five built-in voices (the Chronicler, the Grim Bard, the Old Soldier, the Hearthkeeper, the Trickster), or any character card from the library. A card DM speaks as that character and, like the Trickster, may meet ((out-of-character)) requests in character instead of simply following them. A persona changes how the story is told, never what the dice decided.
+
 ## Card compatibility
 
 - **Import:** Character Card V2 and V3 (PNG with embedded data, `.json`, and V3 `.charx`). This works with cards from SillyTavern, Chub, etc.

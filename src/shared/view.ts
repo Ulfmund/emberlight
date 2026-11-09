@@ -1,4 +1,4 @@
-import type { CampaignSettings, CharacterBuild, CheckResult, GameState, SkillId } from './rules'
+import type { CampaignSettings, CharacterBuild, CheckResult, GameState, Hunger, SkillId, Weapon } from './rules'
 import type { Memory } from './memory'
 
 /** What the interface gets for one campaign. Built by the server from the save file. */
@@ -38,6 +38,13 @@ export type CampaignView = {
     renownTier: string
     xpIntoLevel: number
     xpForNext: number
+    defense: number
+    weapon: Weapon
+    /** Kilograms carried, and the comfortable limit. */
+    carried: number
+    capacity: number
+    load: 'none' | 'encumbered' | 'overloaded'
+    needs: { hunger: Hunger; exhaustion: number; hoursSinceMeal: number; hoursAwake: number }
   }
   /** Cards in this story: the player's own (for the portrait) and companions the DM plays. */
   cast: { cardId: string; role: 'player' | 'companion'; name: string; hasImage: boolean }[]

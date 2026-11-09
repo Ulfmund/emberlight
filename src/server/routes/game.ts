@@ -45,7 +45,16 @@ const SettingsSchema = z.object({
   failForward: z.boolean(),
   ironman: z.boolean(),
   tone: z.enum(['grim', 'grounded', 'heroic', 'whimsical', 'horror']),
-  length: z.enum(['short', 'medium', 'long'])
+  length: z.enum(['short', 'medium', 'long']),
+  combat: z.enum(['narrative', 'turn', 'mixed']),
+  survival: z.boolean(),
+  events: z.enum(['calm', 'normal', 'eventful', 'chaos']),
+  rolls: z.enum(['fewer', 'normal', 'more']),
+  acting: z.enum(['never', 'light']),
+  pacing: z.enum(['sandbox', 'guided']),
+  perspective: z.enum(['second', 'third']),
+  limits: z.string().max(1000),
+  persona: z.string().max(80)
 })
 
 const short = (n: number) => z.string().max(n)
@@ -143,10 +152,10 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
   })
 
   app.put('/api/campaigns/:id/settings', async (c) => {
-    const s = await body(c, SettingsSchema)
+    const s = await body(c, SettingsSchema.partial())
     if (!s) return c.json({ error: 'Invalid settings.' }, 400)
     const r = guard(() => {
-      campaigns.updateSettings(c.req.param('id'), s)
+      campaigns.updateSettings(c.req.param('id'), { ...campaigns.get(c.req.param('id')).settings, ...s })
       return campaigns.view(c.req.param('id'))
     })
     return r.ok ? c.json(r.value) : c.json({ error: r.error }, 404)
@@ -257,6 +266,25 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
     if (!b) return c.json({ error: 'That rename could not be read.' }, 400)
     const r = guard(() => {
       applyRename(campaigns, c.req.param('id'), b)
+      return campaigns.view(c.req.param('id'))
+    })
+    return r.ok ? c.json(r.value) : c.json({ error: r.error }, 400)
+  })
+
+  // ---- the pack (equip, take off, use, drop) ---------------------------------------------
+
+  app.post('/api/campaigns/:id/inventory', async (c) => {
+    const b = await body(
+      c,
+      z.object({
+        action: z.enum(['equip', 'unequip', 'use', 'drop']),
+        name: z.string().min(1).max(80),
+        slot: z.enum(['main', 'off', 'head', 'body', 'hands', 'feet', 'back', 'neck', 'ring1', 'ring2']).optional()
+      })
+    )
+    if (!b) return c.json({ error: 'That could not be read.' }, 400)
+    const r = guard(() => {
+      campaigns.inventoryAction(c.req.param('id'), b.action, b.name, b.slot)
       return campaigns.view(c.req.param('id'))
     })
     return r.ok ? c.json(r.value) : c.json({ error: r.error }, 400)

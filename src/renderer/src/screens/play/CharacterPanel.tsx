@@ -30,6 +30,25 @@ function journalLine(v: CampaignView) {
   return `${people} ${people === 1 ? 'person' : 'people'} · ${places} ${places === 1 ? 'place' : 'places'}`
 }
 
+/** Hunger, tiredness and load, when they're worth mentioning. */
+function bodyChips(view: CampaignView): { label: string; text: string; icon: string; bad: boolean }[] {
+  const out: { label: string; text: string; icon: string; bad: boolean }[] = []
+  const n = view.derived.needs
+  if (view.settings.survival || view.state.character.conditions.includes('hungry')) {
+    if (n.hunger !== 'fed')
+      out.push({
+        label: n.hunger === 'peckish' ? 'Peckish' : n.hunger === 'hungry' ? 'Hungry' : 'Starving',
+        text: n.hunger === 'peckish' ? `Last proper meal ${n.hoursSinceMeal} hours ago.` : n.hunger === 'hungry' ? '−1 to physical checks until you eat.' : '−2 to all checks, and sleep heals nothing until you eat.',
+        icon: 'bread',
+        bad: n.hunger !== 'peckish'
+      })
+  }
+  if (n.exhaustion) out.push({ label: n.exhaustion > 1 ? `Exhausted ${n.exhaustion}` : 'Exhausted', text: `−${n.exhaustion} to all checks. Awake ${n.hoursAwake} hours: sleep removes it.`, icon: 'moon', bad: true })
+  else if (view.settings.survival && n.hoursAwake >= 14) out.push({ label: 'Tired', text: `Awake ${n.hoursAwake} hours. Exhaustion sets in at 18.`, icon: 'moon', bad: false })
+  if (view.derived.load !== 'none') out.push({ label: view.derived.load === 'overloaded' ? 'Overloaded' : 'Encumbered', text: `Carrying ${view.derived.carried} of ${view.derived.capacity} kg: disadvantage on agility checks.`, icon: 'bag', bad: true })
+  return out
+}
+
 export function CharacterPanel({
   view,
   onOpenSheet,
@@ -159,9 +178,17 @@ export function CharacterPanel({
         </div>
       </Tip>
 
-      {c.conditions.length > 0 && (
+      {(c.conditions.length > 0 || bodyChips(view).length > 0) && (
         <div className="flex flex-wrap gap-1.5">
-          {c.conditions.map((id) => (
+          {bodyChips(view).map((chip) => (
+            <Tip key={chip.label} content={chip.text}>
+              <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${chip.bad ? 'border-blood-400/40 bg-blood-500/10 text-blood-400' : 'border-gold-500/30 bg-gold-500/10 text-gold-200'}`}>
+                <Icon name={chip.icon} size={12} />
+                {chip.label}
+              </motion.span>
+            </Tip>
+          ))}
+          {c.conditions.filter((id) => id !== 'hungry' && id !== 'exhausted').map((id) => (
             <Tip key={id} content={CONDITIONS[id].text}>
               <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${['well_fed', 'inspired', 'hidden'].includes(id) ? 'border-moss-400/40 bg-moss-400/10 text-moss-400' : 'border-blood-400/40 bg-blood-500/10 text-blood-400'}`}>
                 <Icon name={CONDITIONS[id].icon} size={12} />

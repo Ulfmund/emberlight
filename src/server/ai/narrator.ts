@@ -12,7 +12,14 @@ import {
   SKILLS,
   TIER_INFO,
   derived,
+  capacityKg,
+  carriedKg,
+  defenseValue,
+  encumbrance,
   generateName,
+  HUNGER_LABEL,
+  mainWeapon,
+  needs,
   skillLevelFromXp,
   type CampaignSettings,
   type CheckResult,
@@ -77,13 +84,17 @@ function memoryBlock(m?: MemoryText): string {
   return out
 }
 
+/** The DM's persona, resolved by the caller (a built-in one, or a character card). */
+export type PersonaText = { name: string; voice: string; ooc: 'follow' | 'argue'; fromCard?: boolean }
+
 export function narratorSystem(
   state: GameState,
   settings: CampaignSettings,
   names: string[],
   cast: CastMember[] = [],
   lore: CardBookEntry[] = [],
-  memory?: MemoryText
+  memory?: MemoryText,
+  persona?: PersonaText
 ): string {
   const c = state.character
   const b = c.build
@@ -100,12 +111,43 @@ export function narratorSystem(
   const hour = Math.floor(state.time.minute / 60)
   const timeOfDay = hour < 5 ? 'night' : hour < 8 ? 'dawn' : hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : hour < 20 ? 'evening' : 'night'
 
-  return `You are the Dungeon Master of a ${TONE[settings.tone]} fantasy roleplaying game.
+  // Gear, load and needs (docs/spec/04-rules-system.md#items-equipment-money).
+  const weapon = mainWeapon(c)
+  const worn = c.inventory.filter((i) => i.equipped && i.equipped !== 'main').map((i) => i.name)
+  const load = encumbrance(c)
+  const need = needs(state, settings.survival)
+  const tiredness = need.exhaustion ? `exhausted (level ${need.exhaustion}, awake ${need.hoursAwake} hours)` : need.hoursAwake >= 14 ? `tired (awake ${need.hoursAwake} hours)` : 'rested'
+  const gear = `Wielding: ${weapon.unarmed ? 'nothing (bare fists)' : weapon.name}. Wearing: ${worn.join(', ') || 'ordinary clothes'}. Defense ${defenseValue(c).total}.`
+  const carrying = `Carrying: ${c.inventory.map((i) => `${i.name}${i.qty > 1 ? ` ×${i.qty}` : ''}`).join(', ') || 'nothing'}; ${formatCoins(c.coins)}.${load !== 'none' ? ` ${load === 'overloaded' ? 'OVERLOADED' : 'ENCUMBERED'}: carrying ${carriedKg(c)} kg of a comfortable ${capacityKg(c)} kg.` : ''}`
+  const body = settings.survival ? `\nHunger: ${HUNGER_LABEL[need.hunger].toLowerCase()} (last proper meal ${need.hoursSinceMeal} hours ago). Tiredness: ${tiredness}.` : ''
+
+  const voice = persona?.voice.trim()
+    ? persona.fromCard
+      ? `\n\nYOUR VOICE AS DM\nYou are ${persona.name}, telling this story as its Dungeon Master. ${persona.voice.trim()}\nYour voice changes how the story is told, never what the dice decided.`
+      : `\n\nYOUR VOICE AS DM\n${persona.voice.trim()}\nYour voice changes how the story is told, never what the dice decided.`
+    : ''
+  const third = settings.perspective === 'third'
+  const ooc =
+    persona?.ooc === 'argue'
+      ? 'Text in ((double parentheses)) is the player talking to you out of character. You may push back, bargain, or grant it with a twist, in your own voice; never lie about what the dice decided, and never treat it as something the character said.'
+      : "Text in ((double parentheses)) is an out-of-character instruction to you: follow it and don't treat it as story."
+  const acting =
+    settings.acting === 'light'
+      ? `The player controls their character's choices, words and decisions. You may describe small involuntary reactions (a flinch, a shiver, a racing heart), but never what ${third ? b.name : 'they'} decide, say or think. Describe the world, other people, and the results of the character's actions, then stop and let the player act.`
+      : "The player controls their character completely. Never decide, say, think or feel anything on the player character's behalf. Describe the world, other people, and the results of the character's actions, then stop and let the player act."
+  const pacing =
+    settings.pacing === 'guided'
+      ? 'Keep a story moving: give the character a clear goal, raise the stakes, and steer gently toward the next turn of the plot, without taking choices away from the player.'
+      : "Let the player lead. Offer hooks and let the world react to what they do, but don't push a plot on them."
+  const limits = settings.limits.trim() ? `\n- Content to avoid, or to fade to black instead of describing: ${settings.limits.trim().replace(/\s+/g, ' ')}.` : ''
+
+  return `You are the Dungeon Master of a ${TONE[settings.tone]} fantasy roleplaying game.${voice}
 
 HOW TO RUN THE GAME
-- Write in second person ("you"), present tense, vivid but economical. Aim for ${LENGTH[settings.length]}.
-- The player controls their character completely. Never decide, say, think or feel anything on the player character's behalf. Describe the world, other people, and the results of the character's actions, then stop and let the player act.
-- In the player's messages, text "in quotation marks" is what the character says aloud; everything else is what they do. Text in ((double parentheses)) is an out-of-character instruction to you: follow it and don't treat it as story.
+- ${third ? `Write in third person about ${b.name}, present tense` : 'Write in second person ("you"), present tense'}, vivid but economical. Aim for ${LENGTH[settings.length]}.
+- ${acting}
+- In the player's messages, text "in quotation marks" is what the character says aloud; everything else is what they do. ${ooc}
+- ${pacing}${limits}
 - A game engine rolls the dice. When the player's message ends with a [GAME ENGINE] block, it states what happened. Narrate exactly that outcome. Never turn a failure into a success or a success into a failure, never ignore damage, and never rescue the character at the last moment.${settings.failForward ? ' On a narrow failure, the character may succeed at a cost instead.' : ''}
 - Match the outcome's strength: a critical success is memorable and brings something extra; a narrow success is a close call; a critical failure goes wrong in a way that matters.
 - Stay in the story. Never write out-of-character notes, questions or ((bracketed)) asides yourself. If the player's action doesn't quite fit the scene (it mentions someone who isn't there, or an item they don't have), interpret it in the most sensible way the scene allows and narrate that; what the dice decided still stands.
@@ -127,7 +169,8 @@ ${b.name}: ${RACES[b.race].label.toLowerCase()}, ${sex.label.toLowerCase()}, ${A
 Level ${c.level}. Health ${c.hp}/${d.maxHp}, stamina ${c.stamina}/${d.maxStamina}${d.maxMana ? `, mana ${c.mana}/${d.maxMana}` : ''}.${c.conditions.length ? `\nConditions: ${c.conditions.map((x) => CONDITIONS[x].label).join(', ')}.` : ''}
 Best skills: ${skills || 'none trained yet'}.
 Renown: ${tier}${deeds ? `, known for: ${deeds}` : ''}. ${renownGuide(tier, b.sex, settings)}
-Carrying: ${c.inventory.map((i) => `${i.name}${i.qty > 1 ? ` ×${i.qty}` : ''}`).join(', ') || 'nothing'}; ${formatCoins(c.coins)}.
+${gear}
+${carrying}${body}
 ${c.status === 'downed' ? 'STATUS: DOWNED: unconscious and dying.\n' : c.status === 'dead' ? 'STATUS: DEAD.\n' : ''}
 WHERE AND WHEN
 Day ${state.time.day}, ${timeOfDay}${state.location ? `, at ${state.location}` : ''}.${memoryBlock(memory)}${companionBlock(cast)}${loreBlock(lore)}`

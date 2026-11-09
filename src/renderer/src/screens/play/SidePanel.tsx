@@ -15,6 +15,9 @@ import {
   type CampaignSettings
 } from '@shared/rules'
 import type { CampaignView } from '@shared/view'
+import { findTemplate, itemTemplate, SLOT_LABEL, SLOTS } from '@shared/rules'
+import { formatCoins } from './CharacterPanel'
+import { LimitsField, PersonaPicker } from '../DmStyle'
 import { useGame } from '../../store'
 import { Icon } from '../../components/Icon'
 import { Tip } from '../../components/Tip'
@@ -143,28 +146,153 @@ function SheetTab({ view }: { view: CampaignView }) {
 }
 
 function BagTab({ view }: { view: CampaignView }) {
-  const inv = view.state.character.inventory
+  const inventory = useGame((x) => x.inventory)
+  const busy = useGame((x) => x.busy)
+  const [open, setOpen] = useState<string | null>(null)
+  const [confirmDrop, setConfirmDrop] = useState<string | null>(null)
+  const [error, setError] = useState('')
+  const c = view.state.character
+  const d = view.derived
+  const inv = c.inventory
+  const worn = SLOTS.map((slot) => ({ slot, item: inv.find((i) => i.equipped === slot) })).filter((x) => x.item || x.slot === 'main' || x.slot === 'body')
+  const pct = Math.min(100, (d.carried / Math.max(1, d.capacity)) * 100)
+  const act = async (action: 'equip' | 'unequip' | 'use' | 'drop', name: string) => {
+    setError('')
+    try {
+      await inventory(action, name)
+      setConfirmDrop(null)
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+  const coins = formatCoins(c.coins)
+
   return (
-    <div>
-      {inv.length === 0 && <p className="text-sm text-parchment-500 italic">Your pack is empty.</p>}
-      <div className="grid grid-cols-2 gap-2">
-        {inv.map((i) => (
-          <motion.div key={i.name} layout initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex items-center gap-2.5 rounded-lg border border-gold-500/15 bg-ink-850/80 p-2.5">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-gold-500/25 bg-ink-800 text-gold-300">
-              <Icon name={i.icon ?? 'bag'} size={18} />
-            </span>
-            <span className="min-w-0 text-sm leading-tight text-parchment-100">
-              {i.name}
-              {i.qty > 1 && <span className="ml-1 text-xs text-gold-300">×{i.qty}</span>}
-            </span>
-          </motion.div>
-        ))}
-      </div>
-      <p className="mt-4 text-xs text-parchment-500">
-        Items you find, buy or lose in the story are added here automatically. Equipment slots and crafting arrive in a later update.
-      </p>
+    <div className="space-y-5">
+      <section>
+        <div className="mb-1 flex justify-between text-xs">
+          <span className="text-parchment-400">Carrying</span>
+          <span className={`tabular-nums ${d.load === 'none' ? 'text-parchment-300' : 'text-blood-400'}`}>
+            {d.carried} / {d.capacity} kg{d.load === 'encumbered' ? ' · encumbered' : d.load === 'overloaded' ? ' · overloaded' : ''}
+          </span>
+        </div>
+        <div className="relative h-1.5 overflow-hidden rounded-full bg-ink-900">
+          <div className={`absolute inset-y-0 left-0 rounded-full ${d.load === 'none' ? 'bg-gold-400' : 'bg-blood-400'}`} style={{ width: `${pct}%` }} />
+        </div>
+        {d.load !== 'none' && <p className="mt-1 text-[0.7rem] text-blood-400">Too much weight: disadvantage on agility checks{d.load === 'overloaded' ? ', and on strength and endurance' : ''}.</p>}
+      </section>
+
+      <section>
+        <h3 className="mb-2 flex items-center justify-between text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">
+          Equipped
+          <Tip content="10 + Defense skill + armour + agility (heavy armour limits agility)">
+            <span className="rounded bg-gold-500/15 px-1.5 py-px text-gold-200 normal-case">Defense {d.defense}</span>
+          </Tip>
+        </h3>
+        <div className="space-y-1">
+          {worn.map(({ slot, item }) => {
+            const tpl = item ? itemTemplate(item.template) ?? findTemplate(item.name) : undefined
+            const detail = slot === 'main'
+              ? d.weapon.unarmed
+                ? 'bare fists, 1d3'
+                : `${d.weapon.dice[0]}d${d.weapon.dice[1]} + ${d.weapon.attr}${d.weapon.ammo ? ` · ${ammoLeft(view, d.weapon.ammo)}` : ''}`
+              : tpl?.armor
+                ? `+${tpl.armor.bonus} armour${tpl.armor.heavy ? ' · heavy' : ''}`
+                : ''
+            return (
+              <div key={slot} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-white/[0.03]">
+                <span className="w-20 shrink-0 text-[0.7rem] tracking-wide text-parchment-500 uppercase">{SLOT_LABEL[slot]}</span>
+                <span className={`min-w-0 flex-1 truncate ${item ? 'text-parchment-100' : 'text-parchment-500 italic'}`}>{item?.name ?? (slot === 'main' ? 'Nothing' : 'Ordinary clothes')}</span>
+                {detail && <span className="shrink-0 text-[0.7rem] text-parchment-400">{detail}</span>}
+                {item && (
+                  <button disabled={busy} onClick={() => void act('unequip', item.name)} className="no-drag shrink-0 cursor-pointer rounded p-1 text-parchment-500 hover:text-gold-200 disabled:opacity-30" title="Take it off">
+                    <Icon name="x" size={13} />
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
+      <section>
+        <h3 className="mb-2 flex items-center justify-between text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">
+          Pack
+          <span className="text-parchment-300 normal-case tabular-nums">
+            {coins.g ? `${coins.g}g ` : ''}
+            {coins.s ? `${coins.s}s ` : ''}
+            {coins.c || (!coins.g && !coins.s) ? `${coins.c}c` : ''}
+          </span>
+        </h3>
+        {inv.length === 0 && <p className="text-sm text-parchment-500 italic">Your pack is empty.</p>}
+        {error && <p className="mb-2 text-xs text-blood-400">{error}</p>}
+        <div className="space-y-1">
+          {inv.map((i) => {
+            const tpl = itemTemplate(i.template) ?? findTemplate(i.name)
+            const usable = Boolean(tpl && (tpl.food || tpl.heal || tpl.cures?.length))
+            const wearable = Boolean(tpl?.fit)
+            const isOpen = open === i.name
+            const weight = Math.round((tpl?.weight ?? 0.5) * i.qty * 10) / 10
+            return (
+              <div key={i.name} className={`rounded-lg border ${isOpen ? 'border-gold-400/40 bg-ink-850' : 'border-gold-500/10 bg-ink-850/60'}`}>
+                <button onClick={() => setOpen(isOpen ? null : i.name)} className="no-drag flex w-full cursor-pointer items-center gap-2.5 px-2.5 py-2 text-left">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-gold-500/25 bg-ink-800 text-gold-300">
+                    <Icon name={i.icon ?? tpl?.icon ?? 'bag'} size={16} />
+                  </span>
+                  <span className="min-w-0 flex-1 text-sm leading-tight text-parchment-100">
+                    {i.name}
+                    {i.qty > 1 && <span className="ml-1 text-xs text-gold-300">×{i.qty}</span>}
+                    {i.equipped && <span className="ml-1.5 rounded bg-gold-500/15 px-1 text-[0.62rem] text-gold-200">{SLOT_LABEL[i.equipped].toLowerCase()}</span>}
+                  </span>
+                  <span className="shrink-0 text-[0.7rem] text-parchment-500 tabular-nums">{weight} kg</span>
+                </button>
+                {isOpen && (
+                  <div className="flex flex-wrap items-center gap-1.5 border-t border-gold-500/10 px-2.5 py-2">
+                    <span className="mr-auto text-[0.7rem] text-parchment-400">{describe(tpl)}</span>
+                    {wearable && !i.equipped && (
+                      <Button size="sm" variant="secondary" disabled={busy} onClick={() => void act('equip', i.name)}>
+                        Equip
+                      </Button>
+                    )}
+                    {usable && (
+                      <Button size="sm" variant="secondary" disabled={busy} onClick={() => void act('use', i.name)}>
+                        {tpl?.food ? 'Eat' : 'Use'}
+                      </Button>
+                    )}
+                    <button
+                      disabled={busy}
+                      onClick={() => (confirmDrop === i.name ? void act('drop', i.name) : setConfirmDrop(i.name))}
+                      className={`no-drag cursor-pointer rounded-md px-2 py-1 text-xs ${confirmDrop === i.name ? 'bg-blood-500 text-parchment-50' : 'text-parchment-400 hover:text-blood-400'}`}
+                    >
+                      {confirmDrop === i.name ? 'Drop it?' : 'Drop'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+        <p className="mt-3 text-xs text-parchment-500">Things you find, buy or lose in the story are added here by themselves. Tap an item to equip, use or drop it.</p>
+      </section>
     </div>
   )
+}
+
+function ammoLeft(view: CampaignView, kind: 'arrow' | 'bolt' | 'stone') {
+  const a = view.state.character.inventory.find((i) => (itemTemplate(i.template) ?? findTemplate(i.name))?.ammoKind === kind)
+  return a ? `${a.qty} ${kind === 'stone' ? 'stones' : `${kind}s`}` : `no ${kind === 'stone' ? 'stones' : `${kind}s`}!`
+}
+
+/** One line about what an item does. */
+function describe(tpl: ReturnType<typeof findTemplate>): string {
+  if (!tpl) return 'An ordinary thing'
+  if (tpl.weapon) return `${tpl.weapon.skill === 'ranged' ? 'Ranged' : 'Melee'} ${tpl.weapon.dice[0]}d${tpl.weapon.dice[1]}${tpl.twoHanded ? ', two hands' : ''}${tpl.tool ? `; tool for ${tpl.tool.join(', ')}` : ''}`
+  if (tpl.armor) return `+${tpl.armor.bonus} armour${tpl.armor.maxAgi !== undefined ? `, agility up to +${tpl.armor.maxAgi}` : ''}${tpl.armor.heavy ? ', heavy' : ''}`
+  if (tpl.food) return `Food: ${tpl.food.hours >= 12 ? 'a full meal' : 'a bite'}${tpl.food.wellFed ? ', leaves you well-fed' : ''}`
+  if (tpl.heal) return `Heals ${tpl.heal[0]}d${tpl.heal[1]}${tpl.heal[2] ? ` + ${tpl.heal[2]}` : ''}${tpl.cures?.length ? `, stops ${tpl.cures.join(', ')}` : ''}`
+  if (tpl.cures?.length) return `Cures ${tpl.cures.join(', ')}`
+  if (tpl.tool) return `Tool for ${tpl.tool.join(', ')}`
+  return tpl.kind === 'material' ? 'Material for crafting' : tpl.kind.charAt(0).toUpperCase() + tpl.kind.slice(1)
 }
 
 function LogTab({ view }: { view: CampaignView }) {
@@ -235,6 +363,16 @@ function SavesTab({ view }: { view: CampaignView }) {
         <Opt k="length" label="Response length" options={[{ id: 'short', label: 'Short' }, { id: 'medium', label: 'Medium' }, { id: 'long', label: 'Long' }]} />
         <Opt k="failForward" label="Fail forward" options={[{ id: false, label: 'Off' }, { id: true, label: 'On' }]} />
         <Opt k="ironman" label="Ironman" options={[{ id: false, label: 'Off' }, { id: true, label: 'On' }]} />
+        <Opt k="survival" label="Hunger & sleep" options={[{ id: true, label: 'On' }, { id: false, label: 'Off' }]} />
+      </section>
+      <section>
+        <h3 className="mb-1 text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">DM style</h3>
+        <PersonaPicker value={s.persona} onChange={(persona) => set({ persona })} />
+        <Opt k="rolls" label="Rolls" options={[{ id: 'fewer', label: 'Fewer' }, { id: 'normal', label: 'Normal' }, { id: 'more', label: 'More' }]} />
+        <Opt k="pacing" label="Pacing" options={[{ id: 'sandbox', label: 'Sandbox' }, { id: 'guided', label: 'Guided story' }]} />
+        <Opt k="perspective" label="Perspective" options={[{ id: 'second', label: 'You (2nd person)' }, { id: 'third', label: 'Third person' }]} />
+        <Opt k="acting" label="Acting for you" options={[{ id: 'never', label: 'Never' }, { id: 'light', label: 'Small reactions' }]} />
+        <LimitsField value={s.limits} onSave={(limits) => set({ limits })} />
       </section>
     </div>
   )

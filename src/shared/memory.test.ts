@@ -158,7 +158,11 @@ describe('Scribe memory output', () => {
     conditionsOn: [],
     conditionsOff: [],
     people: [],
-    places: []
+    places: [],
+    placeKind: 'unknown',
+    ate: 'none',
+    itemsUsed: [],
+    itemsEquipped: []
   }
 
   it('records people and places, but never the player character or nameless extras', () => {
@@ -168,9 +172,9 @@ describe('Scribe memory output', () => {
         ...blank,
         location: 'The Wicker Goose',
         people: [
-          { name: 'Old Tam', otherNames: ['the ferryman'], who: 'ferryman at Millbrook', newFacts: ['owes Brenna a favour'], status: 'alive', attitude: 'friendly' },
-          { name: 'Brenna', otherNames: [], who: 'the hunter', newFacts: [], status: 'alive', attitude: 'unknown' },
-          { name: 'the tall guard', otherNames: [], who: 'a guard', newFacts: [], status: 'alive', attitude: 'neutral' }
+          { name: 'Old Tam', otherNames: ['the ferryman'], who: 'ferryman at Millbrook', newFacts: ['owes Brenna a favour'], status: 'alive', attitude: 'friendly', relation: 'none' },
+          { name: 'Brenna', otherNames: [], who: 'the hunter', newFacts: [], status: 'alive', attitude: 'unknown', relation: 'none' },
+          { name: 'the tall guard', otherNames: [], who: 'a guard', newFacts: [], status: 'alive', attitude: 'neutral', relation: 'none' }
         ],
         places: [{ name: 'Millbrook Crossing', what: 'a ferry landing', newFacts: [] }]
       },

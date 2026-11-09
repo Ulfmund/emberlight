@@ -136,6 +136,8 @@ describe('card files', () => {
 
   it('turns away lorebooks and junk politely', () => {
     expect(() => parseCardFile(new TextEncoder().encode('{"entries":{"0":{"key":["a"]}}}'), 'world.json')).toThrow(/lorebook/)
+    // Even a named one.
+    expect(() => parseCardFile(new TextEncoder().encode('{"name":"Thieves","entries":{"0":{"key":["a"],"content":"x"}}}'), 'thieves.json')).toThrow(/lorebook/)
     expect(() => parseCardFile(new TextEncoder().encode('hello'), 'x.txt')).toThrow(/isn't a character card/)
   })
 

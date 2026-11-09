@@ -120,11 +120,13 @@ export function fromJson(text: string): ParsedCard {
   const spec = str(raw.spec)
   // V2 and V3 keep everything under `data`; V1 has the fields at the top.
   const d = (spec === 'chara_card_v2' || spec === 'chara_card_v3') && isObj(raw.data) ? raw.data : isObj(raw.data) && !raw.name ? raw.data : raw
-  const name = str(d.name ?? d.char_name, 200).trim()
-  if (!name) {
-    if (Array.isArray(raw.entries) || isObj(raw.entries)) throw new CardError('This is a lorebook, not a character card. Lorebook import comes in a later update.')
-    throw new CardError("This file isn't a character card (it has no character name).")
+  // A lorebook (World Info file) has entries and none of a character's fields, even if it has a name.
+  const characterish = ['description', 'personality', 'first_mes', 'scenario', 'char_persona', 'char_greeting', 'mes_example'].some((k) => k in d)
+  if ((Array.isArray(raw.entries) || isObj(raw.entries)) && !spec && !characterish) {
+    throw new CardError('This is a lorebook, not a character card. Open Lorebooks (on the Adventure step, or Journal → Lore) to import it.')
   }
+  const name = str(d.name ?? d.char_name, 200).trim()
+  if (!name) throw new CardError("This file isn't a character card (it has no character name).")
   const data: CardData = {
     spec: spec === 'chara_card_v3' ? 'v3' : spec === 'chara_card_v2' ? 'v2' : 'v1',
     name,

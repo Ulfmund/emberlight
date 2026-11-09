@@ -203,6 +203,8 @@ Both sides roll (e.g. Stealth vs. Perception); the higher total wins, and the at
 
 A level-1 character with average END has about 21 HP. Most weapons deal 1d6–1d10 + STR modifier, so **three or four solid hits can kill.**
 
+*Built (0.8.0)* (`src/shared/rules/gear.ts`): hunger and tiredness are counted in minutes from the in-game clock. Fed under 8 hours since a proper meal, peckish to 16, hungry to 30 (−1 physical checks), then starving (−2 all checks, and sleep heals nothing). Awake 18 hours: Exhausted 1, and one more level every 8 hours (−1 all checks each); a long sleep clears it. A full meal (12 hours of food or more) leaves you fed whatever came before; a snack takes a few hours off. The Scribe reports eating, and food or medicine used from the pack, and the engine applies the item's effect.
+
 **Survival needs** (campaign toggle, on by default, light-touch):
 - **Hunger:** Fed → Peckish → Hungry → Starving. Each step gives growing penalties. Eating resets it; cooked meals can also give *Well-Fed* buffs.
 - **Fatigue:** going without sleep adds levels of *Exhausted* (−1 to all checks per level).
@@ -287,6 +289,8 @@ Renown is how widely and how well the character is known. It changes how people 
 ---
 
 ## Items, equipment, money
+
+*Built (0.8.0)* (`src/shared/rules/items.ts`, `gear.ts`): about a hundred item templates (weapons, armour, shields, clothing, tools, food, medicine, crafting materials). A name from the story is matched to the template whose name or alias it contains ("Rusty iron sword" → Sword), so the engine knows its weight, damage, armour and use. Starting kits are equipped automatically, and a weapon or armour found goes straight into an empty slot. Defense = 10 + Defense level / 5 + armour + AGI modifier (capped by the armour). Over STR × 5 kg: encumbered (disadvantage on AGI checks); over half again: overloaded (also STR and END checks). Heavy armour: disadvantage on Stealth. No tool for mining, woodcutting, fishing, hunting, smithing, alchemy or fletching: disadvantage. Coins weigh 1 kg per 100. The Bag tab equips, takes off, uses and drops things (events from the player). Not yet: per-item stat limits on DM-made items, and buying at listed prices.
 
 - **Equipment slots:** head, body, hands, feet, main hand, off hand, neck, 2 rings, back.
 - **Carrying capacity:** STR × 5 kg. Over the limit = Encumbered (disadvantage on AGI checks, slower travel).

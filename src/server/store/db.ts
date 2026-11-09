@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync, copyFileSync, existsSync, readdirSync, unlinkSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import type { CampaignSettings, CharacterBuild, GameEvent } from '@shared/rules'
+import { normalizeSettings, type CampaignSettings, type CharacterBuild, type GameEvent } from '@shared/rules'
 import type { CardData, CastMember } from '@shared/cards'
 import type { Lorebook } from '@shared/lore'
 
@@ -380,7 +380,7 @@ function toCampaign(r: Record<string, unknown>): CampaignRow {
     created_at: Number(r.created_at),
     updated_at: Number(r.updated_at),
     head_id: r.head_id == null ? null : String(r.head_id),
-    settings: JSON.parse(String(r.settings)),
+    settings: normalizeSettings(JSON.parse(String(r.settings))),
     build: JSON.parse(String(r.build)),
     cast: JSON.parse(String(r.cast_json ?? '[]')),
     lorebooks: JSON.parse(String(r.lore_json ?? '[]'))

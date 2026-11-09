@@ -50,12 +50,20 @@ Combat: an attack, parry or dodge is a check. Use melee, ranged or spellcasting 
 
 Speech in "quotes" is what the character says; social checks only when they are trying to change someone's mind (persuade, lie, threaten, haggle). Social checks normally have risk "none": a failed persuasion means they aren't convinced. Only give a social check risk if failing means violence breaks out at that very moment, and then the harm comes from the people present (riskSource "sentient").`
 
+/** The campaign's "roll frequency" DM setting. */
+const ROLL_FREQUENCY = {
+  fewer: '\n\nThis campaign wants FEWER rolls: call for a check only when failure would change the story in an interesting way.',
+  normal: '',
+  more: '\n\nThis campaign wants MORE rolls: whenever the outcome is at all uncertain, call for a check.'
+}
+
 export async function runReferee(
   provider: Provider,
   model: string,
   state: GameState,
   recent: ChatMessage[],
-  action: string
+  action: string,
+  rolls: 'fewer' | 'normal' | 'more' = 'normal'
 ): Promise<CheckRequest[]> {
   const c = state.character
   const skills = SKILL_IDS.map((s) => [s, skillLevelFromXp(c.skillXp[s] ?? 0)] as const)
@@ -69,7 +77,7 @@ export async function runReferee(
   const prompt = `Recent story:\n${context || '(the adventure is just starting)'}\n\nCharacter: ${c.build.name}, level ${c.level}. Trained skills: ${skills || 'none'}. Health ${c.hp}.\n\nThe player now writes:\n"""${action}"""\n\nWhich checks (if any) does this need?`
 
   const out = await provider.complete(model, {
-    system: SYSTEM,
+    system: SYSTEM + ROLL_FREQUENCY[rolls],
     messages: [{ role: 'user', content: prompt }],
     schema: RefereeSchema,
     name: 'referee'

@@ -161,6 +161,8 @@ Under *Campaign → DM Style*, as simple choices with icons:
 | Perspective | **Second person** ("you") · Third person |
 | Content limits | Free-text list of things to avoid or fade to black |
 
+*Built (0.8.0):* all of these except event frequency (it arrives with random events), in the creator's Adventure step and in-game under Saves. Roll frequency is told to the Referee; the rest to the narrator.
+
 ## No favoritism
 
 The artist's top complaint is that the AI goes easy on the player. Several layers deal with it:
