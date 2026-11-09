@@ -60,7 +60,9 @@ export function TitleScreen() {
           <motion.h1
             custom={1}
             variants={rise}
-            className="gold-text font-display text-[clamp(3rem,7vw,5.6rem)] leading-none font-bold tracking-[0.08em]"
+            // inline-block + nowrap: the box hugs the word, so the gold fill covers every letter
+            // (gradient text is invisible anywhere outside its own box).
+            className="gold-text inline-block pr-[0.08em] font-display text-[clamp(2.6rem,6vw,5.2rem)] leading-none font-bold tracking-[0.08em] whitespace-nowrap"
           >
             EMBERLIGHT
           </motion.h1>

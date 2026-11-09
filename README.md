@@ -30,7 +30,9 @@ This opens the app window. Changes to the interface reload instantly; changes un
 
 ## Making a new release (no command line)
 
-On GitHub: **Releases → Draft a new release**, type a new tag (e.g. `v0.0.2`), add a few notes, and click **Publish release**. The *Build installer* action (`.github/workflows/release.yml`) builds the Windows installer and attaches it to that release within ~10 minutes. The app's version number is taken from the tag.
+On GitHub: **Releases → Draft a new release**, type a new tag (e.g. `v0.0.4`), add a few notes, and click **Publish release**. The *Build installer* action (`.github/workflows/release.yml`) builds the Windows installer and attaches it, plus the update files, to that release within ~10 minutes. The app's version number is taken from the tag. Installed copies then show an **Update** button.
+
+Don't attach files to the release yourself: GitHub's download links for a file that gets replaced can fail for a while afterwards, so the workflow should be the only thing that uploads.
 
 ## Where things live
 

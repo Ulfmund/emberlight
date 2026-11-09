@@ -8,13 +8,13 @@ files:
   - package.json
 asarUnpack:
   - resources/**
-# Where the installed app looks for updates (public GitHub Releases).
-# The release workflow uploads the installer plus latest.yml and the .blockmap that the updater reads.
+# Where the installed app looks for updates: the files on the newest public GitHub Release.
+# GitHub redirects /releases/latest/download/<file> to that release's copy of <file>, so the app
+# reads latest.yml and downloads the installer with no page scraping or API rate limits.
+# The release workflow uploads the installer plus latest.yml and the .blockmap.
 publish:
-  provider: github
-  owner: Ulfmund
-  repo: emberlight
-  releaseType: release
+  provider: generic
+  url: https://github.com/Ulfmund/emberlight/releases/latest/download
 win:
   icon: resources/icon.ico
   target:

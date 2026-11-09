@@ -12,6 +12,7 @@ export type UpdateController = {
 }
 
 const RECHECK_MS = 4 * 60 * 60 * 1000
+const RETRY_MS = 5 * 60 * 1000
 
 /**
  * Self-update from the public GitHub Releases of Ulfmund/emberlight (configured under
@@ -48,11 +49,15 @@ export function createUpdater(): UpdateController {
     status = { state: 'ready', current, version: info.version }
   })
   autoUpdater.on('error', (err) => {
-    const offline = /ENOTFOUND|ECONNREFUSED|ETIMEDOUT|net::ERR/i.test(String(err?.message))
-    // Being offline isn't worth bothering the player about; just look again later.
-    status = offline
-      ? { state: 'none', current }
-      : { state: 'error', current, version: version || undefined, message: 'The update could not be downloaded. Try again later.' }
+    console.error('[updater]', err?.message ?? err)
+    if (status.state === 'downloading') {
+      // The player asked for this download, so tell them it failed (the button offers a retry).
+      status = { state: 'error', current, version, message: 'The update could not be downloaded. Try again later.' }
+    } else {
+      // A failed background check (offline, GitHub hiccup) isn't worth bothering anyone about.
+      status = version ? { state: 'available', current, version } : { state: 'none', current }
+      setTimeout(() => void check(), RETRY_MS)
+    }
   })
 
   const check = async () => {

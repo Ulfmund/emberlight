@@ -46,7 +46,12 @@ Click **Save connection**, then **Begin**.
 
 ## Updating
 
-When there's a new version, download the new installer from **Releases** and run it. It installs over the old one, and your settings are kept.
+Emberlight checks for new versions by itself. When one is out, a glowing **Update** button appears in the top bar (and on the title screen):
+
+1. Click **Update**. It downloads in the background while you keep playing.
+2. When it says **Restart to update**, click it. Emberlight closes, updates itself, and opens again a few seconds later. Your settings and keys are kept.
+
+(Versions older than 0.0.3 don't have the button. If you have one of those, install the newest version from **Releases** by hand once.)
 
 ## Something went wrong?
 
