@@ -19,9 +19,23 @@ const EntrySchema = z.object({
   group: z.string().max(80),
   scanDepth: z.number().int().min(1).max(100).nullable(),
   preventRecursion: z.boolean(),
-  excludeRecursion: z.boolean()
+  excludeRecursion: z.boolean(),
+  position: z.enum(['before_char', 'after_char', 'scene', 'depth']).default('scene'),
+  depth: z.number().int().min(0).max(100).default(4),
+  sticky: z.number().int().min(0).max(100).default(0),
+  cooldown: z.number().int().min(0).max(100).default(0),
+  delay: z.number().int().min(0).max(10_000).default(0),
+  characters: z.array(z.string().max(120)).max(40).default([]),
+  excludeCharacters: z.boolean().default(false)
 })
-const BookSchema = z.object({ id: z.string().max(80), name: z.string().max(120), description: z.string().max(2000), entries: z.array(EntrySchema).max(2000) })
+const BookSchema = z.object({
+  id: z.string().max(80),
+  name: z.string().max(120),
+  description: z.string().max(2000),
+  entries: z.array(EntrySchema).max(2000),
+  global: z.boolean().optional(),
+  budget: z.number().int().min(0).max(200_000).optional()
+})
 
 /** The lorebook library: list, import, edit, export. */
 export function registerLoreRoutes(app: Hono, lore: LoreLibrary) {

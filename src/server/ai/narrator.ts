@@ -72,10 +72,18 @@ ${comps.length === 1 ? 'This character travels' : 'These characters travel'} wit
 ${comps.map(one).join('\n\n')}`
 }
 
-/** Lorebook entries from the cast's cards that the recent story touches. */
+/** Lorebook entries the recent story touches, with the world notes (and in the other places they ask for). */
 export function loreBlock(entries: CardBookEntry[]): string {
-  if (!entries.length) return ''
-  return `\n\nWORLD NOTES (background facts; use them when they matter)\n${entries.map((e) => `- ${e.content.trim()}`).join('\n')}`
+  const here = entries.filter((e) => !e.position || e.position === 'scene')
+  if (!here.length) return ''
+  return `\n\nWORLD NOTES (background facts; use them when they matter)\n${here.map((e) => `- ${e.content.trim()}`).join('\n')}`
+}
+
+/** Entries placed before or after the character. */
+function loreAt(entries: CardBookEntry[], where: 'before_char' | 'after_char'): string {
+  const here = entries.filter((e) => e.position === where)
+  if (!here.length) return ''
+  return `${where === 'before_char' ? 'THE WORLD (keep these true)' : 'MORE ABOUT THE WORLD'}\n${here.map((e) => `- ${e.content.trim()}`).join('\n')}\n\n`
 }
 
 /** Long-term memory for the prompt: older story in summary, and people and places met. */
@@ -187,7 +195,7 @@ HOW TO RUN THE GAME
 - For new characters, prefer names from this list: ${names.join(', ')}. Never use these overused names: ${BANNED_NAMES.slice(0, 10).join(', ')}.
 - Avoid stock phrases ("a shiver ran down your spine", "a testament to", "barely above a whisper").${askRoll}${fight}
 
-THE PLAYER CHARACTER
+${loreAt(lore, 'before_char')}THE PLAYER CHARACTER
 ${b.name}: ${RACES[b.race].label.toLowerCase()}, ${sex.label.toLowerCase()}, ${AGES[b.age].label.toLowerCase()} (${AGES[b.age].years}), ${BACKGROUNDS[b.background].label.toLowerCase()}.${b.appearance ? `\nAppearance: ${b.appearance}` : ''}${b.personality ? `\nPersonality: ${b.personality}` : ''}
 Level ${c.level}. Health ${c.hp}/${d.maxHp}, stamina ${c.stamina}/${d.maxStamina}${d.maxMana ? `, mana ${c.mana}/${d.maxMana}` : ''}.${c.conditions.length ? `\nConditions: ${c.conditions.map((x) => CONDITIONS[x].label).join(', ')}.` : ''}
 Best skills: ${skills || 'none trained yet'}.
@@ -195,7 +203,7 @@ Renown: ${tier}${deeds ? `, known for: ${deeds}` : ''}. ${renownGuide(tier, b.se
 ${gear}
 ${carrying}${body}${magic}
 ${c.status === 'downed' ? 'STATUS: DOWNED: unconscious and dying.\n' : c.status === 'dead' ? 'STATUS: DEAD.\n' : ''}
-WHERE AND WHEN
+${loreAt(lore, 'after_char')}WHERE AND WHEN
 Day ${state.time.day}, ${timeOfDay}${state.location ? `, at ${state.location}` : ''}.${memoryBlock(memory)}${fallenBlock(state, third)}${companionBlock(cast)}${loreBlock(lore)}`
 }
 

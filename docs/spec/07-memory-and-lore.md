@@ -37,11 +37,20 @@ Each entry supports:
 | Token budget | Per-lorebook and global limits |
 | Semantic match (optional) | Triggers by meaning, not just keywords (needs embeddings) |
 
-**Built (0.6.1)** (`src/shared/lore.ts`): primary keys, secondary keys with all four logics, regex keys, case-sensitive and whole-word matching, constant entries, scan depth (default 4 messages), priority, probability, groups (highest priority wins), and recursion (2 rounds, with both opt-outs). When space is short, constant entries come first, then whatever came up most recently (an entry woken by recursion ranks just behind the one that woke it), then priority; the chosen entries are written in priority order. Lore gets about 2,500 / 6,000 / 10,000 characters on lean / standard / rich models. SillyTavern World Info files and card books import, and export back to World Info. Not yet: insertion positions (everything goes in the WORLD NOTES block), sticky / cooldown / delay, character filters, semantic matching, and per-book budgets.
+**Built (0.6.1)** (`src/shared/lore.ts`): primary keys, secondary keys with all four logics, regex keys, case-sensitive and whole-word matching, constant entries, scan depth (default 4 messages), priority, probability, groups (highest priority wins), and recursion (2 rounds, with both opt-outs). When space is short, constant entries come first, then whatever came up most recently (an entry woken by recursion ranks just behind the one that woke it), then priority; the chosen entries are written in priority order. Lore gets about 2,500 / 6,000 / 10,000 characters on lean / standard / rich models. SillyTavern World Info files and card books import, and export back to World Info. (Positions, sticky / cooldown / delay, character filters and per-book budgets followed in 0.15.0, below; semantic matching is still to come.)
+
+*Built (0.15.0)*: the rest of the table, except semantic matching:
+
+- **Insertion positions:** before the character (a "THE WORLD" block ahead of the character sheet), after the character, with the world notes (as before), or in the story itself N messages back (added to the player's message there as a "[World note: …]"; 0 = the newest message).
+- **Sticky / cooldown / delay:** each DM reply keeps the ids of the entries triggered for it. A sticky entry stays in for that many replies after a trigger, without its keyword and without a new chance roll; a cooldown then keeps it out for that many more, keyword or not; a delayed one can't be triggered before the story has that many messages.
+- **Character filters:** an entry for certain characters applies only when one of them is in the story (the player character, a companion, or someone named in the last few messages; first names count); "only when they're not there" turns it around.
+- **Per-book budgets:** a book's own limit, in characters, on top of the overall one. Card books' `token_budget` becomes this.
+- **Global books:** "Use in every adventure" adds a book to every story, attached or not.
+- All of these read from and write to SillyTavern World Info (`position` 0/1/2/4 and `depth`, `sticky`, `cooldown`, `delay`, `characterFilter`).
 
 Lorebooks can be linked to a **campaign** (world lore), a **card** (a character's personal lore), or kept **global**. The editor is a friendly form with a list on the left and the entry on the right, plus a "test" box: type a sentence and see which entries would fire.
 
-*Built (0.6.1):* a library of lorebooks (SQLite `lorebooks` table), attached to a campaign at creation (Adventure step) or later (Journal → Lore). Campaigns read their lorebooks live, so edits apply on the next turn. The editor saves by itself, can export, and has the test box. Card books stay linked to their card. "Global" books are not built yet.
+*Built (0.6.1):* a library of lorebooks (SQLite `lorebooks` table), attached to a campaign at creation (Adventure step) or later (Journal → Lore). Campaigns read their lorebooks live, so edits apply on the next turn. The editor saves by itself, can export, and has the test box. Card books stay linked to their card. Global books: 0.15.0.
 
 ---
 

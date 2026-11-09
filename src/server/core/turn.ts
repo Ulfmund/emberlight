@@ -32,7 +32,7 @@ import {
 } from '@shared/rules'
 import type { ChatMessage, Connection } from '@shared/types'
 import type { MessageView, TurnEvent } from '@shared/view'
-import { normalizeEntry, selectLore } from '@shared/lore'
+import { normalizeEntry, selectLoreDetailed } from '@shared/lore'
 import { DEFAULT_PERSONA, findPersona, personaCardId } from '@shared/personas'
 import { fillMacros, storyName } from '@shared/cards'
 import { estimateTokens, promptBlocks, type PromptReport } from '@shared/inspect'
@@ -516,7 +516,26 @@ export class TurnEngine {
     // Lorebook entries (the story's lorebooks and the cast's cards) wake up when the recent story
     // mentions their keywords. The newest message includes the engine's notes for this turn.
     const loreEntries = [...this.campaigns.loreEntries(c), ...c.cast.flatMap((m) => m.book.map(normalizeEntry))]
-    const lore = selectLore(loreEntries, history.map((m) => m.content), { budgetChars: tier.lore, rng: this.rng })
+    // Timed entries: how many replies ago each was last triggered (sticky, cooldown).
+    const firedAgo = new Map<string, number>()
+    let replies = 0
+    for (let i = path.length - 1; i >= 0; i--) {
+      if (path[i].role !== 'assistant') continue
+      replies++
+      for (const lid of path[i].meta.lore ?? []) if (!firedAgo.has(lid)) firedAgo.set(lid, replies)
+    }
+    // Who's in the story, for entries meant for certain characters.
+    const recentText = path.slice(-4).map((m) => m.content).join('\n').toLowerCase()
+    const named = memory.entities.filter((e) => e.kind === 'person' && [e.name, ...e.aliases].some((n) => n.trim().length > 2 && recentText.includes(n.toLowerCase()))).map((e) => e.name)
+    const present = [after.character.build.name, ...c.cast.map((m) => m.name), ...named]
+    const picked = selectLoreDetailed(loreEntries, history.map((m) => m.content), { budgetChars: tier.lore, rng: this.rng, firedAgo, messages: path.length, present, bookBudgets: this.campaigns.loreBudgets(c) })
+    const lore = picked.entries.filter((e) => e.position !== 'depth')
+    // Entries placed in the story itself, a number of messages back (in the player's message there).
+    for (const e of picked.entries.filter((x) => x.position === 'depth')) {
+      let at = Math.max(0, history.length - 1 - e.depth)
+      while (at > 0 && history[at].role !== 'user') at--
+      if (history[at]?.role === 'user') history[at] = { ...history[at], content: `${history[at].content}\n\n[World note: ${e.content.trim()}]` }
+    }
     const me = after.character.build.name
     const people = relevantEntities(memory, path.slice(-6).map((m) => m.content).join('\n'), after.location, tier.people, [me])
       .map((e) => entityLine(e, tier.facts))
@@ -597,7 +616,7 @@ export class TurnEngine {
     this.campaigns.db.updateMessage(dm.id, {
       content: clean,
       thinking,
-      meta: { kind: 'narration', requestCheck: request, error, notice }
+      meta: { kind: 'narration', requestCheck: request, error, notice, lore: picked.triggered.length ? picked.triggered : undefined }
     })
 
     // The DM set foes on the character: the engine runs the fight from the next turn.

@@ -13,6 +13,7 @@ import { CardLibrary } from '../cards/library'
 import { LoreLibrary } from '../lore/library'
 import { findWorld } from '@shared/worlds'
 import { applyRename } from './rename'
+import { normalizeEntry } from '@shared/lore'
 
 /** A scripted stand-in for a model: the test decides what the Referee, Narrator and Scribe say. */
 class FakeProvider implements Provider {
@@ -714,6 +715,33 @@ describe('turn engine', () => {
     const theirs = db.addMedia({ campaignId: other, kind: 'story', mime: 'image/png', data: new Uint8Array([1]) })
     const bad = await run(engine.act(id, 'Look.', signal, { image: theirs }))
     expect(bad.find((e) => e.type === 'error')).toMatchObject({ message: expect.stringMatching(/no longer there/) })
+  })
+
+  it('places lore where it asks to go, keeps sticky entries in, and uses books meant for every adventure', async () => {
+    db.saveLorebook({
+      id: 'lb_all',
+      name: 'Everywhere',
+      description: '',
+      global: true,
+      entries: [
+        normalizeEntry({ id: 'deep', name: 'Deep', keys: ['raven'], content: 'Ravens here carry messages for the Duke.', position: 'depth', depth: 0, sticky: 1 }),
+        normalizeEntry({ id: 'first', name: 'First', constant: true, content: 'Magic is rare and feared.', position: 'before_char' })
+      ]
+    })
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    // The global book applies, and a constant entry sits before the character.
+    expect(fake.lastSystem).toMatch(/THE WORLD \(keep these true\)\n- Magic is rare and feared\.\n\nTHE PLAYER CHARACTER/)
+    await run(engine.act(id, 'A raven lands on the fence.', signal))
+    // A depth-0 entry goes into the newest message, not the instructions.
+    expect(fake.lastMessages.at(-1)!.content).toContain('[World note: Ravens here carry messages for the Duke.]')
+    expect(fake.lastSystem).not.toContain('Ravens here carry')
+    expect(db.getMessage(campaigns.view(id).messages.at(-1)!.id)?.meta.lore).toContain('deep')
+    // Sticky for one reply: in again next turn without the word, then gone.
+    await run(engine.act(id, 'I walk on.', signal))
+    expect(fake.lastMessages.at(-1)!.content).toContain('[World note: Ravens')
+    await run(engine.act(id, 'I keep walking.', signal))
+    expect(fake.lastMessages.at(-1)!.content).not.toContain('[World note: Ravens')
   })
 
   it('brings random events now and then, and not one after another', async () => {

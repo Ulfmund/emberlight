@@ -37,7 +37,7 @@ import type { CastMember } from '@shared/cards'
 import { projectMemory, type MemoryEvent } from '@shared/memory'
 import { normalizeEntry, type LoreEntry } from '@shared/lore'
 import type { World } from '@shared/worlds'
-import { GameDb, newId, type CampaignRow, type EventRow, type MessageRow } from '../store/db'
+import { GameDb, newId, type CampaignRow, type EventRow, type LorebookRow, type MessageRow } from '../store/db'
 
 export const OPENING_TEXT = '((Begin the adventure: set an opening scene for my character.))'
 
@@ -412,8 +412,21 @@ export class Campaigns {
   }
 
   /** The entries of this story's lorebooks, read fresh so edits in the library apply at once. */
-  loreEntries(c: CampaignRow): LoreEntry[] {
-    return c.lorebooks.flatMap((lid) => this.db.getLorebook(lid)?.entries.map(normalizeEntry) ?? [])
+  /** The story's lorebooks, and every book marked for all adventures. */
+  private loreBooks(c: CampaignRow): LorebookRow[] {
+    const ids = new Set(c.lorebooks)
+    for (const b of this.db.listLorebooks()) if (b.global) ids.add(b.id)
+    return [...ids].map((lid) => this.db.getLorebook(lid)).filter((b): b is LorebookRow => b !== null)
+  }
+
+  /** Entries for the DM, each tagged with its book (for that book's own budget). */
+  loreEntries(c: CampaignRow): (LoreEntry & { book: string })[] {
+    return this.loreBooks(c).flatMap((b) => b.entries.map((e) => ({ ...normalizeEntry(e), book: b.id })))
+  }
+
+  /** Books with a character limit of their own. */
+  loreBudgets(c: CampaignRow): Record<string, number> {
+    return Object.fromEntries(this.loreBooks(c).filter((b) => (b.budget ?? 0) > 0).map((b) => [b.id, b.budget!]))
   }
 
   /**

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { LOGIC_LABEL, normalizeEntry, newEntryId, selectLore, type LoreEntry, type Lorebook, type LorebookSummary, type SecondaryLogic } from '@shared/lore'
+import { LOGIC_LABEL, normalizeEntry, newEntryId, POSITION_LABEL, selectLore, type LoreEntry, type Lorebook, type LorebookSummary, type LorePosition, type SecondaryLogic } from '@shared/lore'
 import { api } from '../api'
 import { Button } from '../components/Button'
 import { Icon } from '../components/Icon'
@@ -233,6 +233,15 @@ function BookEditor({ id, onChanged, onDeleted }: { id: string; onChanged: () =>
           <span className="w-16 shrink-0 text-right text-[0.7rem] text-parchment-500">{state === 'saved' ? 'Saved' : state === 'saving' ? 'Saving…' : state === 'error' ? <span className="text-blood-400">Not saved</span> : '…'}</span>
         </div>
         <textarea value={book.description} onChange={(e) => change({ ...book, description: e.target.value })} rows={1} placeholder="What this lorebook is about (for you; the DM doesn't see this)" className="input resize-y py-1.5 text-sm" />
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-parchment-300">
+          <Check on={Boolean(book.global)} onChange={(v) => change({ ...book, global: v })}>
+            Use in every adventure
+          </Check>
+          <label className="flex items-center gap-2">
+            <span className="text-xs text-parchment-400">Most it may add (characters, 0 = no limit)</span>
+            <input type="number" min={0} step={500} value={book.budget ?? 0} onChange={(e) => change({ ...book, budget: Math.max(0, Math.round(Number(e.target.value) || 0)) })} className="input w-24 py-1 text-sm" />
+          </label>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-48 flex-1">
             <Icon name="sparkle" size={15} className="absolute top-1/2 left-3 -translate-y-1/2 text-ember-400" />
@@ -299,6 +308,7 @@ function EntryCard({
   // Key fields are edited as text so typing a comma doesn't fight the cursor.
   const [keys, setKeys] = useState(csv(e.keys))
   const [sec, setSec] = useState(csv(e.secondaryKeys))
+  const [chars, setChars] = useState(csv(e.characters))
   return (
     <div className={`rounded-xl border bg-ink-850/80 transition-colors ${fired ? 'border-ember-400/70 shadow-[0_0_20px_-8px_rgb(255_122_47/0.8)]' : open ? 'border-gold-400/50' : 'border-gold-500/15'} ${e.enabled ? '' : 'opacity-60'}`}>
       <button onClick={onToggle} className="no-drag flex w-full cursor-pointer items-start gap-3 px-4 py-3 text-left">
@@ -395,6 +405,47 @@ function EntryCard({
                   Other entries can't wake it
                 </Check>
               </div>
+              <Field label="Where the DM is told it">
+                <div className="flex gap-2">
+                  <select value={e.position} onChange={(x) => onChange({ position: x.target.value as LorePosition })} className="input min-w-0 flex-1 py-1.5 text-sm">
+                    {(Object.keys(POSITION_LABEL) as LorePosition[]).map((p) => (
+                      <option key={p} value={p}>
+                        {POSITION_LABEL[p]}
+                      </option>
+                    ))}
+                  </select>
+                  {e.position === 'depth' && (
+                    <input type="number" min={0} max={100} value={e.depth} onChange={(x) => onChange({ depth: Math.max(0, Math.min(100, Math.round(Number(x.target.value) || 0))) })} className="input w-16 py-1.5 text-sm" aria-label="Messages back" title="Messages back (0 = the newest)" />
+                  )}
+                </div>
+              </Field>
+              <Field label="Only with these characters (comma between)">
+                <input
+                  value={chars}
+                  onChange={(x) => {
+                    setChars(x.target.value)
+                    onChange({ characters: fromCsv(x.target.value) })
+                  }}
+                  placeholder="anyone"
+                  className="input py-1.5 text-sm"
+                />
+                {e.characters.length > 0 && (
+                  <span className="mt-1.5 block">
+                    <Check on={e.excludeCharacters} onChange={(v) => onChange({ excludeCharacters: v })}>
+                      Only when they're not there
+                    </Check>
+                  </span>
+                )}
+              </Field>
+              <Field label="Stays in for (replies)">
+                <input type="number" min={0} max={100} value={e.sticky} onChange={(x) => onChange({ sticky: Math.max(0, Math.min(100, Math.round(Number(x.target.value) || 0))) })} className="input py-1.5 text-sm" />
+              </Field>
+              <Field label="Then rests for (replies)">
+                <input type="number" min={0} max={100} value={e.cooldown} onChange={(x) => onChange({ cooldown: Math.max(0, Math.min(100, Math.round(Number(x.target.value) || 0))) })} className="input py-1.5 text-sm" />
+              </Field>
+              <Field label="Not before message number">
+                <input type="number" min={0} max={10000} value={e.delay} onChange={(x) => onChange({ delay: Math.max(0, Math.min(10_000, Math.round(Number(x.target.value) || 0))) })} className="input py-1.5 text-sm" />
+              </Field>
             </div>
           </details>
           <div className="flex justify-end">

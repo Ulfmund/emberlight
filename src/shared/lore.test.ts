@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fromWorldInfo, keysMatch, normalizeEntry, selectLore, toWorldInfo, type LoreEntry } from './lore'
+import { fromWorldInfo, keysMatch, normalizeEntry, selectLore, selectLoreDetailed, toWorldInfo, type LoreEntry } from './lore'
 
 const e = (p: Partial<LoreEntry>): LoreEntry => normalizeEntry({ content: p.name ?? 'x', ...p })
 const names = (xs: LoreEntry[]) => xs.map((x) => x.name)
@@ -51,6 +51,58 @@ describe('lore matching', () => {
     const big = e({ name: 'big', constant: true, content: 'x'.repeat(500) })
     const small = e({ name: 'small', keys: ['sky'], content: 'y'.repeat(600) })
     expect(names(selectLore([big, small], ['The sky.'], { budgetChars: 800 }))).toEqual(['big'])
+  })
+})
+
+describe('timed, filtered and placed entries', () => {
+  const opts = { budgetChars: 10_000, rng: () => 0 }
+
+  it('sticky entries stay in for a few replies; cooldowns keep them out; delays wait', () => {
+    const tower = e({ id: 'tower', name: 'Tower', keys: ['tower'], sticky: 2, cooldown: 2 })
+    const quiet = ['The road is quiet.']
+    // Just triggered: in, and counted as triggered.
+    expect(selectLoreDetailed([tower], ['A tower rises.'], opts)).toEqual({ entries: [tower], triggered: ['tower'] })
+    // Triggered one or two replies ago: still in without its keyword, but not triggered again.
+    expect(selectLoreDetailed([tower], quiet, { ...opts, firedAgo: new Map([['tower', 2]]) })).toEqual({ entries: [tower], triggered: [] })
+    // Then two replies of rest, even when the keyword comes up.
+    expect(selectLore([tower], ['The tower again.'], { ...opts, firedAgo: new Map([['tower', 3]]) })).toEqual([])
+    expect(selectLore([tower], ['The tower again.'], { ...opts, firedAgo: new Map([['tower', 5]]) })).toEqual([tower])
+    // Not before the story's tenth message.
+    const late = e({ name: 'Late', keys: ['tower'], delay: 10 })
+    expect(selectLore([late], ['The tower.'], { ...opts, messages: 9 })).toEqual([])
+    expect(selectLore([late], ['The tower.'], { ...opts, messages: 10 })).toEqual([late])
+  })
+
+  it('only for certain characters, or only without them', () => {
+    const secret = e({ name: 'Secret', keys: ['ring'], characters: ['Elara'] })
+    const other = e({ name: 'Other', keys: ['ring'], characters: ['Elara'], excludeCharacters: true })
+    expect(names(selectLore([secret, other], ['A ring.'], { ...opts, present: ['Brenna Rook', 'Elara Moonbrook'] }))).toEqual(['Secret'])
+    expect(names(selectLore([secret, other], ['A ring.'], { ...opts, present: ['Brenna Rook'] }))).toEqual(['Other'])
+  })
+
+  it('a book can have a limit of its own', () => {
+    const a = { ...e({ name: 'A', keys: ['x'], content: 'a'.repeat(60), priority: 2 }), book: 'small' }
+    const b = { ...e({ name: 'B', keys: ['x'], content: 'b'.repeat(60), priority: 1 }), book: 'small' }
+    const c = { ...e({ name: 'C', keys: ['x'], content: 'c'.repeat(60) }), book: 'big' }
+    // B doesn't fit in its book's 100 characters; C's book has no limit. (Written in priority order.)
+    expect(names(selectLore([a, b, c], ['x'], { ...opts, bookBudgets: { small: 100 } }))).toEqual(['C', 'A'])
+  })
+
+  it('positions, timing and filters go to and from SillyTavern', () => {
+    const wi = {
+      entries: {
+        0: { key: ['a'], content: 'A', position: 0 },
+        1: { key: ['b'], content: 'B', position: 4, depth: 2, sticky: 3, cooldown: 1, delay: 5, characterFilter: { isExclude: true, names: ['Elara'] } },
+        2: { key: ['c'], content: 'C', position: 2 }
+      }
+    }
+    const book = fromWorldInfo(wi)
+    expect(book.entries.map((x) => x.position)).toEqual(['before_char', 'depth', 'scene'])
+    expect(book.entries[1]).toMatchObject({ depth: 2, sticky: 3, cooldown: 1, delay: 5, characters: ['Elara'], excludeCharacters: true })
+    const back = fromWorldInfo(toWorldInfo({ id: 'x', ...book }))
+    expect(back.entries.map((x) => [x.position, x.depth, x.sticky, x.characters])).toEqual(book.entries.map((x) => [x.position, x.depth, x.sticky, x.characters]))
+    // A card book's token budget becomes the book's limit.
+    expect(fromWorldInfo({ entries: [{ keys: ['a'], content: 'A' }], token_budget: 500 }).budget).toBe(1500)
   })
 })
 

@@ -17,7 +17,7 @@ export class LoreLibrary {
 
   get(id: string): Lorebook | null {
     const r = this.db.getLorebook(id)
-    return r ? { id: r.id, name: r.name, description: r.description, entries: r.entries.map(normalizeEntry) } : null
+    return r ? { id: r.id, name: r.name, description: r.description, entries: r.entries.map(normalizeEntry), global: r.global, budget: r.budget } : null
   }
 
   create(name: string): Lorebook {
@@ -64,5 +64,5 @@ export class LoreLibrary {
 }
 
 function summary(r: LorebookRow): LorebookSummary {
-  return { id: r.id, name: r.name, description: r.description, entries: r.entries.length, builtin: r.builtin, updatedAt: r.updated_at }
+  return { id: r.id, name: r.name, description: r.description, entries: r.entries.length, builtin: r.builtin, updatedAt: r.updated_at, global: r.global }
 }

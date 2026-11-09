@@ -29,6 +29,8 @@ export type MessageMeta = {
   /** A picture the player showed with this message (media id), and what it shows, in words. */
   image?: string
   imageText?: string
+  /** DM replies: lorebook entries triggered for it (for sticky and cooldown later). */
+  lore?: string[]
 }
 
 /** What a stored picture is for. */
@@ -176,6 +178,9 @@ export class GameDb {
     const cols = (this.db.prepare('PRAGMA table_info(campaigns)').all() as { name: string }[]).map((c) => c.name)
     if (!cols.includes('cast_json')) this.db.exec("ALTER TABLE campaigns ADD COLUMN cast_json TEXT NOT NULL DEFAULT '[]'")
     if (!cols.includes('lore_json')) this.db.exec("ALTER TABLE campaigns ADD COLUMN lore_json TEXT NOT NULL DEFAULT '[]'")
+    const loreCols = (this.db.prepare('PRAGMA table_info(lorebooks)').all() as { name: string }[]).map((c) => c.name)
+    if (!loreCols.includes('global')) this.db.exec('ALTER TABLE lorebooks ADD COLUMN global INTEGER NOT NULL DEFAULT 0')
+    if (!loreCols.includes('budget')) this.db.exec('ALTER TABLE lorebooks ADD COLUMN budget INTEGER NOT NULL DEFAULT 0')
     this.db.prepare("UPDATE meta SET value = '4' WHERE key = 'schema_version' AND CAST(value AS INTEGER) < 4").run()
   }
 
@@ -261,10 +266,10 @@ export class GameDb {
     const now = Date.now()
     this.db
       .prepare(
-        `INSERT INTO lorebooks (id, name, description, entries, builtin, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET name = excluded.name, description = excluded.description, entries = excluded.entries, updated_at = excluded.updated_at`
+        `INSERT INTO lorebooks (id, name, description, entries, builtin, global, budget, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET name = excluded.name, description = excluded.description, entries = excluded.entries, global = excluded.global, budget = excluded.budget, updated_at = excluded.updated_at`
       )
-      .run(b.id, b.name, b.description, JSON.stringify(b.entries), builtin ? 1 : 0, now, now)
+      .run(b.id, b.name, b.description, JSON.stringify(b.entries), builtin ? 1 : 0, b.global ? 1 : 0, Math.max(0, Math.round(b.budget ?? 0)), now, now)
   }
 
   getLorebook(id: string): LorebookRow | null {
@@ -444,6 +449,8 @@ function toLorebook(r: Record<string, unknown>): LorebookRow {
     description: String(r.description ?? ''),
     entries: JSON.parse(String(r.entries)),
     builtin: Number(r.builtin) === 1,
+    global: Number(r.global ?? 0) === 1,
+    budget: Number(r.budget ?? 0),
     created_at: Number(r.created_at),
     updated_at: Number(r.updated_at)
   }
