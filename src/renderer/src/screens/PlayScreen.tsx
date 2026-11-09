@@ -11,6 +11,7 @@ import { DiceTray } from './play/DiceTray'
 import { DeathScreen, Toasts } from './play/Overlays'
 import { Journal } from './play/Journal'
 import { Inspector } from './play/Inspector'
+import { ReconcileDialog } from './play/ReconcileDialog'
 import { SkipDialog } from './play/SkipDialog'
 import { MobileDrawer, MobileStatus } from './play/Mobile'
 import { CombatTracker } from './play/CombatTracker'
@@ -87,6 +88,7 @@ export function PlayScreen() {
       <SkipDialog view={view} open={skipping} onClose={() => setSkipping(false)} onSkip={(text, plan) => void act(text, { skip: plan })} />
       <Journal view={view} open={journal} onClose={() => setJournal(false)} />
       <Inspector campaignId={view.id} open={inspector} onClose={() => setInspector(false)} />
+      <ReconcileDialog />
       <Toasts />
       <LevelUpPillar />
       <DeathScreen view={view} />
@@ -215,6 +217,14 @@ function Composer({
       el.setSelectionRange(el.value.length, el.value.length)
     })
   }
+
+  // A move that waited for this screen to catch up hands its words back, to send again.
+  const restore = useGame((s) => s.restoreDraft)
+  useEffect(() => {
+    if (restore === null) return
+    setText((cur) => cur || restore)
+    useGame.setState({ restoreDraft: null })
+  }, [restore])
 
   const submit = () => {
     const t = text.trim()

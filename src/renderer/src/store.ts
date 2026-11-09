@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { SettingsView } from '@shared/types'
 import type { Attr, CampaignSettings, CharacterBuild, CheckResult, CombatAction, RaceId, SkipPlan, Work } from '@shared/rules'
-import type { CampaignSummary, CampaignView, MessageView, TurnEvent } from '@shared/view'
+import type { CampaignSummary, CampaignView, Comparison, MessageView, TurnEvent } from '@shared/view'
 import { api, showingHead, type CreateOptions } from './api'
 import type { MemoryEvent } from '@shared/memory'
 import { play } from './sound'
@@ -39,6 +39,13 @@ type State = {
   busy: boolean
   /** The DM is answering a turn sent from another screen (sync.ts). */
   elsewhere: boolean
+  /** The story split between screens: this one's version and the latest (ReconcileDialog). */
+  conflict: Conflict | null
+  /** Text held back from a move that waited for this screen to catch up, for the input box. */
+  restoreDraft: string | null
+  resolveConflict(choice: 'latest' | 'mine'): Promise<void>
+  /** The story changed elsewhere: follow it if it only carried on from here, else ask (sync.ts). */
+  reconcile(): Promise<void>
   live: Live
   abort: AbortController | null
   toasts: Toast[]
@@ -91,6 +98,9 @@ type State = {
 
 let toastId = 0
 
+/** The story split between screens (ReconcileDialog): this one's head, both versions, a held-back move. */
+export type Conflict = { mine: string | null; ahead: Comparison['ahead']; behind: Comparison['behind']; retry?: () => Promise<void>; draft?: string }
+
 export const useGame = create<State>((set, get) => {
   /** Compare before/after views and celebrate level-ups and new skill levels. */
   const announce = (before: CampaignView | null, after: CampaignView) => {
@@ -137,16 +147,68 @@ export const useGame = create<State>((set, get) => {
     announce(before, view)
   }
 
-  /** Another screen moved the story on: say so, and show it as it stands. */
-  const caughtUp = (err: unknown) => {
-    get().toast({ title: 'The story moved on', text: (err as Error).message, tone: 'info', icon: 'rewind' })
-    void get().refresh()
+  /**
+   * This screen shows a story that has changed since. If the other screen only carried it on,
+   * catch up (and hand back any typing, to send again once it's been read). If the story split,
+   * ask which version to keep (ReconcileDialog); a move held back runs after "keep this screen's".
+   */
+  const reconcileWith = async (v: CampaignView, retry?: () => Promise<void>, draft?: string) => {
+    let diff: Comparison
+    try {
+      diff = await api.compare(v.id, v.headId)
+    } catch {
+      return void get().refresh()
+    }
+    if (!diff.behind.length) {
+      await get().refresh()
+      if (draft) set({ restoreDraft: draft })
+      if (diff.ahead.length) get().toast({ title: 'Caught up', text: 'The story moved on from your other screen.', tone: 'info', icon: 'rewind' })
+      return
+    }
+    set({ conflict: { mine: v.headId, ahead: diff.ahead, behind: diff.behind, retry, draft } })
   }
 
+  /** Before a move: is this screen showing the story as it stands? If not, reconcile first. */
+  const upToDate = async (retry: () => Promise<void>, draft?: string): Promise<boolean> => {
+    const v = get().view
+    if (!v) return false
+    try {
+      const s = await api.stamp(v.id)
+      if ((s.head ?? null) === (v.headId ?? null)) return true
+    } catch {
+      return true // the server checks again anyway
+    }
+    await reconcileWith(v, retry, draft)
+    return false
+  }
+
+  /** After Stop: the server is still saving what was written; wait for it before looking. */
+  const settle = async (id: string) => {
+    for (let i = 0; i < 40; i++) {
+      try {
+        if (!(await api.stamp(id)).answering) return
+      } catch {
+        return
+      }
+      await new Promise((r) => setTimeout(r, 250))
+    }
+  }
+
+  /** Another screen moved the story on (a refused rewind or switch): reconcile, then try again if kept. */
+  const caughtUp = (v: CampaignView, retry: () => Promise<void>) => void reconcileWith(v, retry)
+
   /** Runs one streamed turn endpoint and folds its events into the view. */
-  const run = async (path: string, body: unknown) => {
-    const view = get().view
+  const run = async (path: string, body: unknown, checked = false): Promise<void> => {
+    let view = get().view
     if (!view || get().busy) return
+    // A move from a screen that's behind waits until it has caught up (narrating is the server's to check).
+    if (!checked && path !== 'narrate') {
+      const draft = path === 'act' ? (body as { text?: string }).text : undefined
+      if (!(await upToDate(() => run(path, body, true), draft))) return
+      view = get().view
+      if (!view || get().busy) return
+    }
+    let stale = false
     const controller = new AbortController()
     set({ busy: true, abort: controller, live: { ...idleLive } })
     const rollMode = view.settings.rollMode
@@ -187,7 +249,8 @@ export const useGame = create<State>((set, get) => {
             set({ live: { ...get().live, notice: ev.message } })
             break
           case 'error':
-            set({ live: { ...get().live, error: ev.message } })
+            if (ev.stale) stale = true
+            else set({ live: { ...get().live, error: ev.message } })
             break
           case 'view':
             setView(ev.view)
@@ -196,6 +259,8 @@ export const useGame = create<State>((set, get) => {
       },
       controller.signal
     )
+    // Stopped: the server is still saving what the DM wrote so far; wait for it, then look.
+    if (controller.signal.aborted) await settle(view.id)
     // Make sure we end on the saved state, even if the stream was cut short.
     try {
       setView(await api.campaign(view.id))
@@ -204,6 +269,9 @@ export const useGame = create<State>((set, get) => {
     }
     const live = get().live
     set({ busy: false, abort: null, live: { ...idleLive, error: live.error, notice: live.notice, dice: live.dice, hold: live.hold } })
+    // The server found this screen behind (a race the check before it missed): reconcile now.
+    const before = view
+    if (stale) void reconcileWith(before, () => run(path, body, true), path === 'act' ? (body as { text?: string }).text : undefined)
   }
 
   return {
@@ -213,6 +281,8 @@ export const useGame = create<State>((set, get) => {
     view: null,
     busy: false,
     elsewhere: false,
+    conflict: null,
+    restoreDraft: null,
     live: idleLive,
     abort: null,
     toasts: [],
@@ -291,23 +361,52 @@ export const useGame = create<State>((set, get) => {
     swipe: async (messageId) => {
       const v = get().view
       if (!v || get().busy) return
+      const again = () => get().swipe(messageId)
+      if (!(await upToDate(again))) return
       try {
         set({ view: await api.swipe(v.id, messageId), live: idleLive })
-      } catch (err) {
-        caughtUp(err)
+      } catch {
+        caughtUp(v, again)
       }
     },
     rewind: async (messageId) => {
       const v = get().view
       if (!v || get().busy) return
+      const again = () => get().rewind(messageId)
+      if (!(await upToDate(again))) return
       let view: CampaignView
       try {
         view = await api.rewind(v.id, messageId)
-      } catch (err) {
-        return caughtUp(err)
+      } catch {
+        return caughtUp(v, again)
       }
       set({ view, live: idleLive })
       if (view.awaitingNarration) void get().narrateHead()
+    },
+
+    resolveConflict: async (choice) => {
+      const c = get().conflict
+      const v = get().view
+      if (!c || !v) return set({ conflict: null })
+      set({ conflict: null })
+      if (choice === 'latest') {
+        await get().refresh()
+        if (c.draft) set({ restoreDraft: c.draft })
+        return
+      }
+      try {
+        if (c.mine) setView(await api.adopt(v.id, c.mine))
+      } catch (err) {
+        get().toast({ title: "Couldn't keep this screen's version", text: (err as Error).message, tone: 'bad', icon: 'warn' })
+        return
+      }
+      if (c.retry) await c.retry()
+    },
+
+    reconcile: async () => {
+      const v = get().view
+      if (!v || get().busy || get().conflict) return
+      await reconcileWith(v)
     },
     spend: async (attr) => {
       const v = get().view

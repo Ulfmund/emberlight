@@ -258,7 +258,8 @@ export class GameDb {
   }
 
   setHead(id: string, headId: string | null) {
-    this.db.prepare('UPDATE campaigns SET head_id = ?, updated_at = ? WHERE id = ?').run(headId, Date.now(), id)
+    // Always forward, even twice in one millisecond: other screens compare it (stamp).
+    this.db.prepare('UPDATE campaigns SET head_id = ?, updated_at = MAX(updated_at + 1, ?) WHERE id = ?').run(headId, Date.now(), id)
   }
 
   updateCampaign(id: string, patch: Partial<Pick<CampaignRow, 'name' | 'settings' | 'build' | 'lorebooks'>>) {
@@ -399,6 +400,8 @@ export class GameDb {
     this.db
       .prepare('UPDATE messages SET content = ?, thinking = ?, meta = ? WHERE id = ?')
       .run(patch.content ?? m.content, patch.thinking ?? m.thinking, JSON.stringify(patch.meta ?? m.meta), id)
+    // A reply is written into its message when the DM finishes: other screens must see that too.
+    this.db.prepare('UPDATE campaigns SET updated_at = MAX(updated_at + 1, ?) WHERE id = ?').run(Date.now(), m.campaign_id)
   }
 
   getMessage(id: string): MessageRow | null {

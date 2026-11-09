@@ -118,10 +118,10 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
       return false
     }
   }
-  const STALE = 'The story moved on from another screen. Here it is as it stands now.'
+  const STALE = 'This screen was behind the story.'
   const catchUp = (id: string) =>
     (async function* () {
-      yield { type: 'error', message: STALE } as TurnEvent
+      yield { type: 'error', message: STALE, stale: true } as TurnEvent
       yield { type: 'view', view: campaigns.view(id) } as TurnEvent
     })()
 
@@ -190,7 +190,32 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
   /** What an open screen checks every few seconds to stay in step with the others (sync.ts). */
   app.get('/api/campaigns/:id/stamp', (c) => {
     const id = c.req.param('id')
-    return c.json({ stamp: campaigns.db.stamp(id), answering: turns.answering(id) })
+    let head: string | null = null
+    try {
+      head = campaigns.get(id).head_id
+    } catch {
+      return c.json({ error: 'That adventure no longer exists.' }, 404)
+    }
+    return c.json({ stamp: campaigns.db.stamp(id), answering: turns.answering(id), head })
+  })
+
+  /** How this screen's version (ending at ?head=) and the story as it stands differ. */
+  app.get('/api/campaigns/:id/compare', (c) => {
+    const r = guard(() => campaigns.compare(c.req.param('id'), c.req.query('head') ?? ''))
+    return r.ok ? c.json(r.value) : c.json({ error: r.error }, 404)
+  })
+
+  /** Keep this screen's version: the story goes back to the head it shows (the other stays as a branch). */
+  app.post('/api/campaigns/:id/adopt', async (c) => {
+    const b = await body(c, z.object({ head: z.string().min(1).max(80) }))
+    const id = c.req.param('id')
+    if (!b) return c.json({ error: 'Missing message.' }, 400)
+    if (turns.answering(id)) return c.json({ error: 'The DM is answering a turn right now. Try again in a moment.' }, 409)
+    const r = guard(() => {
+      campaigns.rewind(id, b.head)
+      return campaigns.view(id)
+    })
+    return r.ok ? c.json(r.value) : c.json({ error: r.error }, 400)
   })
 
   app.delete('/api/campaigns/:id', (c) => {

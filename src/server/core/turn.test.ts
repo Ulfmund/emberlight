@@ -1049,4 +1049,33 @@ describe('turn engine', () => {
     expect(v.messages.filter((m) => m.role === 'user').map((m) => m.content)).toContain('I look around the crossing.')
     expect(v.messages.some((m) => m.content === 'I shout.')).toBe(false)
   })
+
+  it('compares two versions of the story after the point they share, and keeps either', async () => {
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    fake.referee = { intent: 'other', checks: [] }
+    fake.narration = 'The river runs fast.'
+    await run(engine.act(id, 'I walk to the river.', signal))
+    // This screen's version; then another screen rewinds to the opening and plays it differently.
+    const mine = campaigns.view(id)
+    const opening = mine.messages.filter((m) => m.role === 'assistant')[0]
+    campaigns.rewind(id, opening.id)
+    fake.narration = 'The mill is quiet.'
+    await run(engine.act(id, 'I go to the mill.', signal))
+    const diff = campaigns.compare(id, mine.headId!)
+    expect(diff.ahead.map((m) => [m.role, m.text.slice(0, 18)])).toEqual([['user', 'I go to the mill.'], ['assistant', 'The mill is quiet.']])
+    expect(diff.behind.map((m) => [m.role, m.text.slice(0, 20)])).toEqual([['user', 'I walk to the river.'], ['assistant', 'The river runs fast.']])
+    // A screen that was only behind (the other carried on from where it was) has nothing of its own.
+    expect(campaigns.compare(id, opening.id)).toMatchObject({ behind: [], ahead: [{ role: 'user', text: 'I go to the mill.' }, expect.anything()] })
+    // The preview reads like the story: speech markers out.
+    expect(diff.ahead[1].text).not.toContain('@')
+    // A reply written into its message changes the stamp, even within the same millisecond.
+    const before = db.stamp(id)
+    db.updateMessage(campaigns.view(id).messages.at(-1)!.id, { content: 'The mill is very quiet.' })
+    expect(db.stamp(id)).not.toBe(before)
+    // Keeping this screen's version takes the story back to it; the other stays as a branch.
+    campaigns.rewind(id, mine.headId!)
+    expect(campaigns.view(id).headId).toBe(mine.headId)
+    expect(campaigns.compare(id, mine.headId!).ahead).toEqual([])
+  })
 })

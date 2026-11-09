@@ -25,7 +25,12 @@ export function useSync(campaignId: string) {
         const now = useGame.getState()
         if (!alive || now.busy || now.view?.id !== campaignId) return
         if (now.elsewhere !== s.answering) useGame.setState({ elsewhere: s.answering })
-        if (s.stamp && s.stamp !== now.view.stamp) await now.refresh()
+        if (s.stamp && s.stamp !== now.view.stamp) {
+          // The story itself moved: follow it if it carried on from here, ask if it split. Only the
+          // journal or the like changed: just catch up.
+          if ((s.head ?? null) !== (now.view.headId ?? null)) await now.reconcile()
+          else await now.refresh()
+        }
       } catch {
         // Off the network for a moment: the next check tries again.
       } finally {

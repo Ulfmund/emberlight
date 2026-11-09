@@ -47,7 +47,7 @@ import {
   type SkillId
 } from '@shared/rules'
 import { birthEvent, childrenOf, marriageEvent, MAX_CHILDREN, spouseOf, yearsOld, yearsToComeOfAge } from '@shared/family'
-import type { CampaignSummary, CampaignView, ChangeLine, MessageView } from '@shared/view'
+import type { CampaignSummary, CampaignView, ChangeLine, Comparison, MessageView } from '@shared/view'
 import type { CastMember } from '@shared/cards'
 import { projectMemory, sameName, samePlace, type MemoryEvent } from '@shared/memory'
 import { JourneyLog } from '@shared/journey'
@@ -506,6 +506,31 @@ export class Campaigns {
   }
 
   /** Go back to a point in the story. Everything after it stays saved as another branch. */
+  /**
+   * How the story ending at `head` (what a screen shows) and the story as it stands differ: the
+   * messages each has after the last one they share. Nothing "behind" means the other screen only
+   * carried the story on; something there means the story split (docs/spec/08-ui-ux.md).
+   */
+  compare(id: string, head: string): Comparison {
+    const c = this.get(id)
+    const all = new Map(this.db.messagesFor(id).map((m) => [m.id, m]))
+    const pathTo = (h: string | null) => {
+      const out: MessageRow[] = []
+      for (let m = h ? all.get(h) : undefined; m; m = m.parent_id ? all.get(m.parent_id) : undefined) out.unshift(m)
+      return out
+    }
+    const latest = pathTo(c.head_id)
+    const mine = pathTo(head)
+    let shared = 0
+    while (shared < latest.length && shared < mine.length && latest[shared].id === mine[shared].id) shared++
+    const brief = (ms: MessageRow[]) =>
+      ms
+        .filter((m) => !m.meta.hidden && m.meta.kind !== 'opening')
+        // Speech markers ("@Old Tam:") out, so the preview reads like the story.
+        .map((m) => ({ role: m.role as 'user' | 'assistant', text: m.content.replace(/@([^:\n]{1,40}):/g, '$1:').replace(/\s+/g, ' ').trim().slice(0, 160) }))
+    return { latestHead: c.head_id, ahead: brief(latest.slice(shared)), behind: brief(mine.slice(shared)) }
+  }
+
   rewind(id: string, messageId: string) {
     const m = this.db.getMessage(messageId)
     if (!m || m.campaign_id !== id) throw new Error('That message no longer exists.')

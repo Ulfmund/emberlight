@@ -1,6 +1,6 @@
 import type { Connection, RemoteView, SettingsView, TestResult, UpdateStatus } from '@shared/types'
 import type { CampaignSettings, CharacterBuild, Attr, CompanionRole, HomeKind, SkillId } from '@shared/rules'
-import type { CampaignSummary, CampaignView, TurnEvent } from '@shared/view'
+import type { CampaignSummary, CampaignView, Comparison, TurnEvent } from '@shared/view'
 import type { CardDetail, CardSummary } from '@shared/cards'
 import type { MemoryEvent } from '@shared/memory'
 import type { Lorebook, LorebookSummary } from '@shared/lore'
@@ -50,7 +50,9 @@ export const api = {
   // ---- campaigns
   campaigns: () => fetch('/api/campaigns').then((r) => json<CampaignSummary[]>(r)),
   campaign: (id: string) => fetch(`/api/campaigns/${id}`).then((r) => json<CampaignView>(r)),
-  stamp: (id: string) => fetch(`/api/campaigns/${id}/stamp`).then((r) => json<{ stamp: string; answering: boolean }>(r)),
+  stamp: (id: string) => fetch(`/api/campaigns/${id}/stamp`).then((r) => json<{ stamp: string; answering: boolean; head: string | null }>(r)),
+  compare: (id: string, head: string | null) => fetch(`/api/campaigns/${id}/compare?head=${encodeURIComponent(head ?? '')}`).then((r) => json<Comparison>(r)),
+  adopt: (id: string, head: string) => post(`/api/campaigns/${id}/adopt`, { head }).then((r) => json<CampaignView>(r)),
   createCampaign: (build: CharacterBuild, settings: CampaignSettings, opts: CreateOptions = {}) =>
     post('/api/campaigns', { build, settings, ...opts }).then((r) => json<{ id: string }>(r)),
 

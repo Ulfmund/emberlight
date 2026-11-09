@@ -61,6 +61,8 @@ export function Story({ view, onInspect }: { view: CampaignView; onInspect?: () 
           {msgs.map((m, i) => {
             const isLastDm = m.id === lastDm?.id
             const isLastUser = m.id === lastUser?.id
+            // Another screen's turn: its reply is still being written (the line below says so).
+            if (elsewhere && !busy && m.role === 'assistant' && i === msgs.length - 1 && !m.content.trim()) return null
             if (m.role === 'user') {
               if (m.kind === 'opening') return null
               return (
@@ -103,9 +105,14 @@ export function Story({ view, onInspect }: { view: CampaignView; onInspect?: () 
                       <span className="hidden sm:inline">DM Context</span>
                     </Button>
                   )}
+                  {!isLastDm && canUndo && !busy && msgs[i - 1]?.role === 'user' && !dead && (
+                    <Button variant="ghost" size="sm" icon="reroll" onClick={() => void rewind(msgs[i - 1].id)} title="A new version of this reply (the dice stay the same). What came after is kept as a branch.">
+                      Rewrite
+                    </Button>
+                  )}
                   {!isLastDm && canUndo && !busy && (
-                    <Button variant="ghost" size="sm" icon="rewind" onClick={() => void rewind(m.id)} title="Go back to this moment. Later events are kept as another branch.">
-                      Return here
+                    <Button variant="ghost" size="sm" icon="rewind" onClick={() => void rewind(m.id)} title="Go back to this moment. What came after is kept as a branch.">
+                      Rewind
                     </Button>
                   )}
                 </div>

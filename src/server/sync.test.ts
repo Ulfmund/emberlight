@@ -38,18 +38,23 @@ describe('one adventure, several screens', () => {
       expect(view).toMatchObject({ answering: false })
       expect(typeof view.stamp).toBe('string')
       const stamp = JSON.parse((await call(port, `/api/campaigns/${id}/stamp`)).body)
-      expect(stamp).toEqual({ stamp: view.stamp, answering: false })
+      expect(stamp).toEqual({ stamp: view.stamp, answering: false, head: view.headId })
 
       // A screen that shows an older head can't rewind or act blind: it's sent the story as it stands.
       const behind = await call(port, `/api/campaigns/${id}/rewind`, { method: 'POST', body: { messageId: 'msg_whatever' }, head: 'msg_long_gone' })
       expect(behind.status).toBe(409)
-      expect(JSON.parse(behind.body)).toMatchObject({ stale: true, error: expect.stringMatching(/moved on/) })
+      expect(JSON.parse(behind.body)).toMatchObject({ stale: true, error: 'This screen was behind the story.' })
       const acted = await call(port, `/api/campaigns/${id}/act`, { method: 'POST', body: { text: 'I look around.' }, head: 'msg_long_gone' })
-      expect(acted.body).toMatch(/moved on from another screen/)
+      expect(acted.body).toContain('"stale":true')
       expect(acted.body).toContain('"type":"view"')
       // A screen that's up to date gets the usual answer (this message doesn't exist).
       const current = await call(port, `/api/campaigns/${id}/rewind`, { method: 'POST', body: { messageId: 'msg_whatever' }, head: view.headId ?? '' })
       expect(current.status).toBe(400)
+
+      // Two versions compared: nothing differs here. Keeping this screen's version needs a real message.
+      expect(JSON.parse((await call(port, `/api/campaigns/${id}/compare?head=${view.headId ?? ''}`)).body)).toEqual({ latestHead: view.headId, ahead: [], behind: [] })
+      if (view.headId) expect((await call(port, `/api/campaigns/${id}/adopt`, { method: 'POST', body: { head: view.headId } })).status).toBe(200)
+      expect((await call(port, `/api/campaigns/${id}/adopt`, { method: 'POST', body: { head: 'msg_nope' } })).status).toBe(400)
 
       // Anything that changes the adventure changes its stamp.
       await call(port, `/api/campaigns/${id}/settings`, { method: 'PUT', body: { tone: 'grim' } })

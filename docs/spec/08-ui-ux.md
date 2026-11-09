@@ -46,7 +46,7 @@ The goal is that it **looks and feels like a game**: clear panels, icons for eve
 - **Player action:** a styled line (italic, with a small player-portrait marker). **Player speech:** a bubble on the player's side.
 - **Roll cards:** inline, with the dice result, breakdown on hover, tier label, and a 🔄 reroll button.
 - **Event cards:** small banners for things like "⚠ Ambush!", "📈 Mining 12", "🕯 Day 13 begins".
-- Each DM message: ◀ ▶ to switch swipes, 🔄 regenerate, ✏️ edit, ⏪ rewind to here.
+- Each DM message: ◀ ▶ to switch swipes, 🔄 regenerate, ✏️ edit, ⏪ rewind to here. *(Built: the latest reply has **Rewrite**; since 1.0.3 every older reply has **Rewrite** too, a new version of it with the dice unchanged, and **Rewind**, going back to that moment. What came after is kept as a branch either way. Each player turn can be taken back.)*
 
 **Bottom: the input area.** Suggestion chips, a **quick-action bar** of large icon buttons, the input box with ghost text, an OOC toggle and Send. Quick-action buttons are context-aware: ⚔ appears in danger, 🏕 when it's safe to rest, ⚒ near a forge.
 
@@ -88,6 +88,14 @@ The goal is that it **looks and feels like a game**: clear panels, icons for eve
 - **Catching up.** Every view carries a stamp that changes whenever anything in the adventure does. An open screen checks it every 3 seconds (only while it's visible, and at once when it wakes) and reloads the story if it changed. While the DM answers a turn from the other screen, the story says so.
 - **No moves from a stale screen.** Every change a screen sends carries the head of the story it shows. Acting, answering a roll, rewriting, rerolling, rewinding or switching versions from a screen that hasn't caught up is refused, and the screen is shown the story as it stands.
 - Opening an adventure that's waiting for the DM only asks the DM if no screen already has.
+
+**Reconciling** *(1.0.3)*, as NovelAI does. Before a move, a screen checks it's showing the story as it stands, and compares its version with the latest after the point both share:
+
+- **The other screen only carried the story on** (nothing on this screen is missing from the latest): this screen catches up and says so ("Caught up"). The move isn't made blind; typing is handed back to the input box to send again once read.
+- **The story split** (this screen shows messages the latest no longer has: the other screen rewound, switched versions or rewrote): **The story changed** shows both versions after the shared point, newest four of each. **Show the latest** catches up. **Keep this screen's** takes the story back to this screen's version (the other stays as a branch you can rewind to), then makes the move that was waiting.
+- The same happens when the background check finds the story split while the screen is idle; a story that only carried on is followed quietly.
+- **Stop** waits for the server to finish saving what the DM wrote before looking again. (In 1.0.1 a screen could miss its own stopped reply and then be refused as stale, blamed on "another screen".)
+- A reply is written into its message when the DM finishes, and that changes the stamp too, so a screen that caught up mid-turn sees the finished reply; while the other screen's turn runs, its empty reply isn't shown.
 
 Code: `src/renderer/src/sync.ts`, `stamp` in `src/server/store/db.ts`, the turn lock in `src/server/core/turn.ts`.
 

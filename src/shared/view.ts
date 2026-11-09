@@ -26,6 +26,11 @@ export type MessageView = {
   image?: string
 }
 
+/** A message, in short (the reconcile dialog). */
+export type Brief = { role: 'user' | 'assistant'; text: string }
+/** How a screen's version of the story and the story as it stands differ, after the point they share. */
+export type Comparison = { latestHead: string | null; ahead: Brief[]; behind: Brief[] }
+
 export type CampaignView = {
   id: string
   name: string
@@ -96,5 +101,5 @@ export type TurnEvent =
   | { type: 'thinking'; text: string }
   | { type: 'text'; text: string }
   | { type: 'view'; view: CampaignView }
-  | { type: 'error'; message: string }
+  | { type: 'error'; message: string; /** The screen was behind the story (sync.ts): reconcile. */ stale?: boolean }
   | { type: 'notice'; message: string }
