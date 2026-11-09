@@ -3,6 +3,7 @@ import { mkdirSync, copyFileSync, existsSync, readdirSync, unlinkSync, statSync 
 import { join } from 'node:path'
 import type { CampaignSettings, CharacterBuild, GameEvent } from '@shared/rules'
 import type { CardData, CastMember } from '@shared/cards'
+import type { Lorebook } from '@shared/lore'
 
 /**
  * The save file: one SQLite database in the app's user-data folder.
@@ -44,7 +45,11 @@ export type CampaignRow = {
   build: CharacterBuild
   /** Cards in this story: the player's own card (if any) and companions the DM plays. */
   cast: CastMember[]
+  /** Lorebooks from the library attached to this story (read live, so edits apply). */
+  lorebooks: string[]
 }
+
+export type LorebookRow = Lorebook & { builtin: boolean; created_at: number; updated_at: number }
 
 export type CardRow = {
   id: string
@@ -109,6 +114,15 @@ CREATE TABLE IF NOT EXISTS saves (
   created_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS lorebooks (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  entries TEXT NOT NULL,
+  builtin INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS cards (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -142,7 +156,8 @@ export class GameDb {
     this.db.prepare("INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version', '1')").run()
     const cols = (this.db.prepare('PRAGMA table_info(campaigns)').all() as { name: string }[]).map((c) => c.name)
     if (!cols.includes('cast_json')) this.db.exec("ALTER TABLE campaigns ADD COLUMN cast_json TEXT NOT NULL DEFAULT '[]'")
-    this.db.prepare("UPDATE meta SET value = '2' WHERE key = 'schema_version' AND CAST(value AS INTEGER) < 2").run()
+    if (!cols.includes('lore_json')) this.db.exec("ALTER TABLE campaigns ADD COLUMN lore_json TEXT NOT NULL DEFAULT '[]'")
+    this.db.prepare("UPDATE meta SET value = '3' WHERE key = 'schema_version' AND CAST(value AS INTEGER) < 3").run()
   }
 
   /** Keeps one backup per day for the last 7 days (docs/spec/05-game-state-and-saves.md). */
@@ -186,8 +201,8 @@ export class GameDb {
   createCampaign(c: Omit<CampaignRow, 'created_at' | 'updated_at'>) {
     const now = Date.now()
     this.db
-      .prepare('INSERT INTO campaigns (id, name, created_at, updated_at, head_id, settings, build, cast_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(c.id, c.name, now, now, c.head_id, JSON.stringify(c.settings), JSON.stringify(c.build), JSON.stringify(c.cast))
+      .prepare('INSERT INTO campaigns (id, name, created_at, updated_at, head_id, settings, build, cast_json, lore_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(c.id, c.name, now, now, c.head_id, JSON.stringify(c.settings), JSON.stringify(c.build), JSON.stringify(c.cast), JSON.stringify(c.lorebooks))
   }
 
   getCampaign(id: string): CampaignRow | null {
@@ -203,12 +218,12 @@ export class GameDb {
     this.db.prepare('UPDATE campaigns SET head_id = ?, updated_at = ? WHERE id = ?').run(headId, Date.now(), id)
   }
 
-  updateCampaign(id: string, patch: Partial<Pick<CampaignRow, 'name' | 'settings' | 'build'>>) {
+  updateCampaign(id: string, patch: Partial<Pick<CampaignRow, 'name' | 'settings' | 'build' | 'lorebooks'>>) {
     const c = this.getCampaign(id)
     if (!c) return
     this.db
-      .prepare('UPDATE campaigns SET name = ?, settings = ?, build = ?, updated_at = ? WHERE id = ?')
-      .run(patch.name ?? c.name, JSON.stringify(patch.settings ?? c.settings), JSON.stringify(patch.build ?? c.build), Date.now(), id)
+      .prepare('UPDATE campaigns SET name = ?, settings = ?, build = ?, lore_json = ?, updated_at = ? WHERE id = ?')
+      .run(patch.name ?? c.name, JSON.stringify(patch.settings ?? c.settings), JSON.stringify(patch.build ?? c.build), JSON.stringify(patch.lorebooks ?? c.lorebooks), Date.now(), id)
   }
 
   deleteCampaign(id: string) {
@@ -218,6 +233,31 @@ export class GameDb {
       this.db.prepare('DELETE FROM saves WHERE campaign_id = ?').run(id)
       this.db.prepare('DELETE FROM campaigns WHERE id = ?').run(id)
     })
+  }
+
+  // ---- lorebooks ---------------------------------------------------------------------
+
+  saveLorebook(b: Lorebook, builtin = false) {
+    const now = Date.now()
+    this.db
+      .prepare(
+        `INSERT INTO lorebooks (id, name, description, entries, builtin, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET name = excluded.name, description = excluded.description, entries = excluded.entries, updated_at = excluded.updated_at`
+      )
+      .run(b.id, b.name, b.description, JSON.stringify(b.entries), builtin ? 1 : 0, now, now)
+  }
+
+  getLorebook(id: string): LorebookRow | null {
+    const r = this.db.prepare('SELECT * FROM lorebooks WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    return r ? toLorebook(r) : null
+  }
+
+  listLorebooks(): LorebookRow[] {
+    return (this.db.prepare('SELECT * FROM lorebooks ORDER BY builtin DESC, updated_at DESC').all() as Record<string, unknown>[]).map(toLorebook)
+  }
+
+  deleteLorebook(id: string) {
+    this.db.prepare('DELETE FROM lorebooks WHERE id = ?').run(id)
   }
 
   // ---- character library ------------------------------------------------------------
@@ -342,7 +382,20 @@ function toCampaign(r: Record<string, unknown>): CampaignRow {
     head_id: r.head_id == null ? null : String(r.head_id),
     settings: JSON.parse(String(r.settings)),
     build: JSON.parse(String(r.build)),
-    cast: JSON.parse(String(r.cast_json ?? '[]'))
+    cast: JSON.parse(String(r.cast_json ?? '[]')),
+    lorebooks: JSON.parse(String(r.lore_json ?? '[]'))
+  }
+}
+
+function toLorebook(r: Record<string, unknown>): LorebookRow {
+  return {
+    id: String(r.id),
+    name: String(r.name),
+    description: String(r.description ?? ''),
+    entries: JSON.parse(String(r.entries)),
+    builtin: Number(r.builtin) === 1,
+    created_at: Number(r.created_at),
+    updated_at: Number(r.updated_at)
   }
 }
 

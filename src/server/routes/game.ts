@@ -19,6 +19,7 @@ import type { TurnEngine } from '../core/turn'
 import type { CardLibrary } from '../cards/library'
 import { MAX_COMPANIONS, type CastMember } from '@shared/cards'
 import { MAX_FACTS, type MemoryEvent } from '@shared/memory'
+import { findWorld } from '@shared/worlds'
 
 const tuple = <T extends string>(xs: readonly T[]) => xs as unknown as [T, ...T[]]
 
@@ -108,7 +109,9 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
         /** Cards the DM plays as companions. */
         companions: z.array(z.string().max(80)).max(MAX_COMPANIONS).optional(),
         /** Open with the first companion's greetings instead of a new scene. */
-        useGreeting: z.boolean().optional()
+        useGreeting: z.boolean().optional(),
+        lorebooks: z.array(z.string().max(80)).max(20).optional(),
+        world: z.string().max(80).optional()
       })
     )
     if (!b) return c.json({ error: 'Invalid character.' }, 400)
@@ -122,7 +125,8 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
       for (const cid of new Set(b.companions ?? [])) cast.push(library.castMember(cid, 'companion', build.name))
       const first = cast.find((m) => m.role === 'companion')
       const greetings = b.useGreeting && first ? library.greetings(first.cardId, build.name) : []
-      return campaigns.create(build, settings, b.name, { cast, greetings })
+      const world = b.world ? findWorld(b.world) : undefined
+      return campaigns.create(build, settings, b.name, { cast, greetings, world, lorebooks: (b.lorebooks ?? []).filter((x) => campaigns.db.getLorebook(x)) })
     })
     return made.ok ? c.json({ id: made.value }) : c.json({ error: made.error }, 400)
   })
@@ -210,6 +214,16 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
     if (!b) return c.json({ error: 'Missing attribute.' }, 400)
     const r = guard(() => {
       turns.spend(c.req.param('id'), b.attr as Attr)
+      return campaigns.view(c.req.param('id'))
+    })
+    return r.ok ? c.json(r.value) : c.json({ error: r.error }, 400)
+  })
+
+  app.put('/api/campaigns/:id/lorebooks', async (c) => {
+    const b = await body(c, z.object({ ids: z.array(z.string().max(80)).max(20) }))
+    if (!b) return c.json({ error: 'Invalid lorebooks.' }, 400)
+    const r = guard(() => {
+      campaigns.setLorebooks(c.req.param('id'), b.ids)
       return campaigns.view(c.req.param('id'))
     })
     return r.ok ? c.json(r.value) : c.json({ error: r.error }, 400)

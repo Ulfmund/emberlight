@@ -40,6 +40,14 @@ Click **Save connection**, then **Begin**.
 4. When an action is risky, the game asks for a roll. For big moments the **dice tray** appears: click to throw. The result (from Critical failure to Critical success) decides what happens, and the DM writes it that way. Failures can hurt, and your character can die.
 5. Your adventure saves itself after every turn. **Continue** on the title screen picks up where you left off; **Load Adventure** lists them all.
 
+### Worlds and lorebooks
+
+On the **Adventure** step of the character creator:
+- **World**: pick **The Cinder Marches** to start in a ready-made region (a grey border country twenty years after a volcano buried its capital), or let the DM invent one.
+- **Lorebooks**: add world knowledge of your own. Import SillyTavern lorebooks (World Info `.json` files), or write one: each entry has a few **keywords** and the text the DM is told when the story mentions them. The **Test** box shows which entries a sentence would wake up.
+
+During an adventure, **Journal → Lore** adds or removes lorebooks; changes apply from the next turn.
+
 ### The DM's memory
 
 The DM keeps a record of the people and places you meet (what they're like, what they owe you, how they feel about you) and, in long adventures, writes summaries of older events. So even on a small local model it remembers what happened long after those messages stop fitting.

@@ -4,7 +4,7 @@ A roleplaying app with an AI Dungeon Master that works with local models (LM Stu
 
 > **Just want to play?** Follow [docs/INSTALL.md](docs/INSTALL.md): download the installer from **Releases** and double-click it. No command line needed.
 
-The full design is in [docs/spec/](docs/spec/README.md). **Current state: Milestone 1** (playable core): character creator, rules engine, dice, an AI Referee/Narrator/Scribe turn loop, saving with rewinds and rerolls, and SillyTavern-style character card import. **Milestone 2 (memory) is under way:** people and places are remembered, long stories are summarized in layers, and the Journal shows all of it for the player to correct, with pinned notes. Full lorebooks, the example world and combat depth come next.
+The full design is in [docs/spec/](docs/spec/README.md). **Current state: Milestone 1** (playable core): character creator, rules engine, dice, an AI Referee/Narrator/Scribe turn loop, saving with rewinds and rerolls, and SillyTavern-style character card import. **Milestone 2 (memory) is under way:** people and places are remembered, long stories are summarized in layers, the Journal shows all of it for the player to correct, with pinned notes, and lorebooks (SillyTavern-compatible) plus an example world, *The Cinder Marches*, are in. Phones can play over home Wi-Fi. Next: the context inspector, rename/retcon, then combat depth (Milestone 3).
 
 ## Running it (development)
 
@@ -43,6 +43,7 @@ src/
   server/      The local game server (the desktop window and, later, the phone use it)
     ai/          Model providers (OpenAI-compatible, Ollama, Claude) and DM prompts
     cards/       Character card import (PNG / JSON / CHARX) and the character library
+    lore/        The lorebook library
     store/       Settings, encrypted API keys and the save file (in %APPDATA%/Emberlight)
   renderer/    The interface (React)
     src/screens/     Title, Connect, Play

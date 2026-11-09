@@ -16,6 +16,8 @@ import { TurnEngine } from './core/turn'
 import { registerGameRoutes } from './routes/game'
 import { registerCardRoutes } from './routes/cards'
 import { CardLibrary } from './cards/library'
+import { LoreLibrary } from './lore/library'
+import { registerLoreRoutes } from './routes/lore'
 
 export type ServerOptions = {
   dataDir: string
@@ -220,6 +222,7 @@ export async function startServer(opts: ServerOptions): Promise<{ port: number; 
   const turns = new TurnEngine(campaigns, () => settings.connection, (id) => secrets.get(id))
   const library = new CardLibrary(db)
   registerCardRoutes(app, library)
+  registerLoreRoutes(app, new LoreLibrary(db))
   registerGameRoutes(app, campaigns, turns, library)
 
   // ---- The UI itself (production) ------------------------------------------------------

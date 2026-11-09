@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 // The local game server always listens on this port in development so the
 // Vite dev server can proxy /api to it. (Production picks a free port itself.)
-export const DEV_SERVER_PORT = 41730
+export const DEV_SERVER_PORT = Number(process.env.EMBERLIGHT_PORT) || 41730
 
 export default defineConfig({
   main: {

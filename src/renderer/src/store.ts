@@ -56,6 +56,8 @@ type State = {
   spend(attr: Attr): Promise<void>
   /** A correction or note from the Journal. */
   journal(edit: MemoryEvent): Promise<void>
+  /** Which library lorebooks the open story uses. */
+  setLorebooks(ids: string[]): Promise<void>
   saveSlot(name: string): Promise<void>
   loadSlot(saveId: string): Promise<void>
   deleteSlot(saveId: string): Promise<void>
@@ -243,6 +245,13 @@ export const useGame = create<State>((set, get) => {
       // A turn may be streaming; its own final view will include this change too.
       if (!get().busy) set({ view })
       else set({ view: { ...get().view!, memory: view.memory } })
+    },
+    setLorebooks: async (ids) => {
+      const v = get().view
+      if (!v) return
+      const view = await api.setCampaignLorebooks(v.id, ids)
+      if (!get().busy) set({ view })
+      else set({ view: { ...get().view!, lorebooks: view.lorebooks } })
     },
     saveSlot: async (name) => {
       const v = get().view

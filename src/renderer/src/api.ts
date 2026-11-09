@@ -3,8 +3,9 @@ import type { CampaignSettings, CharacterBuild, Attr } from '@shared/rules'
 import type { CampaignSummary, CampaignView, TurnEvent } from '@shared/view'
 import type { CardDetail, CardSummary } from '@shared/cards'
 import type { MemoryEvent } from '@shared/memory'
+import type { Lorebook, LorebookSummary } from '@shared/lore'
 
-export type CreateOptions = { playerCard?: string; companions?: string[]; useGreeting?: boolean }
+export type CreateOptions = { playerCard?: string; companions?: string[]; useGreeting?: boolean; lorebooks?: string[]; world?: string }
 
 async function json<T>(res: Response): Promise<T> {
   const body = await res.json().catch(() => ({}))
@@ -42,6 +43,21 @@ export const api = {
   campaign: (id: string) => fetch(`/api/campaigns/${id}`).then((r) => json<CampaignView>(r)),
   createCampaign: (build: CharacterBuild, settings: CampaignSettings, opts: CreateOptions = {}) =>
     post('/api/campaigns', { build, settings, ...opts }).then((r) => json<{ id: string }>(r)),
+
+  // ---- lorebooks
+  lorebooks: () => fetch('/api/lorebooks').then((r) => json<LorebookSummary[]>(r)),
+  lorebook: (id: string) => fetch(`/api/lorebooks/${encodeURIComponent(id)}`).then((r) => json<Lorebook>(r)),
+  createLorebook: (name: string) => post('/api/lorebooks', { name }).then((r) => json<Lorebook>(r)),
+  saveLorebook: (b: Lorebook) => put(`/api/lorebooks/${encodeURIComponent(b.id)}`, b).then((r) => json<Lorebook>(r)),
+  importLorebook: (file: File) =>
+    fetch('/api/lorebooks/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream', 'X-Filename': encodeURIComponent(file.name) },
+      body: file
+    }).then((r) => json<Lorebook>(r)),
+  deleteLorebook: (id: string) => fetch(`/api/lorebooks/${encodeURIComponent(id)}`, { method: 'DELETE' }).then((r) => json<LorebookSummary[]>(r)),
+  lorebookExportUrl: (id: string) => `/api/lorebooks/${encodeURIComponent(id)}/export`,
+  setCampaignLorebooks: (id: string, ids: string[]) => put(`/api/campaigns/${id}/lorebooks`, { ids }).then((r) => json<CampaignView>(r)),
 
   // ---- character library
   cards: () => fetch('/api/cards').then((r) => json<CardSummary[]>(r)),

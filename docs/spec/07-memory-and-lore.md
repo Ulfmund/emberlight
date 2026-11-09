@@ -37,7 +37,11 @@ Each entry supports:
 | Token budget | Per-lorebook and global limits |
 | Semantic match (optional) | Triggers by meaning, not just keywords (needs embeddings) |
 
+**Built (0.6.0)** (`src/shared/lore.ts`): primary keys, secondary keys with all four logics, regex keys, case-sensitive and whole-word matching, constant entries, scan depth (default 4 messages), priority, probability, groups (highest priority wins), and recursion (2 rounds, with both opt-outs). When space is short, constant entries come first, then whatever came up most recently (an entry woken by recursion ranks just behind the one that woke it), then priority; the chosen entries are written in priority order. Lore gets about 2,500 / 6,000 / 10,000 characters on lean / standard / rich models. SillyTavern World Info files and card books import, and export back to World Info. Not yet: insertion positions (everything goes in the WORLD NOTES block), sticky / cooldown / delay, character filters, semantic matching, and per-book budgets.
+
 Lorebooks can be linked to a **campaign** (world lore), a **card** (a character's personal lore), or kept **global**. The editor is a friendly form with a list on the left and the entry on the right, plus a "test" box: type a sentence and see which entries would fire.
+
+*Built (0.6.0):* a library of lorebooks (SQLite `lorebooks` table), attached to a campaign at creation (Adventure step) or later (Journal → Lore). Campaigns read their lorebooks live, so edits apply on the next turn. The editor saves by itself, can export, and has the test box. Card books stay linked to their card. "Global" books are not built yet.
 
 ---
 

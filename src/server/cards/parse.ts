@@ -1,5 +1,6 @@
 import { inflateRawSync, inflateSync } from 'node:zlib'
 import type { CardBookEntry, CardData } from '@shared/cards'
+import { fromWorldInfo } from '@shared/lore'
 
 /**
  * Reads Character Card V1/V2/V3 files: PNG with the card in a text chunk (`chara` for V2,
@@ -144,27 +145,11 @@ export function fromJson(text: string): ParsedCard {
 
 function readBook(book: unknown): CardBookEntry[] {
   if (!isObj(book)) return []
-  const list = Array.isArray(book.entries) ? book.entries : isObj(book.entries) ? Object.values(book.entries) : []
-  return list
-    .filter(isObj)
-    .slice(0, 500)
-    .map((e, i) => {
-      const keys = strs(e.keys ?? e.key, 50)
-      const secondaryKeys = strs(e.secondary_keys ?? e.keysecondary, 50)
-      const ext = isObj(e.extensions) ? e.extensions : {}
-      return {
-        keys,
-        secondaryKeys,
-        content: str(e.content, 20_000),
-        constant: e.constant === true,
-        enabled: e.enabled !== false && e.disable !== true,
-        selective: e.selective === true,
-        caseSensitive: e.case_sensitive === true || ext.case_sensitive === true,
-        priority: Number(e.priority ?? e.insertion_order ?? e.order ?? 100 - i) || 0,
-        name: str(e.name ?? e.comment, 200)
-      }
-    })
-    .filter((e) => e.content.trim() && (e.constant || e.keys.length))
+  try {
+    return fromWorldInfo(book).entries.slice(0, 500)
+  } catch {
+    return []
+  }
 }
 
 // ---- CHARX (zip) ----------------------------------------------------------------------------

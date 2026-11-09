@@ -22,14 +22,18 @@ import {
 import type { CampaignSummary, CampaignView, ChangeLine, MessageView } from '@shared/view'
 import type { CastMember } from '@shared/cards'
 import { projectMemory, type MemoryEvent } from '@shared/memory'
+import { normalizeEntry, type LoreEntry } from '@shared/lore'
+import type { World } from '@shared/worlds'
 import { GameDb, newId, type CampaignRow, type EventRow, type MessageRow } from '../store/db'
 
 export const OPENING_TEXT = '((Begin the adventure: set an opening scene for my character.))'
 
-export function openingText(cast: CastMember[]): string {
+export function openingText(cast: CastMember[], world?: World): string {
   const names = cast.filter((m) => m.role === 'companion').map((m) => m.name)
-  if (!names.length) return OPENING_TEXT
   const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+  const company = names.length ? ` ${list} ${names.length === 1 ? 'is' : 'are'} there too.` : ''
+  if (world) return `((Begin the adventure in ${world.name}. ${world.opening}${company}))`
+  if (!names.length) return OPENING_TEXT
   return `((Begin the adventure: set an opening scene for my character, with ${list} there too.))`
 }
 
@@ -37,6 +41,10 @@ export type CreateExtras = {
   cast?: CastMember[]
   /** Open the story with these instead of asking the DM (a card's greetings; extra ones become swipes). */
   greetings?: string[]
+  /** Lorebooks from the library to attach. */
+  lorebooks?: string[]
+  /** A starter world: its lorebook, opening scene and starting place. */
+  world?: World
 }
 
 /**
@@ -72,19 +80,22 @@ export class Campaigns {
     const opening = newId('msg')
     const cast = extras.cast ?? []
     const greetings = extras.greetings ?? []
+    const world = extras.world
+    const lorebooks = [...new Set([...(world ? [world.lorebook.id] : []), ...(extras.lorebooks ?? [])])]
     this.db.transaction(() => {
-      this.db.createCampaign({ id, name: name?.trim() || `The tale of ${build.name}`, head_id: opening, settings, build, cast })
+      this.db.createCampaign({ id, name: name?.trim() || `The tale of ${build.name}`, head_id: opening, settings, build, cast, lorebooks })
       const now = Date.now()
       this.db.addMessage({
         id: opening,
         campaign_id: id,
         parent_id: null,
         role: 'user',
-        content: openingText(cast),
+        content: openingText(cast, world),
         thinking: '',
         meta: { hidden: true, kind: 'opening' },
         created_at: now
       })
+      if (world) this.db.addEvents(id, opening, newId('grp'), 'engine', [{ type: 'location', name: world.start }])
       let first: string | null = null
       greetings.forEach((g, i) => {
         const m = this.db.addMessage({ id: newId('msg'), campaign_id: id, parent_id: opening, role: 'assistant', content: g, thinking: '', meta: { kind: 'narration' }, created_at: now + 1 + i })
@@ -185,6 +196,7 @@ export class Campaigns {
       },
       cast: c.cast.map((m) => ({ cardId: m.cardId, role: m.role, name: m.name, hasImage: m.hasImage })),
       memory: projectMemory(events.map((e) => e.event)),
+      lorebooks: c.lorebooks.map((lid) => this.db.getLorebook(lid)).filter((b) => b !== null).map((b) => ({ id: b.id, name: b.name, entries: b.entries.length })),
       messages,
       awaitingNarration: last?.role === 'user',
       saves: this.db.savesFor(id).map((s) => ({ id: s.id, name: s.name, messageId: s.message_id, createdAt: s.created_at }))
@@ -222,6 +234,17 @@ export class Campaigns {
 
   rename(id: string, name: string) {
     this.db.updateCampaign(id, { name })
+  }
+
+  /** Which library lorebooks this story uses. */
+  setLorebooks(id: string, ids: string[]) {
+    this.get(id)
+    this.db.updateCampaign(id, { lorebooks: [...new Set(ids)].filter((x) => this.db.getLorebook(x)) })
+  }
+
+  /** The entries of this story's lorebooks, read fresh so edits in the library apply at once. */
+  loreEntries(c: CampaignRow): LoreEntry[] {
+    return c.lorebooks.flatMap((lid) => this.db.getLorebook(lid)?.entries.map(normalizeEntry) ?? [])
   }
 
   /**

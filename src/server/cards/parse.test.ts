@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { deflateRawSync, deflateSync } from 'node:zlib'
 import { parseCardFile, pngTextChunks } from './parse'
 import { activeLore, fillMacros, guessFromCard, tagline, type CardBookEntry } from '@shared/cards'
+import { normalizeEntry } from '@shared/lore'
 
 // ---- tiny file builders ---------------------------------------------------------------------
 
@@ -171,12 +172,12 @@ describe('card helpers', () => {
   })
 
   it('picks lorebook entries by keyword', () => {
-    const e = (p: Partial<CardBookEntry>): CardBookEntry => ({ keys: [], secondaryKeys: [], content: 'x', constant: false, enabled: true, selective: false, caseSensitive: false, priority: 0, name: '', ...p })
+    const e = (p: Partial<CardBookEntry>): CardBookEntry => normalizeEntry({ content: 'x', priority: 0, ...p })
     const book = [
       e({ keys: ['marsh'], content: 'marsh lore' }),
       e({ constant: true, content: 'always' }),
       e({ keys: ['tower'], content: 'tower lore' }),
-      e({ keys: ['king'], secondaryKeys: ['crown'], selective: true, content: 'royal lore' }),
+      e({ keys: ['king'], secondaryKeys: ['crown'], content: 'royal lore' }),
       e({ keys: ['/drag(on|oness)/i'], content: 'dragon lore' }),
       e({ keys: ['marsh'], content: 'off', enabled: false })
     ]

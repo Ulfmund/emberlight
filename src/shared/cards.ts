@@ -1,24 +1,13 @@
 import { RACE_IDS, type RaceId, type SexId } from './rules'
+import { normalizeEntry, selectLore, type LoreEntry } from './lore'
 
 /**
  * Character cards (docs/spec/03-characters-and-cards.md#card-compatibility).
  * Cards from SillyTavern, Chub and friends are normalized into `CardData` on import.
  */
 
-export type CardBookEntry = {
-  keys: string[]
-  secondaryKeys: string[]
-  content: string
-  /** Always included, no keyword needed. */
-  constant: boolean
-  enabled: boolean
-  /** Needs a primary key AND a secondary key. */
-  selective: boolean
-  caseSensitive: boolean
-  /** Higher goes first when space is short. */
-  priority: number
-  name: string
-}
+/** A card's embedded lorebook entry: the same as any lorebook entry (see lore.ts). */
+export type CardBookEntry = LoreEntry
 
 export type CardData = {
   spec: 'v1' | 'v2' | 'v3'
@@ -129,44 +118,10 @@ export function guessFromCard(d: Pick<CardData, 'description' | 'personality' | 
 
 // ---- Lorebook ---------------------------------------------------------------------------
 
-const keyMatcher = (key: string, caseSensitive: boolean): ((text: string) => boolean) => {
-  const re = /^\/(.+)\/([gimsuy]*)$/.exec(key)
-  if (re) {
-    try {
-      const r = new RegExp(re[1], re[2].replace('g', ''))
-      return (t) => r.test(t)
-    } catch {
-      return () => false
-    }
-  }
-  const k = key.trim()
-  if (!k) return () => false
-  const escaped = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  // Whole words for plain keys, like SillyTavern's default.
-  const r = new RegExp(/^\w/.test(k) && /\w$/.test(k) ? `\\b${escaped}\\b` : escaped, caseSensitive ? '' : 'i')
-  return (t) => r.test(t)
-}
-
 /**
- * Picks the lorebook entries that apply to the recent story: constant entries, plus any
- * whose keywords appear in `recent`. Stays within `budgetChars`.
+ * Picks a card book's entries that apply to `recent` (one block of text). Older saved entries
+ * are filled in with defaults first. The full engine is `selectLore` in lore.ts.
  */
-export function activeLore(entries: CardBookEntry[], recent: string, budgetChars = 3000): CardBookEntry[] {
-  const hits = entries.filter((e) => {
-    if (!e.enabled || !e.content.trim()) return false
-    if (e.constant) return true
-    const primary = e.keys.some((k) => keyMatcher(k, e.caseSensitive)(recent))
-    if (!primary) return false
-    if (e.selective && e.secondaryKeys.length) return e.secondaryKeys.some((k) => keyMatcher(k, e.caseSensitive)(recent))
-    return true
-  })
-  hits.sort((a, b) => Number(b.constant) - Number(a.constant) || b.priority - a.priority)
-  const out: CardBookEntry[] = []
-  let used = 0
-  for (const e of hits) {
-    if (used + e.content.length > budgetChars && out.length) continue
-    out.push(e)
-    used += e.content.length
-  }
-  return out
+export function activeLore(entries: Partial<LoreEntry>[], recent: string, budgetChars = 3000): LoreEntry[] {
+  return selectLore(entries.map(normalizeEntry), [recent], { budgetChars, defaultDepth: 1 })
 }

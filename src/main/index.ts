@@ -7,7 +7,8 @@ import { createUpdater } from './updater'
 import icon from '../../resources/icon.png?asset'
 
 // Must match DEV_SERVER_PORT in electron.vite.config.ts.
-const DEV_SERVER_PORT = 41730
+// EMBERLIGHT_PORT lets a second copy run beside another (e.g. a test copy for the phone).
+const DEV_SERVER_PORT = Number(process.env.EMBERLIGHT_PORT) || 41730
 const here = dirname(fileURLToPath(import.meta.url))
 const devUrl = process.env.ELECTRON_RENDERER_URL
 

@@ -10,6 +10,8 @@ import { Campaigns } from './campaigns'
 import { TurnEngine } from './turn'
 import type { Provider, CompleteOptions } from '../ai/providers/types'
 import { CardLibrary } from '../cards/library'
+import { LoreLibrary } from '../lore/library'
+import { findWorld } from '@shared/worlds'
 
 /** A scripted stand-in for a model: the test decides what the Referee, Narrator and Scribe say. */
 class FakeProvider implements Provider {
@@ -329,5 +331,37 @@ describe('turn engine', () => {
     expect(fake.lastSystem).toMatch(/Chapter, day 1: Chapter \d+\. A chapter passed/)
     // Summaries never repeat what's still shown in full: the latest scene isn't summarized yet.
     expect(fake.lastMessages.at(-1)!.content).toContain('(70)')
+  })
+  it('starts in the example world and gives the DM its lore when it comes up', async () => {
+    const lore = new LoreLibrary(db)
+    const world = findWorld('cinder_marches')!
+    expect(lore.list().map((b) => b.id)).toContain(world.lorebook.id)
+
+    const id = campaigns.create(build, DEFAULT_SETTINGS, undefined, { world })
+    const v0 = campaigns.view(id)
+    expect(v0.state.location).toBe('Wending')
+    expect(v0.lorebooks).toEqual([{ id: world.lorebook.id, name: world.lorebook.name, entries: world.lorebook.entries.length }])
+
+    await run(engine.narrateHead(id, signal))
+    expect(fake.lastMessages[0].content).toContain('Begin the adventure in The Cinder Marches')
+    // The overview is always there; the toll bridge entry woke up because the opening mentions it.
+    expect(fake.lastSystem).toContain('THE CINDER MARCHES: a border province')
+    expect(fake.lastSystem).toContain('WENDING: a walled market town')
+    expect(fake.lastSystem).not.toContain('GREYCOATS:')
+
+    // Mentioning the Grey Brothers brings them in, and recursion follows them to Emberhall.
+    fake.narration = 'A monk in grey watches you.'
+    await run(engine.act(id, 'I ask the monk if he is one of the Grey Brothers.', signal))
+    expect(fake.lastSystem).toContain('THE GREY BROTHERS:')
+    expect(fake.lastSystem).toContain('EMBERHALL:')
+
+    // Edits in the library apply at once; detaching the book removes it.
+    const book = lore.get(world.lorebook.id)!
+    lore.save({ ...book, entries: book.entries.map((e) => (e.name === 'The Cinder Marches' ? { ...e, content: 'THE CINDER MARCHES (edited).' } : e)) })
+    await run(engine.regenerate(id, signal))
+    expect(fake.lastSystem).toContain('THE CINDER MARCHES (edited).')
+    campaigns.setLorebooks(id, [])
+    await run(engine.regenerate(id, signal))
+    expect(fake.lastSystem).not.toContain('THE CINDER MARCHES')
   })
 })

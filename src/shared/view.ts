@@ -43,6 +43,8 @@ export type CampaignView = {
   cast: { cardId: string; role: 'player' | 'companion'; name: string; hasImage: boolean }[]
   /** People, places and summaries remembered on this branch of the story. */
   memory: Memory
+  /** Library lorebooks attached to this story. */
+  lorebooks: { id: string; name: string; entries: number }[]
   messages: MessageView[]
   /** The newest message is the player's and the DM hasn't answered yet. */
   awaitingNarration: boolean

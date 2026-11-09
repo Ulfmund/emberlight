@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   AGE_IDS,
@@ -42,6 +42,9 @@ import { cardImageUrl, fillMacros, guessFromCard, type CardSummary } from '@shar
 import { useGame } from '../store'
 import { api } from '../api'
 import { CardLibrary } from './CardLibrary'
+import { LoreEditor } from './LoreEditor'
+import { WORLDS } from '@shared/worlds'
+import type { LorebookSummary } from '@shared/lore'
 import { Button } from '../components/Button'
 import { Icon } from '../components/Icon'
 import { Medallion } from '../components/Medallion'
@@ -124,6 +127,9 @@ export function CreatorScreen() {
   const [playerCard, setPlayerCard] = useState<CardSummary | null>(null)
   const [companions, setCompanions] = useState<CardSummary[]>([])
   const [useGreeting, setUseGreeting] = useState(true)
+  /** A starter world (its lorebook comes with it) and other lorebooks from the library. */
+  const [world, setWorld] = useState<string | null>(null)
+  const [lorebooks, setLorebooks] = useState<string[]>([])
   const [library, setLibrary] = useState<{ open: boolean; dropped: File[] }>({ open: false, dropped: [] })
 
   const sexMode = settings.sexModifiers
@@ -193,7 +199,7 @@ export function CreatorScreen() {
     setError('')
     try {
       const greet = useGreeting && (companions[0]?.greetings ?? 0) > 0
-      await create(withSyncedName(build), settings, { playerCard: playerCard?.id, companions: companions.map((c) => c.id), useGreeting: greet })
+      await create(withSyncedName(build), settings, { playerCard: playerCard?.id, companions: companions.map((c) => c.id), useGreeting: greet, world: world ?? undefined, lorebooks })
     } catch (err) {
       setError((err as Error).message)
       setStarting(false)
@@ -304,6 +310,10 @@ export function CreatorScreen() {
                   onAddCompanion={() => setLibrary({ open: true, dropped: [] })}
                   useGreeting={useGreeting}
                   setUseGreeting={setUseGreeting}
+                  world={world}
+                  setWorld={setWorld}
+                  lorebooks={lorebooks}
+                  setLorebooks={setLorebooks}
                 />
               )}
             </motion.div>
@@ -715,7 +725,11 @@ function AdventureStep({
   onRemoveCompanion,
   onAddCompanion,
   useGreeting,
-  setUseGreeting
+  setUseGreeting,
+  world,
+  setWorld,
+  lorebooks,
+  setLorebooks
 }: {
   settings: CampaignSettings
   setSettings: (s: CampaignSettings) => void
@@ -724,8 +738,19 @@ function AdventureStep({
   onAddCompanion: () => void
   useGreeting: boolean
   setUseGreeting: (v: boolean) => void
+  world: string | null
+  setWorld: (w: string | null) => void
+  lorebooks: string[]
+  setLorebooks: (ids: string[]) => void
 }) {
   const greeter = companions[0]?.greetings ? companions[0] : null
+  const [loreOpen, setLoreOpen] = useState(false)
+  const [library, setLibrary] = useState<LorebookSummary[]>([])
+  useEffect(() => {
+    if (!loreOpen) api.lorebooks().then(setLibrary).catch(() => setLibrary([]))
+  }, [loreOpen])
+  const worldBook = WORLDS.find((w) => w.id === world)?.lorebook.id
+  const chosen = library.filter((b) => lorebooks.includes(b.id) && b.id !== worldBook)
   const set = (p: Partial<CampaignSettings>) => setSettings({ ...settings, ...p })
   const Row = ({ label, text, children }: { label: string; text: string; children: React.ReactNode }) => (
     <div className="grid gap-2 border-b border-gold-500/10 py-4 md:grid-cols-[14rem_1fr] md:items-center">
@@ -739,6 +764,16 @@ function AdventureStep({
   return (
     <>
       <StepTitle title="Adventure" text="How the Dungeon Master runs this campaign. You can change these later." />
+      <LoreEditor
+        open={loreOpen}
+        onClose={() => setLoreOpen(false)}
+        context="new adventure"
+        attached={[...lorebooks, ...(worldBook ? [worldBook] : [])]}
+        onToggleAttach={(id) => {
+          if (id === worldBook) return setWorld(null)
+          setLorebooks(lorebooks.includes(id) ? lorebooks.filter((x) => x !== id) : [...lorebooks, id])
+        }}
+      />
       <div className="panel rounded-2xl px-5">
         <Row label="Companions" text="Characters from cards who travel with you. The DM plays them.">
           <div className="flex flex-wrap items-center gap-2">
@@ -753,6 +788,31 @@ function AdventureStep({
             ))}
             <Button size="sm" variant="ghost" icon="plus" onClick={onAddCompanion}>
               {companions.length ? 'Add another' : 'Bring a companion'}
+            </Button>
+          </div>
+        </Row>
+        <Row label="World" text="Where the story is set">
+          <div className="flex flex-col gap-2">
+            <Segmented
+              value={world ?? 'none'}
+              onChange={(v) => setWorld(v === 'none' ? null : v)}
+              options={[{ id: 'none', label: 'The DM invents it', hint: 'A fresh world made up as you play.' }, ...WORLDS.map((w) => ({ id: w.id, label: w.name, hint: w.tagline }))]}
+            />
+            {world && <p className="text-xs text-parchment-400">{WORLDS.find((w) => w.id === world)?.tagline} Its lorebook comes with it, and you can read or change it.</p>}
+          </div>
+        </Row>
+        <Row label="Lorebooks" text="Extra world knowledge, given to the DM when it comes up">
+          <div className="flex flex-wrap items-center gap-2">
+            {chosen.map((b) => (
+              <span key={b.id} className="flex items-center gap-1.5 rounded-full border border-gold-500/30 bg-ink-850 py-1 pr-1 pl-3 text-sm text-parchment-100">
+                {b.name}
+                <button onClick={() => setLorebooks(lorebooks.filter((x) => x !== b.id))} className="no-drag cursor-pointer rounded-full p-1 text-parchment-400 hover:text-blood-400" title={`Don't use ${b.name}`}>
+                  <Icon name="x" size={13} />
+                </button>
+              </span>
+            ))}
+            <Button size="sm" variant="ghost" icon="scroll" onClick={() => setLoreOpen(true)}>
+              {chosen.length ? 'Change' : 'Choose or import'}
             </Button>
           </div>
         </Row>

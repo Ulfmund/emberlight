@@ -12,7 +12,7 @@ import {
 } from '@shared/rules'
 import type { ChatMessage, Connection } from '@shared/types'
 import type { MessageView, TurnEvent } from '@shared/view'
-import { activeLore } from '@shared/cards'
+import { normalizeEntry, selectLore } from '@shared/lore'
 import { entityLine, projectMemory, relevantEntities, storySoFar, type Summary } from '@shared/memory'
 import { summarizeChapter, summarizeScene, updateArc } from '../ai/jobs/summarizer'
 import { createProvider, type Provider } from '../ai/providers'
@@ -26,9 +26,9 @@ type Ctx = { provider: Provider; model: string; contextChars: number }
 
 /** How much the prompt can hold, by the model's context size (docs/spec/07-memory-and-lore.md#prompt-assembly). */
 function memoryTier(contextChars: number) {
-  if (contextChars < 40_000) return { people: 6, facts: 2, storyShare: 0.18 } // lean: ≤ ~12k tokens
-  if (contextChars < 120_000) return { people: 10, facts: 4, storyShare: 0.15 }
-  return { people: 14, facts: 6, storyShare: 0.12 }
+  if (contextChars < 40_000) return { people: 6, facts: 2, storyShare: 0.18, lore: 2500 } // lean: ≤ ~12k tokens
+  if (contextChars < 120_000) return { people: 10, facts: 4, storyShare: 0.15, lore: 6000 }
+  return { people: 14, facts: 6, storyShare: 0.12, lore: 10_000 }
 }
 
 /** Summaries: a scene covers 10–16 story messages; a chapter covers 6 scenes. */
@@ -256,14 +256,15 @@ export class TurnEngine {
       return { role: 'user', content: m.content + extra }
     })
 
-    // Lorebook entries wake up when the last few messages mention their keywords.
-    const recent = path.slice(-4).map((m) => m.content).join('\n')
-    const lore = activeLore(c.cast.flatMap((m) => m.book), recent)
-
     // Long-term memory: people and places from earlier, and summaries of whatever no longer
     // fits word for word. Summaries are dropped while their messages are still shown in full.
     const memory = projectMemory(events.map((e) => e.event))
     const tier = memoryTier(ctx.contextChars)
+
+    // Lorebook entries (the story's lorebooks and the cast's cards) wake up when the recent story
+    // mentions their keywords. The newest message includes the engine's notes for this turn.
+    const loreEntries = [...this.campaigns.loreEntries(c), ...c.cast.flatMap((m) => m.book.map(normalizeEntry))]
+    const lore = selectLore(loreEntries, history.map((m) => m.content), { budgetChars: tier.lore, rng: this.rng })
     const people = relevantEntities(memory, path.slice(-6).map((m) => m.content).join('\n'), after.location, tier.people, [c.build.name])
       .map((e) => entityLine(e, tier.facts))
       .join('\n')

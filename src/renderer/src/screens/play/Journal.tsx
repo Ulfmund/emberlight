@@ -7,6 +7,7 @@ import { useGame } from '../../store'
 import { Button } from '../../components/Button'
 import { Icon } from '../../components/Icon'
 import { speakerColor } from '../../components/StoryText'
+import { LoreEditor } from '../LoreEditor'
 
 /**
  * The Journal (docs/spec/07-memory-and-lore.md#journal-what-the-player-sees): everything the
@@ -14,7 +15,7 @@ import { speakerColor } from '../../components/StoryText'
  * correction to what the DM knows.
  */
 
-type Section = 'people' | 'places' | 'story' | 'notes'
+type Section = 'people' | 'places' | 'story' | 'notes' | 'lore'
 
 const ATTITUDE_INFO: Record<Attitude, { label: string; color: string }> = {
   hostile: { label: 'Hostile', color: '#d9574c' },
@@ -47,7 +48,8 @@ export function Journal({ view, open, onClose }: { view: CampaignView; open: boo
     { id: 'people', label: 'People', icon: 'user', count: people.length },
     { id: 'places', label: 'Places', icon: 'map', count: places.length },
     { id: 'story', label: 'Story', icon: 'scroll', count: m.scenes.length + m.chapters.length || undefined },
-    { id: 'notes', label: 'Pinned', icon: 'pin', count: m.notes.length || undefined }
+    { id: 'notes', label: 'Pinned', icon: 'pin', count: m.notes.length || undefined },
+    { id: 'lore', label: 'Lore', icon: 'book', count: view.lorebooks.length || undefined }
   ]
 
   return (
@@ -104,6 +106,7 @@ export function Journal({ view, open, onClose }: { view: CampaignView; open: boo
                 {section === 'places' && <EntityList view={view} items={places} kind="place" />}
                 {section === 'story' && <StorySection view={view} />}
                 {section === 'notes' && <NotesSection view={view} />}
+                {section === 'lore' && <LoreSection view={view} />}
               </div>
             </div>
           </motion.div>
@@ -596,6 +599,40 @@ function NotesSection({ view }: { view: CampaignView }) {
           ))}
         </AnimatePresence>
       </ul>
+    </>
+  )
+}
+
+// ---- Lorebooks in this adventure ---------------------------------------------------------------
+
+function LoreSection({ view }: { view: CampaignView }) {
+  const setLorebooks = useGame((x) => x.setLorebooks)
+  const [open, setOpen] = useState(false)
+  const ids = view.lorebooks.map((b) => b.id)
+  return (
+    <>
+      <Heading title="Lore" text="Lorebooks this adventure uses. The DM is given an entry when the story mentions its keywords." />
+      {!view.lorebooks.length && <Empty>No lorebooks in this adventure.</Empty>}
+      <ul className="mb-5 space-y-2">
+        {view.lorebooks.map((b) => (
+          <li key={b.id} className="flex items-center gap-3 rounded-xl border border-gold-500/15 bg-ink-850/80 px-4 py-3">
+            <Icon name="book" size={18} className="shrink-0 text-gold-400" />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-parchment-100">{b.name}</span>
+              <span className="text-xs text-parchment-500">
+                {b.entries} entr{b.entries === 1 ? 'y' : 'ies'}
+              </span>
+            </span>
+            <button onClick={() => void setLorebooks(ids.filter((x) => x !== b.id))} className="no-drag cursor-pointer rounded-lg px-2 py-1 text-xs text-parchment-400 hover:text-blood-400">
+              Stop using
+            </button>
+          </li>
+        ))}
+      </ul>
+      <Button variant="secondary" size="sm" icon="scroll" onClick={() => setOpen(true)}>
+        Open lorebooks
+      </Button>
+      <LoreEditor open={open} onClose={() => setOpen(false)} attached={ids} onToggleAttach={(id) => void setLorebooks(ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id])} />
     </>
   )
 }
