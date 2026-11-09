@@ -3,6 +3,7 @@ import { findPreset } from '@shared/presets'
 import titleArt from '../assets/title.jpg'
 import logo from '../assets/logo-die.png'
 import { EmberField } from '../components/EmberField'
+import { UpdateNotice } from '../components/UpdateNotice'
 import { Button } from '../components/Button'
 import { Icon } from '../components/Icon'
 import { useGame } from '../store'
@@ -106,6 +107,10 @@ export function TitleScreen() {
             <span className="text-parchment-400">No model connected yet</span>
           )}
         </motion.div>
+
+        <div className="absolute right-[5vw] bottom-8">
+          <UpdateNotice />
+        </div>
       </div>
     </div>
   )

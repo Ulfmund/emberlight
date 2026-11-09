@@ -63,6 +63,7 @@ jobs:
           done
           exit 1
 
-      - name: Attach installer to the release
+      # latest.yml and the .blockmap are what installed copies read to find and download updates.
+      - name: Attach installer and update files to the release
         shell: bash
-        run: gh release upload "$TAG" release/Emberlight-Setup-*.exe --clobber
+        run: gh release upload "$TAG" release/Emberlight-Setup-*.exe release/Emberlight-Setup-*.exe.blockmap release/latest.yml --clobber

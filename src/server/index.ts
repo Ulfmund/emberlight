@@ -5,7 +5,14 @@ import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { getRequestListener } from '@hono/node-server'
 import { z } from 'zod'
-import { ChatRequest, Connection, type SettingsView, type StreamEvent, type TestResult } from '@shared/types'
+import {
+  ChatRequest,
+  Connection,
+  type SettingsView,
+  type StreamEvent,
+  type TestResult,
+  type UpdateStatus
+} from '@shared/types'
 import { findPreset } from '@shared/presets'
 import { SettingsStore } from './store/settings'
 import { SecretStore, type Cipher } from './store/secrets'
@@ -23,6 +30,13 @@ export type ServerOptions = {
   port: number
   /** Try the next ports if the first is taken. */
   portFallback?: boolean
+  /** The desktop app's self-updater (absent when there's nothing to update, e.g. tests). */
+  updates?: {
+    status(): UpdateStatus
+    check(): Promise<void>
+    download(): Promise<void>
+    install(): void
+  }
 }
 
 /**
@@ -82,6 +96,22 @@ export async function startServer(opts: ServerOptions): Promise<{ port: number; 
   app.delete('/api/keys/:presetId', async (c) => {
     secrets.delete(c.req.param('presetId'))
     return c.json(await settingsView())
+  })
+
+  // ---- App updates ---------------------------------------------------------------------
+  const updates = opts.updates
+  app.get('/api/update', (c) => c.json<UpdateStatus>(updates?.status() ?? { state: 'disabled' }))
+  app.post('/api/update/check', async (c) => {
+    await updates?.check()
+    return c.json<UpdateStatus>(updates?.status() ?? { state: 'disabled' })
+  })
+  app.post('/api/update/download', (c) => {
+    void updates?.download()
+    return c.json<UpdateStatus>(updates?.status() ?? { state: 'disabled' })
+  })
+  app.post('/api/update/install', (c) => {
+    updates?.install()
+    return c.json({ ok: true })
   })
 
   // ---- Connection test -----------------------------------------------------------------

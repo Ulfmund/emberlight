@@ -8,6 +8,13 @@ files:
   - package.json
 asarUnpack:
   - resources/**
+# Where the installed app looks for updates (public GitHub Releases).
+# The release workflow uploads the installer plus latest.yml and the .blockmap that the updater reads.
+publish:
+  provider: github
+  owner: Ulfmund
+  repo: emberlight
+  releaseType: release
 win:
   icon: resources/icon.ico
   target:

@@ -73,5 +73,16 @@ export type SettingsView = {
   secureStorage: boolean
 }
 
+/** Where the app's self-update is at. "disabled" = development build or phone. */
+export type UpdateStatus =
+  | { state: 'disabled' }
+  | { state: 'idle'; current: string }
+  | { state: 'checking'; current: string }
+  | { state: 'none'; current: string }
+  | { state: 'available'; current: string; version: string }
+  | { state: 'downloading'; current: string; version: string; percent: number }
+  | { state: 'ready'; current: string; version: string }
+  | { state: 'error'; current: string; message: string; version?: string }
+
 /** Below this, long campaigns will struggle no matter what the app does. */
 export const SMALL_CONTEXT = 8192

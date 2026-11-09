@@ -1,4 +1,5 @@
 import logo from '../assets/logo-die.png'
+import { UpdateNotice } from './UpdateNotice'
 
 /**
  * The 40px strip at the top of the desktop window. The page draws it; Windows draws the
@@ -10,6 +11,7 @@ export function TitleBar({ children }: { children?: React.ReactNode }) {
       <img src={logo} alt="" className="h-6 w-6 drop-shadow-[0_0_6px_rgb(255_140_40/0.5)]" draggable={false} />
       <span className="font-display text-[0.8rem] tracking-[0.3em] text-parchment-300">EMBERLIGHT</span>
       <div className="flex min-w-0 flex-1 items-center gap-2">{children}</div>
+      <UpdateNotice compact />
     </div>
   )
 }

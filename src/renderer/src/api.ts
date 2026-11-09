@@ -1,4 +1,4 @@
-import type { ChatMessage, Connection, SettingsView, StreamEvent, TestResult } from '@shared/types'
+import type { ChatMessage, Connection, SettingsView, StreamEvent, TestResult, UpdateStatus } from '@shared/types'
 
 async function json<T>(res: Response): Promise<T> {
   const body = await res.json().catch(() => ({}))
@@ -25,6 +25,10 @@ export const api = {
 
   deleteKey: (presetId: string) =>
     fetch(`/api/keys/${encodeURIComponent(presetId)}`, { method: 'DELETE' }).then((r) => json<SettingsView>(r)),
+
+  updateStatus: () => fetch('/api/update').then((r) => json<UpdateStatus>(r)),
+  downloadUpdate: () => fetch('/api/update/download', { method: 'POST' }).then((r) => json<UpdateStatus>(r)),
+  installUpdate: () => fetch('/api/update/install', { method: 'POST' }).then((r) => json<{ ok: boolean }>(r)),
 
   testConnection: (connection: Connection, key?: string) =>
     fetch('/api/connection/test', {

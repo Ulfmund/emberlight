@@ -3,6 +3,7 @@ import { app, BrowserWindow, safeStorage, shell } from 'electron'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { startServer } from '../server'
+import { createUpdater } from './updater'
 import icon from '../../resources/icon.png?asset'
 
 // Must match DEV_SERVER_PORT in electron.vite.config.ts.
@@ -50,7 +51,8 @@ app.whenReady().then(async () => {
     staticDir: devUrl ? undefined : join(here, '../renderer'),
     devOrigins: devUrl ? [new URL(devUrl).origin] : undefined,
     port: DEV_SERVER_PORT,
-    portFallback: !devUrl
+    portFallback: !devUrl,
+    updates: createUpdater()
   })
   serverPort = server.port
   console.log(`Emberlight local server: http://127.0.0.1:${serverPort}/`)
