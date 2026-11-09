@@ -33,7 +33,7 @@ Built in milestones. Each one ends with something playable, so the artist can te
 - Name generators, banned-name stream filter, phrase list
 - Rename / retcon flow ✅ 0.7.0
 
-## Milestone 3 — Game depth
+## Milestone 3 — Game depth ✅ (0.10.0)
 - Combat modes (narrative / turn-based / mixed), ambush and initiative, enemy templates ✅ 0.9.0 (24 templates, the tracker, one-tap moves, DM-started fights)
 - Inventory, equipment slots, encumbrance, money ✅ 0.8.0
 - Gathering and crafting skills with recipes and nodes ✅ 0.10.0 (16 gathering spots, 28 recipes, the Bag's Make list)
@@ -42,7 +42,7 @@ Built in milestones. Each one ends with something playable, so the artist can te
 - Death flow, Hall of the Fallen, quick new adventurer in the same world ✅ 0.10.0 (epitaphs; continue as your child)
 - DM style settings, DM persona cards ✅ 0.8.0 (event frequency ✅ 0.9.0)
 
-## Milestone 4 — Polish and reach
+## Milestone 4 — Polish and reach ✅ (0.15.0)
 - Full "juice" pass (including the typing runes), effects settings ✅ 0.12.0
 - Suggestions + ghost text ✅ 0.11.0
 - Play on Phone (QR pairing, PWA, mobile layout, shake to roll) *(QR pairing on Wi-Fi, tunnel link and mobile layout ✅ 0.5.0; home-screen app and shake to roll ✅ 0.12.0)*
@@ -53,14 +53,14 @@ Built in milestones. Each one ends with something playable, so the artist can te
 - Spells ✅ 0.13.0 (17 spells; learned from callings, teachers and tomes)
 - UI sound effects ✅ 0.12.0
 
-## v1.x
+## v1.x ✅ (0.20.0; the leftovers in 0.21.0–0.23.0: quests, things and ties, the timeline, item pictures and automatic portraits, boss music and stingers)
 - Ambient audio and dynamic music ([09](09-audio.md)) ✅ 0.16.0 (made on the spot, or from your own tagged tracks)
 - Semantic (embedding) memory search ✅ 0.20.0 (memory by meaning: people, places, older chapters and lore recalled by what's happening, with a local embedding model)
 - Faction reputation ✅ 0.18.0 (standing from hated to honoured, moved by your deeds; it counts on social checks with their people)
 - Location art; a simple map of visited places ✅ 0.19.0 (wide pictures of places, emblems for factions, and the Journal's map of the way so far)
 - Companions travelling with the player (AI-controlled in combat) ✅ 0.17.0 (up to four, from cards or the story; five fighting roles; healers can save you)
 
-## 1.0 — The life sim, storytellers and peoples
+## 1.0 — The life sim, storytellers and peoples ✅ (1.0.0, 2026-11-09)
 *Decided 2026-11-09: the life sim comes into 1.0 instead of a later v2, along with storyteller personalities and the peoples' cultures.*
 - **Aging** ✅ 0.24.0: characters grow older with the calendar (some peoples much slower), and the stage of life they reach sets their caps (physical caps fall after middle age, Intellect and Arcane caps rise) ([04](04-rules-system.md#seasons-and-aging))
 - **Seasons** with effects on gathering, weather and sound ✅ 0.24.0 (the DM plays winter roads as slow and a night in the open as dangerous)
@@ -70,6 +70,11 @@ Built in milestones. Each one ends with something playable, so the artist can te
 - **Homes and work** ✅ 0.28.0: rent or buy a home (a night there mends fully), take up work that pays by its skill, and spend days, weeks or years at it ([04](04-rules-system.md#homes-and-work))
 - **Family** ✅ 0.29.0: marry someone from the story, children born (by choice, or over years raising a family) who grow up with the calendar, and a grown child takes up the tale ([04](04-rules-system.md#family)) *(playing the next generation after a death ✅ 0.10.0)*
 
+## After 1.0
+*Added 2026-11-09.*
+- **Multiplayer** (big): several players in one story, each with their own character, taking turns or acting together, on their own devices. Turn order, who the DM is answering, and how dice and memory work with more than one player all need designing first.
+- **More built-in worlds and lorebooks** (small): a few more ready-made worlds next to *The Cinder Marches*, picked from community lorebooks (Chub). Only ones whose authors allow it (an open licence, or asking), with credit.
+- **A grimdark sci-fi ruleset** (big): a second rules system in the spirit of the Warhammer 40,000 tabletop RPGs (percentile characteristics, careers, wounds, corruption and insanity), for a grimdark sci-fi campaign. It would use its own names and setting, not Games Workshop's.
+
 ## Not planned
-- Multiplayer
 - Text-to-speech (unless audiobook-quality becomes practical)
