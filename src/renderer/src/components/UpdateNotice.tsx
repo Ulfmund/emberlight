@@ -12,23 +12,30 @@ const useUpdates = create<{ status: UpdateStatus; set(s: UpdateStatus): void }>(
 }))
 
 let polling = false
+let timer: ReturnType<typeof setTimeout> | undefined
+
+async function tick() {
+  clearTimeout(timer)
+  let next = 60_000
+  try {
+    const s = await api.updateStatus()
+    useUpdates.getState().set(s)
+    if (s.state === 'disabled') return // development build: nothing to do
+    if (s.state === 'checking' || s.state === 'downloading' || s.state === 'idle') next = 800
+  } catch {
+    next = 5000
+  }
+  timer = setTimeout(tick, next)
+}
+
 function startPolling() {
   if (polling) return
   polling = true
-  const tick = async () => {
-    let next = 60_000
-    try {
-      const s = await api.updateStatus()
-      useUpdates.getState().set(s)
-      if (s.state === 'disabled') return // development build: nothing to do
-      if (s.state === 'checking' || s.state === 'downloading' || s.state === 'idle') next = 800
-    } catch {
-      next = 5000
-    }
-    setTimeout(tick, next)
-  }
   void tick()
 }
+
+/** Check again right away (after a click), instead of waiting for the next slow poll. */
+const pollNow = () => void tick()
 
 /**
  * "Update available" → "Downloading 42%" → "Restart to update". Hidden when there's nothing to say.
@@ -46,6 +53,7 @@ export function UpdateNotice({ compact = false }: { compact?: boolean }) {
   const onClick = async () => {
     if (status.state === 'available' || status.state === 'error') {
       useUpdates.getState().set(await api.downloadUpdate())
+      pollNow()
     } else if (status.state === 'ready') {
       setRestarting(true)
       await api.installUpdate()
@@ -59,7 +67,9 @@ export function UpdateNotice({ compact = false }: { compact?: boolean }) {
         ? `Update to ${version}`
         : `Version ${version} is ready to download`
       : status.state === 'downloading'
-        ? `Downloading… ${status.percent}%`
+        ? status.percent > 0
+          ? `Downloading… ${status.percent}%`
+          : 'Downloading…'
         : status.state === 'ready'
           ? 'Restart to update'
           : status.state === 'error'
