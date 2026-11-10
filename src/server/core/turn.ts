@@ -43,6 +43,7 @@ import { estimateTokens, promptBlocks, type PromptReport } from '@shared/inspect
 import { entityLine, projectMemory, questBrief, relevantEntities, sameName, storySoFar, type Summary } from '@shared/memory'
 import { factionBrief, factionStanding, withReputation } from '@shared/factions'
 import { birthsDuring, familyBrief, yearsOld } from '@shared/family'
+import { tidySpeech } from '@shared/speech'
 import type { LoreEntry } from '@shared/lore'
 import type { Memory } from '@shared/memory'
 import type { Embedder } from '../ai/embeddings'
@@ -589,7 +590,7 @@ export class TurnEngine {
 
     const history: ChatMessage[] = path.map((m, i) => {
       const isLast = i === path.length - 1
-      if (m.role === 'assistant') return { role: 'assistant', content: m.content || '(…)' }
+      if (m.role === 'assistant') return { role: 'assistant', content: tidySpeech(m.content, after.character.build.name) || '(…)' }
       const checks = events.filter((e) => e.message_id === m.id && e.event.type === 'roll').map((e) => (e.event as { check: CheckResult }).check)
       const extra = isLast ? (notes ? `\n\n[GAME ENGINE]\n${notes}` : '') : pastRollNote(checks)
       return { role: 'user', content: withPicture(m.content, m.meta.imageText) + extra }
@@ -716,7 +717,9 @@ export class TurnEngine {
     if (signal.aborted && !error) error = text ? undefined : 'Stopped.'
 
     const { text: noRoll, request } = extractRollRequest(text.trim())
-    const { text: clean, fight } = extractFight(noRoll)
+    const { text: fightless, fight } = extractFight(noRoll)
+    // Speech tags in the wrong place (inside a sentence, or the player character's) put right.
+    const clean = tidySpeech(fightless, after.character.build.name)
     this.campaigns.db.updateMessage(dm.id, {
       content: clean,
       thinking,

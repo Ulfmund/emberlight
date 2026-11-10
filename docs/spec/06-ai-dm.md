@@ -102,6 +102,16 @@ Introduce: a wolf pack's howl from the treeline (random event).
 
 **Dialogue format.** Narrators are asked to write character speech as its own line, `@Name: "…"`. That lets the UI show a portrait and bubble for each speaker, while narration stays as normal paragraphs. If a model doesn't follow the format, a fallback attributes quotes to the nearest named speaker, and the Scribe corrects it.
 
+### Speech lines
+
+*Built (1.0.4)* (`src/shared/speech.ts`). Models (DeepSeek among them; the same happens on Perchance) sometimes put the tag in the wrong place: inside a sentence or a quotation (`He shakes his head. "@Branmund: "And don't…`), in bold, or with the player character's name, often for the person being spoken to. The DM is told the tag names whoever speaks, never whoever they speak to and never the player character, and only ever starts a line. What still slips through is put right when the reply is saved, when older replies are sent back to the DM, and on screen (so replies from before 1.0.4 read right too):
+
+- A tag at the start of a line stays a speech bubble, tidied of bold or a stray quote mark.
+- A tag after a finished sentence, with quoted words after it, starts a new line: the DM forgot one.
+- Any other tag where a sentence starts is taken out, so the words read as plain story.
+- A tag with the player character's name never makes a bubble (the DM never speaks for them).
+- In the middle of a sentence ("turns to @Old Tam"), it's a mention: it loses only the @.
+
 ### 7. Scribe
 
 After the narration, the Scribe extracts structured updates:

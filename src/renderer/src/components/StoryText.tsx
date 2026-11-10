@@ -1,30 +1,30 @@
 import { Fragment } from 'react'
+import { SPEECH_LINE, tidySpeech } from '@shared/speech'
 import { usePortrait } from '../portraits'
 
 /**
  * Renders DM prose: narration paragraphs, `@Name: "…"` dialogue lines as portrait bubbles,
  * and light inline formatting (*italic*, **bold**, "speech"). While streaming, each new word
- * fades in; finished text renders plainly.
+ * fades in; finished text renders plainly. Speech tags the DM put in the wrong place are put
+ * right first (speech.ts); `player` is the player character's name.
  */
 
 type Block = { kind: 'para'; text: string } | { kind: 'dialogue'; speaker: string; text: string }
 
-const DIALOGUE = /^@([^:\n]{1,40}):\s*(.*)$/
-
-export function parseBlocks(text: string): Block[] {
+export function parseBlocks(text: string, player?: string): Block[] {
   const blocks: Block[] = []
   let para: string[] = []
   const flushPara = () => {
     if (para.length) blocks.push({ kind: 'para', text: para.join(' ') })
     para = []
   }
-  for (const raw of text.split('\n')) {
+  for (const raw of tidySpeech(text, player).split('\n')) {
     const line = raw.trim()
     if (!line) {
       flushPara()
       continue
     }
-    const m = DIALOGUE.exec(line)
+    const m = SPEECH_LINE.exec(line)
     if (m) {
       flushPara()
       blocks.push({ kind: 'dialogue', speaker: m[1].trim(), text: m[2] })
@@ -36,8 +36,8 @@ export function parseBlocks(text: string): Block[] {
   return blocks
 }
 
-export function StoryText({ text, animate }: { text: string; animate: boolean }) {
-  const blocks = parseBlocks(text)
+export function StoryText({ text, animate, player }: { text: string; animate: boolean; player?: string }) {
+  const blocks = parseBlocks(text, player)
   return (
     <div className="story selectable space-y-4">
       {blocks.map((b, i) =>

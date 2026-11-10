@@ -189,10 +189,11 @@ const RUNES = ['ᚠ', 'ᚱ', 'ᛟ', 'ᚨ', 'ᛉ']
 
 function DmTurn({ m, streaming, held }: { m: MessageView; streaming: boolean; held?: boolean }) {
   const waiting = streaming && !m.content
+  const player = useGame((s) => s.view?.build.name)
   return (
     <div>
       {(m.thinking || waiting) && <Thinking text={m.thinking} active={waiting} label={held ? 'The dice are rolling…' : undefined} />}
-      {m.content && <StoryText text={m.content} animate={streaming} />}
+      {m.content && <StoryText text={m.content} animate={streaming} player={player} />}
       {streaming && m.content && <span className="ml-1 inline-block h-5 w-[3px] translate-y-1 animate-pulse rounded bg-ember-500 shadow-[0_0_10px_var(--color-ember-500)]" />}
       {m.notice && <p className="mt-3 text-sm text-gold-300 italic">{m.notice}</p>}
       {m.error && (
