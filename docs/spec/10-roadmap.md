@@ -70,7 +70,7 @@ Built in milestones. Each one ends with something playable, so the artist can te
 - **Homes and work** ✅ 0.28.0: rent or buy a home (a night there mends fully), take up work that pays by its skill, and spend days, weeks or years at it ([04](04-rules-system.md#homes-and-work))
 - **Family** ✅ 0.29.0: marry someone from the story, children born (by choice, or over years raising a family) who grow up with the calendar, and a grown child takes up the tale ([04](04-rules-system.md#family)) *(playing the next generation after a death ✅ 0.10.0)*
 
-## 1.1 — People made like characters ✅ (1.1.0, 2026-11-10)
+## 1.1 — People made like characters ✅ (1.1.0 and 1.1.1, 2026-11-10)
 *Asked for 2026-11-09 by the main player: "generate NPC cards from the same criteria that the character creation process uses, and just have age be a slider."*
 - **People's cards by the creator's criteria** ✅: race, sex, age, calling, appearance and personality for everyone in the Journal, written by the Scribe for someone new and kept steady after; shown on their card, told to the DM, used for their portrait, and editable with the creator's controls ([03](03-characters-and-cards.md#npcs-created-during-play))
 - **Age as a slider** ✅: in years, in the creator and on people's cards, at each people's pace; the stage of life follows from it ([03](03-characters-and-cards.md#character-creator))
