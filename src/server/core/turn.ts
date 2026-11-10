@@ -59,6 +59,9 @@ import { engineNotes, extractFight, extractRollRequest, fitHistory, NameFilter, 
 import { newId, type CampaignRow, type EventRow, type MessageRow } from '../store/db'
 import type { Campaigns } from './campaigns'
 
+/** What the DM is told when the player presses Continue with nothing typed. */
+export const PASS_TEXT = '((I wait and let the moment play out. Carry the story on without my character doing anything in particular.))'
+
 type Ctx = { provider: Provider; model: string; contextChars: number }
 
 /** What the engine worked out for a turn (see engineTurn). */
@@ -186,8 +189,16 @@ export class TurnEngine {
   }
 
   /** The player acts (free text; or a move picked on the tracker, or "Make" in the Bag). */
-  async *act(id: string, text: string, signal: AbortSignal, picked: { combat?: CombatAction; work?: Work; spell?: string; image?: string; skip?: SkipPlan } = {}): AsyncGenerator<TurnEvent> {
-    yield* this.oneAtATime(id, () => this.playTurn(id, { text, kind: 'action', ...picked }, signal))
+  async *act(id: string, text: string, signal: AbortSignal, picked: { combat?: CombatAction; work?: Work; spell?: string; image?: string; skip?: SkipPlan; pass?: boolean } = {}): AsyncGenerator<TurnEvent> {
+    const { pass, ...rest } = picked
+    if (pass) {
+      // Continue: nothing typed. The story moves on without the character doing anything in
+      // particular (in a fight, they hold back and the foes take their turn). Not shown as a turn.
+      const inFight = Boolean(this.campaigns.state(this.campaigns.get(id)).combat)
+      yield* this.oneAtATime(id, () => this.playTurn(id, { text: PASS_TEXT, kind: 'action', hidden: true, ...(inFight ? { combat: { kind: 'none' as const } } : {}) }, signal))
+      return
+    }
+    yield* this.oneAtATime(id, () => this.playTurn(id, { text, kind: 'action', ...rest }, signal))
   }
 
   /** The player answers a roll the DM asked for. */

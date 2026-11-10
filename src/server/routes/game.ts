@@ -346,7 +346,9 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
     const b = await body(
       c,
       z.object({
-        text: z.string().min(1).max(4000),
+        text: z.string().max(4000),
+        /** Continue: nothing typed, the story moves on. */
+        pass: z.boolean().optional(),
         combat: CombatMoveSchema.optional(),
         work: WorkSchema.optional(),
         spell: z.string().max(40).optional(),
@@ -357,7 +359,9 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
     const id = c.req.param('id')
     if (staleFrom(c, id)) return stream(c, () => catchUp(id))
     return stream(c, (signal) =>
-      b ? turns.act(id, b.text, signal, { combat: b.combat, work: b.work, spell: b.spell, image: b.image, skip: b.skip }) : (async function* () { yield { type: 'error', message: 'Write something first.' } as TurnEvent })()
+      b && (b.pass || b.text.trim())
+        ? turns.act(id, b.text, signal, { combat: b.combat, work: b.work, spell: b.spell, image: b.image, skip: b.skip, pass: b.pass && !b.text.trim() })
+        : (async function* () { yield { type: 'error', message: 'Write something first.' } as TurnEvent })()
     )
   })
 

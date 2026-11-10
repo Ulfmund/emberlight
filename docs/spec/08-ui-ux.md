@@ -48,7 +48,7 @@ The goal is that it **looks and feels like a game**: clear panels, icons for eve
 - **Event cards:** small banners for things like "⚠ Ambush!", "📈 Mining 12", "🕯 Day 13 begins".
 - Each DM message: ◀ ▶ to switch swipes, 🔄 regenerate, ✏️ edit, ⏪ rewind to here. *(Built: the latest reply has **Rewrite**; since 1.0.3 every older reply has **Rewrite** too, a new version of it with the dice unchanged, and **Rewind**, going back to that moment. What came after is kept as a branch either way. Each player turn can be taken back.)*
 
-**Bottom: the input area.** Suggestion chips, a **quick-action bar** of large icon buttons, the input box with ghost text, an OOC toggle and Send. Quick-action buttons are context-aware: ⚔ appears in danger, 🏕 when it's safe to rest, ⚒ near a forge.
+**Bottom: the input area.** Suggestion chips, a **quick-action bar** of large icon buttons, the input box with ghost text, an OOC toggle and Send. Quick-action buttons are context-aware: ⚔ appears in danger, 🏕 when it's safe to rest, ⚒ near a forge. *(Since 1.2.1 the send button says **Continue** while the box is empty: the story goes on with the character doing nothing in particular, and the turn isn't shown. In a fight they hold back and the foes take their turn.)*
 
 **Right: tabbed panel.**
 - **Sheet:** attributes as bars with cap markers, and skills grouped (Combat, Adventuring, Social, Gathering, Crafting) with level, XP progress and cap. Every number has a tooltip explaining where it comes from.

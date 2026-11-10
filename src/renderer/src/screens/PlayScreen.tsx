@@ -61,7 +61,8 @@ export function PlayScreen() {
           <Story view={view} onInspect={() => setInspector(true)} />
         </PortraitContext.Provider>
         <CombatTracker view={view} />
-        <Composer campaignId={view.id} disabled={dead} busy={busy} holding={live.hold} onSend={(t, image) => void act(t, image ? { image } : undefined)} onStop={stop} />
+        {/* A death takes the message box's place, below the story (Overlays.tsx); while the DM is still telling it, the box stays (to stop it). */}
+        {dead && !busy ? <DeathScreen view={view} /> : <Composer campaignId={view.id} disabled={dead} busy={busy} holding={live.hold} onSend={(t, image) => void act(t, image ? { image } : undefined)} onContinue={() => void act('', { pass: true })} onStop={stop} />}
         <DiceTray />
       </main>
 
@@ -91,7 +92,6 @@ export function PlayScreen() {
       <ReconcileDialog />
       <Toasts />
       <LevelUpPillar />
-      <DeathScreen view={view} />
     </div>
   )
 }
@@ -105,6 +105,7 @@ function Composer({
   busy,
   holding,
   onSend,
+  onContinue,
   onStop
 }: {
   campaignId: string
@@ -112,6 +113,8 @@ function Composer({
   busy: boolean
   holding: boolean
   onSend: (t: string, image?: string) => void
+  /** Nothing typed: the story moves on without the character doing anything. */
+  onContinue: () => void
   onStop: () => void
 }) {
   const [text, setText] = useState('')
@@ -375,6 +378,10 @@ function Composer({
           {busy && !holding ? (
             <Button variant="secondary" icon="stop" onClick={onStop} title="Stop the DM">
               Stop
+            </Button>
+          ) : !text.trim() && !pic ? (
+            <Button variant="primary" icon="right" onClick={onContinue} disabled={busy || disabled} title="Let the story go on without doing anything">
+              Continue
             </Button>
           ) : (
             <Button variant="primary" icon="quill" onClick={submit} disabled={!text.trim() || busy || disabled} title="Send (Enter)">

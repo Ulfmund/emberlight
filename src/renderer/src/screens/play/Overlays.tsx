@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { CampaignView } from '@shared/view'
 import { useGame } from '../../store'
@@ -42,11 +43,17 @@ export function Toasts() {
   )
 }
 
-/** Shown when the character dies (docs/spec/03-characters-and-cards.md#when-a-character-dies). */
+/**
+ * When the character dies (docs/spec/03-characters-and-cards.md#when-a-character-dies): a panel
+ * in place of the message box, so the story above can still be read (since 1.2.1; it used to
+ * cover the screen). Nothing more can be done in the story until a choice is made. It folds
+ * down to one line to read more.
+ */
 export function DeathScreen({ view }: { view: CampaignView }) {
-  const { go, rewind, busy, startHeir } = useGame()
+  const { go, rewind, startHeir } = useGame()
+  const [folded, setFolded] = useState(false)
   const c = view.state.character
-  if (c.status !== 'dead' || busy) return null
+  if (c.status !== 'dead') return null
   // Rewind to just before the fatal turn: the DM message before the last player action.
   const msgs = view.messages
   let lastUser = -1
@@ -59,55 +66,75 @@ export function DeathScreen({ view }: { view: CampaignView }) {
   const heir = { campaignId: view.id, settings: view.settings, dead: view.build.name }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1.2 }} className="absolute inset-0 z-40 grid place-items-center bg-[radial-gradient(circle,rgb(11_8_9/0.75),rgb(0_0_0/0.96))] backdrop-grayscale">
-      <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.8, duration: 1 }} className="flex max-w-md flex-col items-center text-center">
-        <Medallion name={view.build.name} race={view.build.race} size={110} dead image={playerPortrait(view)} />
-        <div className="mt-6 font-display text-sm tracking-[0.4em] text-blood-400">HERE LIES</div>
-        <h2 className="mt-1 font-display text-4xl tracking-wider text-parchment-100">{view.build.name}</h2>
-        <p className="mt-2 font-story text-lg text-parchment-400 italic">
-          {cause ?? 'Fallen'} · level {c.level} · day {view.state.time.day}
-          {c.deeds.length ? ` · remembered for having ${c.deeds[c.deeds.length - 1].text}` : ''}
-        </p>
-        {c.epitaph && (
-          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.8, duration: 1.2 }} className="mt-5 max-w-sm font-story text-xl leading-relaxed text-parchment-200 italic">
-            “{c.epitaph}”
-          </motion.p>
-        )}
-        <div className="mt-8 flex w-full max-w-xs flex-col gap-3 px-4">
-          <Button variant="primary" icon="d20" onClick={() => startHeir(heir)}>
-            A new adventurer in this world
-          </Button>
-          {children.map((ch) => (
-            <Button
-              key={ch.id}
-              variant="secondary"
-              icon="laurel"
-              onClick={() =>
-                startHeir({
-                  ...heir,
-                  // Their card comes with them: who they are, and when they set out.
-                  child: { id: ch.id, name: ch.name, race: ch.race, sex: ch.sex, calling: ch.calling, appearance: ch.appearance, personality: ch.personality, ...heirStart(ch, view.state.time.day, view.build.race) },
-                  race: view.build.race
-                })
-              }
-            >
-              Continue as {ch.name}, their child{yearsOld(ch, view.state.time.day) !== undefined ? ` (${yearsOld(ch, view.state.time.day)})` : ''}
-            </Button>
-          ))}
-          {before && !view.settings.ironman && (
-            <Button variant="secondary" icon="rewind" onClick={() => void rewind(before.id)}>
-              Rewind before the fatal moment
-            </Button>
-          )}
-          <Button variant="ghost" icon="back" onClick={() => go('title')}>
-            Back to the menu
-          </Button>
+    <motion.section
+      initial={{ y: 40, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.8 }}
+      aria-label={`${view.build.name} has died`}
+      className="relative z-20 border-t border-blood-500/30 bg-gradient-to-t from-ink-950 via-ink-950 to-[rgb(40_12_14/0.92)] backdrop-blur-md"
+    >
+      <div className="mx-auto max-h-[60vh] max-w-3xl overflow-y-auto px-4 pt-3 pb-[max(0.9rem,env(safe-area-inset-bottom))] md:px-6">
+        <div className="flex items-center gap-3">
+          <Medallion name={view.build.name} race={view.build.race} size={folded ? 36 : 56} dead image={playerPortrait(view)} />
+          <div className="min-w-0 flex-1">
+            <div className="font-display text-[0.7rem] tracking-[0.35em] text-blood-400">HERE LIES</div>
+            <h2 className="truncate font-display text-2xl tracking-wider text-parchment-100">{view.build.name}</h2>
+            {!folded && (
+              <p className="font-story text-[0.98rem] text-parchment-400 italic">
+                {cause ?? 'Fallen'} · level {c.level} · day {view.state.time.day}
+                {c.deeds.length ? ` · remembered for having ${c.deeds[c.deeds.length - 1].text}` : ''}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setFolded(!folded)}
+            className="no-drag shrink-0 cursor-pointer rounded-lg px-2.5 py-1.5 text-xs text-parchment-400 hover:bg-white/5 hover:text-gold-200"
+            aria-expanded={!folded}
+          >
+            {folded ? 'Choices' : 'Hide'}
+          </button>
         </div>
-        <p className="mt-6 max-w-sm px-4 text-xs leading-relaxed text-parchment-500">
-          <Icon name="laurel" size={12} className="mr-1 inline -translate-y-px" />
-          {view.build.name} will be remembered in the Hall of the Fallen{before_.length ? `, beside ${before_.map((f) => f.name).join(', ')}` : ''}. Whoever comes next finds the same world, its people and its history.
-        </p>
-      </motion.div>
-    </motion.div>
+        {!folded && (
+          <>
+            {c.epitaph && <p className="mt-3 font-story text-lg leading-relaxed text-parchment-200 italic">“{c.epitaph}”</p>}
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button variant="primary" icon="d20" onClick={() => startHeir(heir)}>
+                A new adventurer in this world
+              </Button>
+              {children.map((ch) => (
+                <Button
+                  key={ch.id}
+                  variant="secondary"
+                  icon="laurel"
+                  onClick={() =>
+                    startHeir({
+                      ...heir,
+                      // Their card comes with them: who they are, and when they set out.
+                      child: { id: ch.id, name: ch.name, race: ch.race, sex: ch.sex, calling: ch.calling, appearance: ch.appearance, personality: ch.personality, ...heirStart(ch, view.state.time.day, view.build.race) },
+                      race: view.build.race
+                    })
+                  }
+                >
+                  Continue as {ch.name}, their child{yearsOld(ch, view.state.time.day) !== undefined ? ` (${yearsOld(ch, view.state.time.day)})` : ''}
+                </Button>
+              ))}
+              {before && !view.settings.ironman && (
+                <Button variant="secondary" icon="rewind" onClick={() => void rewind(before.id)}>
+                  Rewind before the fatal moment
+                </Button>
+              )}
+              <Button variant="ghost" icon="back" onClick={() => go('title')}>
+                Back to the menu
+              </Button>
+            </div>
+            <p className="mt-3 text-xs leading-relaxed text-parchment-500">
+              <Icon name="laurel" size={12} className="mr-1 inline -translate-y-px" />
+              {view.build.name} will be remembered in the Hall of the Fallen{before_.length ? `, beside ${before_.map((f) => f.name).join(', ')}` : ''}. Whoever comes next finds the same world, its people and its history.
+            </p>
+          </>
+        )}
+      </div>
+    </motion.section>
   )
 }

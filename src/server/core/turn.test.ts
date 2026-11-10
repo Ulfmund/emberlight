@@ -7,7 +7,7 @@ import type { StreamEvent } from '@shared/types'
 import type { TurnEvent } from '@shared/view'
 import { GameDb } from '../store/db'
 import { Campaigns } from './campaigns'
-import { TurnEngine } from './turn'
+import { PASS_TEXT, TurnEngine } from './turn'
 import type { Provider, CompleteOptions } from '../ai/providers/types'
 import { CardLibrary } from '../cards/library'
 import { LoreLibrary } from '../lore/library'
@@ -289,6 +289,19 @@ describe('turn engine', () => {
     library.delete(summary.id)
     expect(campaigns.view(id).cast[0].name).toBe('Elara')
   })
+  it('carries the story on when the player presses Continue with nothing typed', async () => {
+    const id = campaigns.create(build, DEFAULT_SETTINGS)
+    await run(engine.narrateHead(id, signal))
+    const turn = await run(engine.act(id, '', signal, { pass: true }))
+    expect(turn.some((e) => e.type === 'error')).toBe(false)
+    const msgs = campaigns.view(id).messages
+    const mine = msgs.at(-2)!
+    // The DM is told to go on; the story shows no turn of the player's.
+    expect(mine).toMatchObject({ role: 'user', hidden: true, content: PASS_TEXT })
+    expect(msgs.at(-1)!.role).toBe('assistant')
+    expect(fake.lastSystem).toBeTruthy()
+  })
+
   it('remembers people across turns, and forgets them on a rewind', async () => {
     const id = campaigns.create(build, DEFAULT_SETTINGS)
     await run(engine.narrateHead(id, signal))

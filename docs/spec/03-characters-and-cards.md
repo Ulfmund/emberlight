@@ -90,7 +90,7 @@ Other edits (appearance, personality) update the character's entity record, so t
 
 ## When a character dies
 
-1. A death screen (tasteful, with an animation) shows the cause, the final roll, and a short epitaph written by the DM.
+1. A death screen (tasteful, with an animation) shows the cause, the final roll, and a short epitaph written by the DM. *(Since 1.2.1 it's a panel in place of the message box, under the story, so what happened can still be read; it folds down to one line with **Hide**. Nothing more can be done in the story until a choice is made.)*
 2. The character is saved to the campaign's **Hall of the Fallen** (their sheet, story highlights, and the turn they died).
 3. Options: **New adventurer in this world** (quick create; the world, NPCs and history carry on), **Continue as your child** (only if the character had children: pick one; they inherit the family name, a share of their parent's Renown, and whatever the story left them), **Rewind** (go back to before the fatal turn; the player chooses to cheat), or **End campaign**.
 4. In the same world, the dead character can become part of the story: a grave, a rumor, a lost item that turns up again.
