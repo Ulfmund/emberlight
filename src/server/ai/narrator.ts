@@ -37,6 +37,7 @@ import {
   weatherPassed,
   ageStage,
   ageYears,
+  agesBrief,
   buildNow,
   practiced,
   spanSentence,
@@ -227,6 +228,7 @@ HOW TO RUN THE GAME
   @Old Tam: "Road's not safe after dark."
   Never write speech inline like: "Road's not safe," the old man says. The @Name is whoever is speaking, never whoever they speak to, and never ${b.name}. It only ever starts a line: never put it inside a sentence or inside quotation marks.
 - For new characters, prefer names from this list: ${names.join(', ')}. Never use these overused names: ${BANNED_NAMES.slice(0, 10).join(', ')}.
+- People the story already knows keep who they are: their race, sex, age, calling, looks and manner as their record below gives them. ${agesBrief()}
 - Avoid stock phrases ("a shiver ran down your spine", "a testament to", "barely above a whisper").${askRoll}${fight}
 
 ${peoples ? `${peoples}

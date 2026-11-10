@@ -81,7 +81,7 @@ export function FamilySection({ view }: { view: CampaignView }) {
               return (
                 <li key={k.id} className="flex items-baseline justify-between gap-2">
                   <span className={k.status === 'dead' ? 'text-parchment-500 line-through' : ''}>{k.name}</span>
-                  <span className="shrink-0 text-xs text-parchment-500">{y !== undefined ? `${y} · ${childStage(y, view.build.race)}` : 'your child'}</span>
+                  <span className="shrink-0 text-xs text-parchment-500">{y !== undefined ? `${y} · ${childStage(y, k.race ?? view.build.race)}` : 'your child'}</span>
                 </li>
               )
             })}

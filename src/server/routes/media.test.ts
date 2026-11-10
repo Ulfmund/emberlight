@@ -87,7 +87,8 @@ describe('pictures', () => {
     expect(saved.body).toMatchObject({ backend: 'sdwebui', hasKey: false })
     const prompt = (await j(`/api/campaigns/${id}/images/prompt`)).body
     expect(prompt).toMatchObject({ ready: true })
-    expect(prompt.prompt).toBe('oil painting, portrait of an adult human woman, hunter, Tall')
+    // Race, sex and age in years, as people in the Journal are painted (an adult starts at 27).
+    expect(prompt.prompt).toBe('oil painting, portrait of a 27-year-old human woman, hunter, Tall')
     const made = await post(`/api/campaigns/${id}/images/generate`, { prompt: prompt.prompt })
     expect(made.status).toBe(200)
     expect((made.body.view as { state: { character: { portrait?: string } } }).state.character.portrait).toBe(made.body.media)

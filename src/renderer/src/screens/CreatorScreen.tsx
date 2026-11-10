@@ -17,10 +17,15 @@ import {
   SKILL_IDS,
   SKILLS,
   START_SKILL_MAX,
+  ageRange,
   attrCapBreakdown,
   attrRange,
   fmtMod,
   generateName,
+  rescaleAge,
+  stageAt,
+  startingAge,
+  typicalAge,
   maxHp,
   maxMana,
   maxStamina,
@@ -39,7 +44,9 @@ import {
   type SkillId
 } from '@shared/rules'
 import { cardImageUrl, fillMacros, guessFromCard, type CardSummary } from '@shared/cards'
+import { APPEARANCE_IDEAS as APPEARANCE, callingFor, PERSONALITY_IDEAS as PERSONALITY } from '@shared/people'
 import { useGame } from '../store'
+import { AgeSlider, stageYears } from '../components/AgeSlider'
 import { api } from '../api'
 import { CardLibrary } from './CardLibrary'
 import { LoreEditor } from './LoreEditor'
@@ -61,35 +68,21 @@ const STEPS = [
   { id: 'adventure', label: 'Adventure', icon: 'map' }
 ] as const
 
-const APPEARANCE: string[] = [
-  'Weathered skin and a crooked nose, broken more than once.',
-  'Tall and lean, with ink-black hair tied back and grey eyes.',
-  'Broad-shouldered, freckled, a braid down to the waist.',
-  'A burn scar along one jaw, half hidden by a short beard.',
-  'Slight and quick, with a mop of copper curls.',
-  'Sun-browned, with laugh lines and calloused hands.',
-  'Pale as milk, with sharp cheekbones and a cool stare.',
-  'Stocky and strong, with a shaved head and a silver earring.',
-  'Soft-spoken eyes, mismatched: one green, one brown.',
-  'Plain-faced and forgettable, which is useful.'
-]
-const PERSONALITY: string[] = [
-  'Quiet and stubborn; slow to trust, loyal once won.',
-  'Cheerful, nosy and incapable of leaving a mystery alone.',
-  'Proud and short-tempered, but fiercely fair.',
-  'Careful with words, careless with coin.',
-  'Superstitious, kind to animals, rude to priests.',
-  'A dreamer who reads everything and believes half of it.',
-  'Ambitious and calculating, with a soft spot for underdogs.',
-  'Gruff on the outside, sentimental underneath.',
-  'Restless; hates staying anywhere longer than a week.',
-  'Honest to a fault, which has caused trouble before.'
-]
-
 const rng = () => Math.random()
 
+/** "Ten years after", "A year after", "Days after": when a child sets out after the death. */
+function afterDeath(days: number): string {
+  const years = Math.floor(days / 360)
+  const words = ['', 'A year', 'Two years', 'Three years', 'Four years', 'Five years', 'Six years', 'Seven years', 'Eight years', 'Nine years', 'Ten years']
+  return years >= 1 ? `${words[years] ?? `${years} years`} after` : 'Days after'
+}
+
 /** Keeps a build legal after a choice changes its caps or budget. */
-function normalize(b0: CharacterBuild, sexMode: SexMode): CharacterBuild {
+function normalize(b00: CharacterBuild, sexMode: SexMode): CharacterBuild {
+  // The stage of life follows the age in years, kept to what an adventurer of this people can be.
+  const range = ageRange(b00.race, 'adventurer')
+  const years = Math.min(range.max, Math.max(range.min, Math.round(b00.years ?? startingAge(b00))))
+  const b0 = { ...b00, years, age: stageAt(years, b00.race) }
   // A new race may not have the old calling: switch to its first one.
   const b = RACE_BACKGROUNDS[b0.race].includes(b0.background) ? b0 : { ...b0, background: RACE_BACKGROUNDS[b0.race][0] }
   const humanBonus = b.race === 'human' ? (b.humanBonus.length === 2 ? b.humanBonus : (['STR', 'AGI'] as Attr[])) : []
@@ -120,15 +113,22 @@ export function CreatorScreen() {
   /** After a death, this makes whoever takes up the tale in the same story (no world to pick). */
   const steps = heir ? STEPS.slice(0, STEPS.length - 1) : STEPS
   const [settings, setSettings] = useState<CampaignSettings>(() => (heir ? { ...heir.settings } : { ...DEFAULT_SETTINGS }))
+  /** A child of the dead whose birth the story knows sets out at the age they are then. */
+  const heirAge = heir?.child?.age
   const [build, setBuild] = useState<CharacterBuild>(() => {
     const mode = heir?.settings.sexModifiers ?? DEFAULT_SETTINGS.sexModifiers
     const b = randomBuild(rng, mode, '')
     if (heir?.child) {
-      // Their parent's people and family name; grown, and only lately on the road.
+      // Their card from the Journal, with their parent's people and family name; grown, and only
+      // lately on the road.
+      const kid = heir.child
       const surname = heir.dead.trim().split(/\s+/).slice(1).join(' ')
-      const given = heir.child.name.trim()
+      const given = kid.name.trim()
       const name = given.split(/\s+/).length === 1 && surname ? `${given} ${surname}` : given
-      return normalize({ ...b, race: heir.race ?? b.race, age: 'young', name, appearance: '', personality: '' }, mode)
+      const race = kid.race ?? heir.race ?? b.race
+      const background = callingFor(kid.calling, race) ?? b.background
+      const years = heirAge ?? typicalAge('young', race)
+      return normalize({ ...b, race, sex: kid.sex ?? b.sex, background, years, name, appearance: kid.appearance ?? '', personality: kid.personality ?? '' }, mode)
     }
     return { ...b, name: generateName(rng, b.race, b.sex), appearance: '', personality: '' }
   })
@@ -146,7 +146,15 @@ export function CreatorScreen() {
   const [library, setLibrary] = useState<{ open: boolean; dropped: File[] }>({ open: false, dropped: [] })
 
   const sexMode = settings.sexModifiers
-  const update = (patch: Partial<CharacterBuild>) => setBuild((b) => normalize({ ...b, ...patch }, sexMode))
+  const update = (patch: Partial<CharacterBuild>) =>
+    setBuild((b) => {
+      const next = { ...b, ...patch }
+      // Another people, the same point in life (a human of 27 is a dwarf of 68), unless the
+      // story has already said how old they are.
+      if (heirAge !== undefined) next.years = heirAge
+      else if (patch.race && patch.race !== b.race && patch.years === undefined) next.years = rescaleAge(startingAge(b), b.race, patch.race)
+      return normalize(next, sexMode)
+    })
 
   /** The name the card's description currently uses (it follows renames). */
   const [descName, setDescName] = useState('')
@@ -202,8 +210,8 @@ export function CreatorScreen() {
   const rollAdventurer = () => {
     const b = randomBuild(rng, sexMode, '')
     const rolled = { ...b, name: generateName(rng, b.race, b.sex), appearance: pickOne(APPEARANCE), personality: pickOne(PERSONALITY) }
-    // A child keeps their name and their parent's people.
-    setBuild(heir?.child ? normalize({ ...rolled, name: build.name, race: build.race, age: 'young' }, sexMode) : rolled)
+    // A child keeps their name, their people, their sex and their age.
+    setBuild(heir?.child ? normalize({ ...rolled, name: build.name, race: build.race, sex: build.sex, years: heirAge ?? rescaleAge(rolled.years ?? startingAge(rolled), rolled.race, build.race) }, sexMode) : rolled)
     setPlayerCard(null)
     setRolling((r) => r + 1)
     setStep(4)
@@ -321,14 +329,14 @@ export function CreatorScreen() {
               </div>
               <p className="mt-1 text-sm text-parchment-400">
                 {heir.child
-                  ? `Ten years after ${heir.dead} fell, their child sets out: they keep the family name and inherit their parent's savings, a share of their renown, and their weapon.`
+                  ? `${afterDeath(heir.child.days)} ${heir.dead} fell, their child sets out: they keep the family name and inherit their parent's savings, a share of their renown, and their weapon.`
                   : `A few days after ${heir.dead} fell, someone new comes to the same lands. The world, its people and its history carry on.`}
               </p>
             </div>
           )}
           <AnimatePresence mode="wait">
             <motion.div key={step} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.22 }}>
-              {step === 0 && <OriginStep build={build} update={update} settings={settings} setSettings={(s) => { setSettings(s); setBuild((b) => normalize(b, s.sexModifiers)) }} />}
+              {step === 0 && <OriginStep build={build} update={update} settings={settings} setSettings={(s) => { setSettings(s); setBuild((b) => normalize(b, s.sexModifiers)) }} ageFixed={heirAge !== undefined} />}
               {step === 1 && <CallingStep build={build} update={update} />}
               {step === 2 && <AttributesStep build={build} update={update} sexMode={sexMode} />}
               {step === 3 && <SkillsStep build={build} update={update} sexMode={sexMode} />}
@@ -444,7 +452,21 @@ function Segmented<T extends string>({ value, options, onChange }: { value: T; o
   )
 }
 
-function OriginStep({ build, update, settings, setSettings }: { build: CharacterBuild; update: (p: Partial<CharacterBuild>) => void; settings: CampaignSettings; setSettings: (s: CampaignSettings) => void }) {
+function OriginStep({
+  build,
+  update,
+  settings,
+  setSettings,
+  ageFixed = false
+}: {
+  build: CharacterBuild
+  update: (p: Partial<CharacterBuild>) => void
+  settings: CampaignSettings
+  setSettings: (s: CampaignSettings) => void
+  /** A child of the dead sets out at the age the story says they are. */
+  ageFixed?: boolean
+}) {
+  const stage = AGES[build.age]
   return (
     <>
       <StepTitle title="Origin" text="Where you come from shapes what you can become. Every choice moves your limits." />
@@ -503,24 +525,31 @@ function OriginStep({ build, update, settings, setSettings }: { build: Character
       </div>
 
       <h3 className="mt-8 mb-3 text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">Age</h3>
-      <div className="grid gap-3 md:grid-cols-4">
-        {AGE_IDS.map((a) => {
-          const age = AGES[a]
-          return (
-            <Card key={a} active={build.age === a} onClick={() => update({ age: a })} className="p-3">
-              <span className="font-display tracking-wide text-parchment-50">{age.label}</span>
-              <span className="ml-2 text-xs text-parchment-500">{age.years}</span>
-              <div className="mt-2">
-                <ModChips mods={age.attrs} />
-              </div>
-              {(age.skillLevels > 0 || age.xpBonus > 0) && (
-                <p className="mt-1.5 text-[0.7rem] text-gold-300/80">
-                  {age.xpBonus ? `+${age.xpBonus * 100}% skill XP` : `+${age.skillLevels} skill levels, +${age.renown} Renown`}
-                </p>
-              )}
-            </Card>
-          )
-        })}
+      <div className="rounded-xl border border-gold-500/15 bg-ink-850/70 p-4">
+        <AgeSlider race={build.race} value={startingAge(build)} onChange={(years) => update({ years })} who="adventurer" disabled={ageFixed} />
+        {ageFixed && <p className="mt-1 text-xs text-parchment-400">Their age when they take up the tale.</p>}
+        {!ageFixed && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {AGE_IDS.map((a) => (
+              <button
+                key={a}
+                type="button"
+                onClick={() => update({ years: typicalAge(a, build.race) })}
+                className={`no-drag focus-ring cursor-pointer rounded-md border px-2.5 py-1 text-xs transition-colors touch:py-1.5 ${
+                  build.age === a ? 'border-gold-300 bg-gold-400/20 text-gold-100' : 'border-gold-500/20 text-parchment-400 hover:text-gold-200'
+                }`}
+              >
+                <span className="font-semibold">{AGES[a].label}</span> <span className="text-parchment-500">{stageYears(a, build.race)}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <ModChips mods={stage.attrs} />
+          {(stage.skillLevels > 0 || stage.xpBonus > 0) && (
+            <span className="text-[0.75rem] text-gold-300/80">{stage.xpBonus ? `+${stage.xpBonus * 100}% skill XP` : `+${stage.skillLevels} skill levels, +${stage.renown} Renown`}</span>
+          )}
+        </div>
       </div>
     </>
   )
@@ -1050,7 +1079,7 @@ function Preview({ build, sexMode, rolling, image, companions }: { build: Charac
       <Medallion name={build.name} race={build.race} size={104} image={image} />
       <div className="mt-4 font-display text-xl tracking-wide text-gold-200">{build.name || 'Unnamed'}</div>
       <div className="text-sm text-parchment-400">
-        {RACES[build.race].label} · {SEXES[sexMode][build.sex].label} · {AGES[build.age].label}
+        {RACES[build.race].label} · {SEXES[sexMode][build.sex].label} · {startingAge(build)}, {AGES[build.age].label.toLowerCase()}
       </div>
       <div className="text-sm text-gold-300/80">{BACKGROUNDS[build.background].label}</div>
 

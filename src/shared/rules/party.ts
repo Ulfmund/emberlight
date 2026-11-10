@@ -82,11 +82,13 @@ export function allyHealth(a: Companion, level: number): string {
   return r >= 1 ? 'unhurt' : r > 0.7 ? 'scratched' : r > 0.4 ? 'hurt' : 'badly hurt'
 }
 
+// The character creator's callings are here too (Grove Healer, Bone-Caller, Lane Warden…), so
+// someone whose card gives one fights the way it suggests.
 const ROLE_WORDS: [CompanionRole, RegExp][] = [
-  ['healer', /\b(healers?|healing|priests?|priestess(es)?|clerics?|monks?|nuns?|herbalists?|physicians?|medics?|doctors?|druids?|midwi(fe|ves)|surgeons?|apothecar(y|ies)|acolytes?|wise wom[ae]n)\b/],
-  ['mage', /\b(mages?|wizards?|witch(es)?|sorcer(er|ess|ers|esses)|warlocks?|magicians?|enchant(er|ers|ress)|conjurers?|necromancers?|spellcasters?|arcanists?|magus|magi)\b/],
-  ['archer', /\b(archers?|hunters?|huntress(es)?|rangers?|bowm[ae]n|bowyers?|marksm[ae]n|poachers?|trappers?|crossbowm[ae]n)\b/],
-  ['scout', /\b(thie(f|ves)|rogues?|scouts?|spy|spies|assassins?|cutpurses?|urchins?|smugglers?|pickpockets?|burglars?|trackers?)\b/]
+  ['healer', /\b(healers?|healing|priests?|priestess(es)?|clerics?|monks?|nuns?|herbalists?|physicians?|medics?|doctors?|druids?|midwi(fe|ves)|surgeons?|apothecar(y|ies)|acolytes?|wise wom[ae]n|grove ?healers?|bone-?callers?|shamans?)\b/],
+  ['mage', /\b(mages?|wizards?|witch(es)?|sorcer(er|ess|ers|esses)|warlocks?|magicians?|enchant(er|ers|ress)|conjurers?|necromancers?|spellcasters?|arcanists?|magus|magi|rune-?carvers?|loremasters?|moonsingers?)\b/],
+  ['archer', /\b(archers?|hunters?|huntress(es)?|rangers?|bowm[ae]n|bowyers?|marksm[ae]n|poachers?|trappers?|crossbowm[ae]n|grove ?wardens?)\b/],
+  ['scout', /\b(thie(f|ves)|rogues?|scouts?|spy|spies|assassins?|cutpurses?|urchins?|smugglers?|pickpockets?|burglars?|trackers?|lane ?wardens?|delvers?)\b/]
 ]
 
 /**

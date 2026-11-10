@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { allyId, CONDITION_IDS, findSpell, findTemplate, guessRole, PARTY_MAX, PLACE_KINDS, SPELLS, templateOf, weatherNow, type ConditionId, type GameEvent, type GameState, type InventoryItem } from '@shared/rules'
+import { ageRange, agesBrief, allyId, CONDITION_IDS, findSpell, findTemplate, guessRole, PARTY_MAX, PLACE_KINDS, RACE_IDS, SPELLS, templateOf, weatherNow, type ConditionId, type GameEvent, type GameState, type InventoryItem, type RaceId } from '@shared/rules'
+import { isRace, PERSON_LIMITS } from '@shared/people'
 import type { Provider } from '../providers'
 import { activeQuests, entityLine, findEntity, parseTie, relevantEntities, RELATIONS, sameFaction, sameName, samePlace, type Memory, type Tie } from '@shared/memory'
 
@@ -32,6 +33,15 @@ const RecordSchema = z.object({
   relation: z.enum(RELATIONS).describe("People only: how they're tied to the player character: child, parent, sibling, spouse, lover, friend, ally, companion, employer, rival, enemy, or none").default('none'),
   partOf: z.string().describe('People: the named group they belong to ("the Town Watch"). Quests: who asked it of the character. Items: who has it now ("the player" for the player character). Otherwise empty').default(''),
   ties: z.array(z.string()).describe('People only: their ties to other named characters the story states, each as "how: name" ("granddaughter of: Old Tam", "owes money to: Sergeant Pell"). Not ties to the player character').default([]),
+  race: z
+    .enum(['unknown', ...RACE_IDS] as [string, ...string[]])
+    .describe("People only: their people (human, dwarf, elf, halfling or orc). Someone new: the likeliest if the story doesn't say. Unknown for someone in KNOWN, or someone of none of these peoples")
+    .default('unknown'),
+  sex: z.enum(['female', 'male', 'unknown']).describe('People only. Someone new: always female or male').default('unknown'),
+  age: z.number().int().describe('People only: their age in years. Someone new: always your best guess from how the story shows them. 0 for someone in KNOWN').default(0),
+  calling: z.string().describe('People only: what they do, in a word or two ("smith", "innkeeper", "hedge witch"). Someone new: always').default(''),
+  appearance: z.string().describe('People only, someone new: what they look like, in one short line').default(''),
+  personality: z.string().describe('People only, someone new: how they carry themselves, in one short line, from how they act').default(''),
   standingChange: z
     .number()
     .int()
@@ -87,6 +97,7 @@ const SYSTEM = `You are the Scribe for a fantasy roleplaying game. You keep the 
 - Facts are what someone would still need to know a month later: "owes the player 5 silver", "lost two fingers to the river-thing", "is secretly the baron's son", "took the player prisoner". Never moods, gestures, smells, what a room looks like, or a blow-by-blow of a fight. Never guesses ("possibly", "seems to"): only what the story states. For someone already in KNOWN, add only what's new, and most turns add nothing.
 - When someone recorded under a description ("grey-bearded man") gives their name, record them under the name and put the description in otherNames, so the record is renamed rather than duplicated.
 - relation: only ties to the player character the story makes clear. A child is the player character's own son or daughter.
+- Someone new (not in KNOWN) always gets a full card, like the player character's from the character creator: race, sex, age, calling, appearance and personality, none left empty. Take them from what the story shows; where it says nothing, choose what fits what it does show (a village smith is most likely a grown human man; a boy sweeping a forge, a human child). This is the one place where you fill gaps instead of recording only what's stated. For someone in KNOWN, give only what their record lacks (KNOWN shows what it has), and leave the rest empty. ${agesBrief()}
 - ties: whenever the story says how two other characters are tied (family, marriage, debts, loyalties, feuds), record it on each of them as "how: name": "that's Wenna, my son's girl" said by Old Tam gives Wenna "granddaughter of: Old Tam" and Old Tam "grandfather of: Wenna".
 - factions: named groups only. standingChange is for what the character did in this exchange, not for what the group is like; most turns it is 0.
 - quests: when the character takes on a task that lasts beyond the scene (asked by someone, or of their own choosing: "I'll find out who burned the mill"), record it as active, with who asked it in partOf; when it's clearly achieved, done; when it can no longer be done, failed. Use the name from QUESTS for one already recorded. A passing errand isn't a quest.
@@ -117,7 +128,7 @@ export async function runScribe(
   const party = state.party ?? []
   const prompt = `Character: ${c.build.name}. Carrying: ${c.inventory.map((i) => `${i.name}${i.qty > 1 ? ` ×${i.qty}` : ''}`).join(', ') || 'nothing'}. Conditions: ${c.conditions.join(', ') || 'none'}. Location: ${state.location ?? 'unknown'}.
 TRAVELLING WITH: ${party.map((a) => a.name).join(', ') || 'nobody'}.
-${known.length ? `\nKNOWN (already recorded):\n${known.map((e) => entityLine(e, 4)).join('\n')}\n` : ''}${quests.length ? `\nQUESTS (open, already recorded): ${quests.map((q) => q.name).join('; ')}\n` : ''}
+${known.length ? `\nKNOWN (already recorded):\n${known.map((e) => entityLine(e, 4, { day: state.time.day, looks: true })).join('\n')}\n` : ''}${quests.length ? `\nQUESTS (open, already recorded): ${quests.map((q) => q.name).join('; ')}\n` : ''}
 PLAYER: ${playerText}
 ${engineNotes ? `\nGAME ENGINE: ${engineNotes}\n` : ''}
 DM: ${narration}
@@ -225,7 +236,8 @@ export function scribeToEvents(raw: ScribeInput, state: GameState, memory?: Memo
     const e = known(n)
     if (p?.status === 'dead' || e?.status === 'dead') continue
     const name = e?.name ?? p?.name ?? n
-    const role = guessRole([p?.what, e?.summary, ...(p?.newFacts ?? []), ...(e?.facts ?? [])].filter(Boolean).join('\n'))
+    // What they do says most about how they fight (a hunter shoots, a hedge witch casts).
+    const role = guessRole([e?.calling, p?.calling, p?.what, e?.summary, ...(p?.newFacts ?? []), ...(e?.facts ?? [])].filter(Boolean).join('\n'))
     events.push({ type: 'party_join', companion: { id: allyId(name), name, role } })
     party = [...party, { id: allyId(name), name, role, wounds: 0, down: false, joinedDay: state.time.day }]
   }
@@ -274,6 +286,13 @@ export function scribeToEvents(raw: ScribeInput, state: GameState, memory?: Memo
       .map(parseTie)
       .filter((t): t is Tie => t !== null && aName(t.name) && !sameName(t.name, me) && !sameName(t.name, name))
       .slice(0, 4)
+    // Who they are, as the creator has it: what the record lacks is filled in (memory.ts).
+    const race: RaceId | undefined = isRace(p.race) ? p.race : undefined
+    const oldest = race ? ageRange(race, 'anyone').max : 120
+    const age = p.age >= 1 && p.age <= oldest ? p.age : undefined
+    const calling = line(p.calling, PERSON_LIMITS.calling)
+    const appearance = line(p.appearance, PERSON_LIMITS.appearance)
+    const personality = line(p.personality, PERSON_LIMITS.personality)
     events.push({
       type: 'entity',
       kind: 'person',
@@ -286,6 +305,12 @@ export function scribeToEvents(raw: ScribeInput, state: GameState, memory?: Memo
       relation: p.relation && p.relation !== 'none' ? p.relation : undefined,
       faction: line(p.partOf, 60) || undefined,
       ...(ties.length ? { ties } : {}),
+      ...(race ? { race } : {}),
+      ...(p.sex === 'female' || p.sex === 'male' ? { sex: p.sex } : {}),
+      ...(age !== undefined ? { age } : {}),
+      ...(calling ? { calling } : {}),
+      ...(appearance ? { appearance } : {}),
+      ...(personality ? { personality } : {}),
       day
     })
   }

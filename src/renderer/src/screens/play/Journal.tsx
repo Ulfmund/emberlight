@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { ATTITUDES, fmtStanding, MAX_FACTS, parseTie, QUEST_STATUSES, sameFaction, sameName, STANDINGS, standingLabel, type Attitude, type Entity, type EntityStatus, type MemoryEvent, type Summary, type Tie } from '@shared/memory'
 import { cardImageUrl } from '@shared/cards'
-import { BACKGROUNDS, RACES } from '@shared/rules'
+import { BACKGROUNDS, RACE_IDS, RACES, rescaleAge, typicalAge, type RaceId, type SexId } from '@shared/rules'
+import { ageOn, APPEARANCE_IDEAS, bornAt, PERSON_LIMITS, personLine, PERSONALITY_IDEAS } from '@shared/people'
+import { AgeSlider } from '../../components/AgeSlider'
 import type { CampaignView } from '@shared/view'
 import { useGame } from '../../store'
 import { Button } from '../../components/Button'
@@ -218,7 +220,7 @@ const LIST_TEXT: Record<Entity['kind'], { title: string; text: string; empty: st
 
 function EntityList({ view, items, kind }: { view: CampaignView; items: Entity[]; kind: Entity['kind'] }) {
   const [query, setQuery] = useState('')
-  const shown = query.trim() ? items.filter((e) => [e.name, ...e.aliases, e.summary, ...e.facts].join(' ').toLowerCase().includes(query.trim().toLowerCase())) : items
+  const shown = query.trim() ? items.filter((e) => [e.name, ...e.aliases, e.summary, e.calling ?? '', e.appearance ?? '', ...e.facts].join(' ').toLowerCase().includes(query.trim().toLowerCase())) : items
   return (
     <>
       <Heading title={LIST_TEXT[kind].title} text={LIST_TEXT[kind].text} />
@@ -259,7 +261,7 @@ function EntityCard({ entity: e, view }: { entity: Entity; view: CampaignView })
         </button>
       )}
       {editing ? (
-        <EntityEditor entity={e} onDone={() => setEditing(false)} />
+        <EntityEditor entity={e} day={view.state.time.day} onDone={() => setEditing(false)} />
       ) : (
         <div className="flex gap-4">
           <button
@@ -299,12 +301,29 @@ function EntityCard({ entity: e, view }: { entity: Entity; view: CampaignView })
               {e.kind === 'person' && e.faction && <span className="text-xs text-gold-300/80">of {e.faction}</span>}
               {e.kind === 'quest' && <span className={`text-xs font-semibold uppercase ${STATUS_INFO[e.status].tone}`}>{STATUS_INFO[e.status].label}</span>}
             </div>
+            {e.kind === 'person' && personLine(e, view.state.time.day) && <p className="mt-0.5 text-[0.82rem] text-parchment-300">{personLine(e, view.state.time.day)}</p>}
             {e.kind === 'person' && <AttitudeMeter value={e.attitude} />}
             {e.kind === 'faction' && <StandingMeter value={e.standing ?? 0} />}
             {e.kind === 'person' && e.ties && e.ties.length > 0 && <p className="mt-1 text-[0.8rem] text-parchment-400">{e.ties.map((t) => `${t.how.charAt(0).toUpperCase()}${t.how.slice(1)} ${t.name}`).join(' · ')}</p>}
             {e.kind === 'quest' && e.giver && <p className="mt-1 text-[0.8rem] text-parchment-400">Asked by {e.giver}</p>}
             {e.kind === 'item' && e.holder && <p className="mt-1 text-[0.8rem] text-parchment-400">{e.holder === 'you' ? 'You have it' : `${e.holder} has it`}</p>}
             <p className="mt-1.5 text-[0.92rem] leading-snug text-parchment-200">{e.summary || <span className="text-parchment-500 italic">No description yet.</span>}</p>
+            {e.kind === 'person' && (e.appearance || e.personality) && (
+              <div className="mt-1.5 space-y-0.5 text-[0.85rem] leading-snug text-parchment-300">
+                {e.appearance && (
+                  <p>
+                    <span className="mr-1.5 text-[0.66rem] font-semibold tracking-[0.12em] text-gold-400/90 uppercase">Appearance</span>
+                    {e.appearance}
+                  </p>
+                )}
+                {e.personality && (
+                  <p>
+                    <span className="mr-1.5 text-[0.66rem] font-semibold tracking-[0.12em] text-gold-400/90 uppercase">Personality</span>
+                    {e.personality}
+                  </p>
+                )}
+              </div>
+            )}
             {e.facts.length > 0 && (
               <ul className="mt-2 space-y-1">
                 {e.facts.map((f, i) => (
@@ -401,12 +420,40 @@ function Choice<T extends string>({ value, options, onChange }: { value: T; opti
   )
 }
 
+/** Another idea from the creator's list (never the same one twice running). */
+const pickIdea = (ideas: string[], now: string) => {
+  const rest = ideas.filter((x) => x !== now)
+  return rest[Math.floor(Math.random() * rest.length)] ?? now
+}
+
+/** The creator's dice: suggest something for a field. */
+function Dice({ onClick, title }: { onClick: () => void; title: string }) {
+  return (
+    <motion.button type="button" whileTap={{ rotate: 180, scale: 0.85 }} onClick={onClick} title={title} aria-label={title} className="no-drag absolute top-2 right-2 cursor-pointer rounded-md p-1.5 text-gold-400 hover:bg-white/5 hover:text-gold-200">
+      <Icon name="d20" size={16} />
+    </motion.button>
+  )
+}
+
 function Label({ children }: { children: React.ReactNode }) {
   return <span className="mb-1 block text-[0.68rem] font-semibold tracking-[0.14em] text-gold-400 uppercase">{children}</span>
 }
 
-function EntityEditor({ entity: e, onDone }: { entity: Entity; onDone: () => void }) {
+function EntityEditor({ entity: e, day, onDone }: { entity: Entity; day: number; onDone: () => void }) {
   const { save, error } = useSave()
+  // People: who they are, by the character creator's criteria (people.ts).
+  const knownAge = ageOn(e, day)
+  const [race, setRace] = useState<RaceId | ''>(e.race ?? '')
+  const [sex, setSex] = useState<SexId | ''>(e.sex ?? '')
+  const [years, setYears] = useState<number | null>(knownAge ?? null)
+  const [calling, setCalling] = useState(e.calling ?? '')
+  const [appearance, setAppearance] = useState(e.appearance ?? '')
+  const [personality, setPersonality] = useState(e.personality ?? '')
+  const pickRace = (r: RaceId | '') => {
+    // Another people, the same point in life (as in the creator).
+    if (r && race && r !== race && years !== null) setYears(rescaleAge(years, race, r))
+    setRace(r)
+  }
   // Renaming goes through its own choice (retcon or in-story), so the name isn't edited here.
   const name = e.name
   const [renaming, setRenaming] = useState(false)
@@ -440,7 +487,18 @@ function EntityEditor({ entity: e, onDone }: { entity: Entity; onDone: () => voi
       faction: person ? faction.trim() || null : undefined,
       ties: person ? ties.split('\n').map(parseTie).filter((t): t is Tie => t !== null) : undefined,
       giver: quest ? giver.trim() || null : undefined,
-      holder: item ? holder.trim() || null : undefined
+      holder: item ? holder.trim() || null : undefined,
+      ...(person
+        ? {
+            race: race || null,
+            sex: sex || null,
+            // Their birthday stays put unless their age was changed.
+            born: years === null ? null : years === knownAge ? e.born : bornAt(years, day),
+            calling: calling.trim() || null,
+            appearance,
+            personality
+          }
+        : {})
     })
     if (ok) onDone()
   }
@@ -467,6 +525,53 @@ function EntityEditor({ entity: e, onDone }: { entity: Entity; onDone: () => voi
           <input value={aliases} onChange={(x) => setAliases(x.target.value)} placeholder="Other names, separated by commas" className="input py-2 text-sm" />
         </label>
       </div>
+      {person && (
+        <div className="space-y-3 rounded-lg border border-gold-500/10 bg-ink-900/40 p-3">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <Label>Race</Label>
+              <Choice value={race || 'unknown'} onChange={(v) => pickRace(v === 'unknown' ? '' : v)} options={[...RACE_IDS.map((r) => ({ id: r, label: RACES[r].label })), { id: 'unknown' as const, label: '?' }]} />
+            </div>
+            <div>
+              <Label>Sex</Label>
+              <Choice
+                value={sex || 'unknown'}
+                onChange={(v) => setSex(v === 'unknown' ? '' : v)}
+                options={[{ id: 'female' as const, label: 'Female' }, { id: 'male' as const, label: 'Male' }, { id: 'unknown' as const, label: '?' }]}
+              />
+            </div>
+          </div>
+          <div>
+            <span className="flex items-baseline justify-between">
+              <Label>Age</Label>
+              {years !== null && (
+                <button type="button" onClick={() => setYears(null)} className="no-drag cursor-pointer text-[0.7rem] text-parchment-500 hover:text-parchment-200 touch:py-1">
+                  Not known
+                </button>
+              )}
+            </span>
+            <AgeSlider race={race || 'human'} value={years ?? typicalAge('adult', race || 'human')} onChange={setYears} who="anyone" unknown={years === null} label={`${e.name}'s age in years`} />
+          </div>
+          <label className="block">
+            <Label>Calling</Label>
+            <input value={calling} onChange={(x) => setCalling(x.target.value)} maxLength={PERSON_LIMITS.calling} placeholder="Smith, innkeeper, priest…" className="input py-2 text-sm" />
+          </label>
+          <label className="block">
+            <Label>Appearance</Label>
+            <span className="relative block">
+              <textarea value={appearance} onChange={(x) => setAppearance(x.target.value)} maxLength={PERSON_LIMITS.appearance} rows={2} className="input resize-y py-2 pr-11 text-sm leading-relaxed" />
+              <Dice onClick={() => setAppearance(pickIdea(APPEARANCE_IDEAS, appearance))} title="Suggest an appearance" />
+            </span>
+          </label>
+          <label className="block">
+            <Label>Personality</Label>
+            <span className="relative block">
+              <textarea value={personality} onChange={(x) => setPersonality(x.target.value)} maxLength={PERSON_LIMITS.personality} rows={2} className="input resize-y py-2 pr-11 text-sm leading-relaxed" />
+              <Dice onClick={() => setPersonality(pickIdea(PERSONALITY_IDEAS, personality))} title="Suggest a personality" />
+            </span>
+          </label>
+        </div>
+      )}
       <label className="block">
         <Label>{person ? 'Who they are' : group ? 'What they are' : quest ? 'What has to be done' : 'What it is'}</Label>
         <input value={summary} onChange={(x) => setSummary(x.target.value)} maxLength={400} className="input py-2 text-sm" />

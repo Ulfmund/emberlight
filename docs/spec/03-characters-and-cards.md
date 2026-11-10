@@ -16,6 +16,16 @@ So the same card (and portrait) can be a level-1 farmhand in one campaign and a 
 
 When the Scribe notices a new named character in the story, it creates a lightweight **NPC stub**: name, short description, where they were met, and relationship to the player. A stub gets a full sheet automatically the moment it's needed (e.g. combat starts), generated from its description. Any stub can be "promoted" to a full library card with one click.
 
+*Built (1.1.0): people are made like characters* (`src/shared/people.ts`). Everyone in the Journal has a card by the character creator's own criteria: **race, sex, age, calling, appearance and personality**. The Scribe writes the whole card for someone new: from what the story shows, and where it says nothing, what fits it (a village smith is most likely a grown human man). It's the one place the Scribe fills gaps instead of recording only what's stated. After that it only fills what the card still lacks, so a guess never drifts from scene to scene and a correction in the Journal stands. Calling is free words ("smith", "innkeeper", "hedge witch"), since the creator's callings are for someone setting out on an adventure.
+
+- **Age is a number that follows the calendar**: stored as the day they were born, so everyone grows older through a Timeskip, as the player character does. The DM and the Scribe are told how each people ages ("grown from / old from": humans 21 / 56, dwarves 53 / 140, elves 105 / 280, halflings 26 / 70, orcs 17 / 45), so a grey-braided dwarf isn't written down as fifty.
+- **The Journal card** reads "Dwarf woman · 54 · smith", with appearance and personality under the one-line description. The editor uses the creator's controls: race and sex as choices, age on a slider (from birth to old age, at that people's pace; "Not known" until set), calling, and appearance and personality with the creator's dice for ideas.
+- **The DM** sees each person's card in their line ("Hild (dwarf woman, 54, smith, …)"), and with room in the context, their appearance and personality too, and is told to keep people as their record has them.
+- **Portraits** are painted from the card, the way the player's is from the sheet ("a 54-year-old dwarf woman, smith, grey braids…").
+- **Children** get their people and sex at birth. A child who takes up the tale starts the creator from their card: race, sex, appearance, personality, and their calling when it's one of their people's creator callings. Their age is fixed when the story knows when they were born.
+- **Companions** fight the way their calling suggests (a hunter shoots, a grove healer heals; the creator's callings are known to the role guess).
+- People don't get attribute or skill numbers yet: nothing in the game would use them.
+
 ### The DM is a card too
 
 The DM persona card controls the narrator's voice and attitude. The default is a fair, vivid, neutral DM. Alternative DM cards can change tone, harshness, or even allow refusal (e.g. "the bratty DM who argues with you"). DM cards don't have sheets.
@@ -56,7 +66,7 @@ A step-by-step screen with big illustrated choices. Every step shows how the cho
 
 1. **Race** — cards with art, a one-line flavor text, and a mini chart of stat caps.
 2. **Sex** — shows its cap modifiers.
-3. **Age** — young / adult / middle-aged / elder (affects caps; the character grows older as the story goes on, see [04](04-rules-system.md#seasons-and-aging)).
+3. **Age** — young / adult / middle-aged / elder (affects caps; the character grows older as the story goes on, see [04](04-rules-system.md#seasons-and-aging)). *(Since 1.1.0 a slider in years, the same as on people's Journal cards: an adventurer can be 16 to 90 in human years, at their people's pace (an elf 80 to 450). The stage follows from the years, shows beside the number with what it does to the limits, and has buttons to jump to each stage's typical age. Choosing another people keeps the same point in life: a human of 27 becomes a dwarf of 68.)*
 4. **Background** — e.g. farmhand, apprentice smith, temple acolyte, street thief, hunter. Sets starting skills and gear.
 5. **Attributes** — point-buy. Each attribute is a bar showing its current value and a **cap marker** for this character. Hovering a cap shows why ("Dwarf +2, Male +1").
 6. **Skills** — spend starting skill points; caps shown the same way.

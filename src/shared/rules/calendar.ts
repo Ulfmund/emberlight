@@ -1,6 +1,6 @@
 import type { CharacterBuild } from './character'
 import type { GameState } from './state'
-import { AGES, type AgeId, type RaceId, type SkillId } from './tables'
+import { AGES, RACE_IDS, RACES, type AgeId, type RaceId, type SkillId } from './tables'
 
 /**
  * The calendar and growing older (docs/spec/04-rules-system.md#seasons-and-aging). A year is
@@ -49,8 +49,50 @@ const STAGE_FROM: [AgeId, number][] = [
   ['adult', 21],
   ['young', 0]
 ]
+/** The youngest an adventurer can set out, and the oldest anyone is, in human years. */
+const SETS_OUT = 16
+const OLDEST_ADVENTURER = 90
+const OLDEST = 100
 
-export const startingAge = (b: Pick<CharacterBuild, 'age' | 'race'>) => Math.round(TYPICAL[b.age] * (AGE_SCALE[b.race] ?? 1))
+const scale = (race: RaceId) => AGE_SCALE[race] ?? 1
+
+/** A typical age, in years, for someone of this people at this stage of life. */
+export const typicalAge = (age: AgeId, race: RaceId) => Math.round(TYPICAL[age] * scale(race))
+
+/** The stage of life someone of this people is in at this age (the age table's rows). */
+export function stageAt(years: number, race: RaceId): AgeId {
+  const human = years / scale(race)
+  return STAGE_FROM.find(([, from]) => human >= from)![0]
+}
+
+/** The ages the age slider offers: an adventurer from 16 (in human years); anyone from birth. */
+export function ageRange(race: RaceId, who: 'adventurer' | 'anyone'): { min: number; max: number } {
+  const s = scale(race)
+  return who === 'adventurer' ? { min: Math.round(SETS_OUT * s), max: Math.round(OLDEST_ADVENTURER * s) } : { min: 0, max: Math.round(OLDEST * s) }
+}
+
+/** Where each stage of life begins and ends for this people, in years, within the slider's range. */
+export function ageBands(race: RaceId, who: 'adventurer' | 'anyone'): { age: AgeId; from: number; to: number }[] {
+  const { min, max } = ageRange(race, who)
+  const starts = [...STAGE_FROM].reverse().map(([age, from]) => ({ age, from: Math.max(min, Math.round(from * scale(race))) }))
+  return starts.map((b, i) => ({ ...b, to: i + 1 < starts.length ? starts[i + 1].from - 1 : max })).filter((b) => b.to >= b.from)
+}
+
+/**
+ * For the DM and the Scribe: when each people is grown and when old, so a grey-braided dwarf
+ * smith isn't recorded as fifty, and a dwarf of fifty isn't told as old.
+ */
+export function agesBrief(): string {
+  const at = (stage: AgeId) => STAGE_FROM.find(([a]) => a === stage)![1]
+  const parts = RACE_IDS.map((r) => `${RACES[r].plural.toLowerCase()} ${Math.round(at('adult') * scale(r))} / ${Math.round(at('elder') * scale(r))}`)
+  return `Each people ages at its own pace (grown from / old from, in years): ${parts.join(', ')}.`
+}
+
+/** The same point in life for another people (a human of 27 is a dwarf of 68). */
+export const rescaleAge = (years: number, from: RaceId, to: RaceId) => Math.round((years / scale(from)) * scale(to))
+
+/** Their age when the story begins: as the player set it, or typical for the stage they chose. */
+export const startingAge = (b: Pick<CharacterBuild, 'age' | 'race'> & { years?: number }) => (b.years !== undefined ? Math.round(b.years) : typicalAge(b.age, b.race))
 
 /** The character's age in years, now. */
 export function ageYears(state: Pick<GameState, 'character' | 'time'>): number {
@@ -61,10 +103,9 @@ export function ageYears(state: Pick<GameState, 'character' | 'time'>): number {
 
 /** The stage of life the character is in now (it decides their limits). */
 export function ageStage(state: Pick<GameState, 'character' | 'time'>): AgeId {
-  const human = ageYears(state) / (AGE_SCALE[state.character.build.race] ?? 1)
   // A character never seems younger than they began (a "middle-aged" 36 stays middle-aged).
   const began = AGE_IDS_IN_ORDER.indexOf(state.character.build.age)
-  const now = AGE_IDS_IN_ORDER.indexOf(STAGE_FROM.find(([, from]) => human >= from)![0])
+  const now = AGE_IDS_IN_ORDER.indexOf(stageAt(ageYears(state), state.character.build.race))
   return AGE_IDS_IN_ORDER[Math.max(began, now)]
 }
 const AGE_IDS_IN_ORDER: AgeId[] = ['young', 'adult', 'middle', 'elder']

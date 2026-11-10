@@ -224,7 +224,7 @@ Resting in the wild rolls on the random encounter table (see [06](06-ai-dm.md#5-
 
 *Built (0.24.0).* The story keeps a calendar: four seasons of 90 days and a year of 360, beginning on the first day of spring. The Sheet shows the date ("Day 300 · Winter, year 1"), and the DM is told the season and what it means.
 
-**Growing older.** A character's age is counted in years. It starts at a typical age for the stage picked at creation (in human years: young 18, adult 27, middle-aged 44, elder 62) and goes up by one every 360 days. Some peoples age much slower than others:
+**Growing older.** A character's age is counted in years. It starts at the age set on the creator's slider (1.1.0; before that, a typical age for the stage picked: in human years young 18, adult 27, middle-aged 44, elder 62) and goes up by one every 360 days. People in the Journal age the same way, from the day they were born (see [03](03-characters-and-cards.md#npcs-created-during-play)). Some peoples age much slower than others:
 
 | People | Ages | An adult starts at | Middle-aged from | Elder from |
 |---|---|---|---|---|

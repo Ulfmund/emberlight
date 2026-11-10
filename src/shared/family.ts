@@ -38,6 +38,21 @@ export function childStage(years: number, race: RaceId): string {
 /** Years until a child is grown enough to take up the tale (0 if they already are). */
 export const yearsToComeOfAge = (years: number, race: RaceId) => Math.max(0, Math.ceil(COME_OF_AGE * (AGE_SCALE[race] ?? 1) - years))
 
+/** A child takes up the tale this many years after their parent's death, if their age isn't known. */
+export const HEIR_YEARS = 10
+
+/**
+ * When a child takes up the tale after their parent's death: once they've come of age (at least
+ * a few days on), or ten years on if the story never said when they were born. Their age then,
+ * when it's known.
+ */
+export function heirStart(child: Pick<Entity, 'born'>, day: number, race: RaceId): { days: number; age?: number } {
+  const years = yearsOld(child, day)
+  const wait = years === undefined ? HEIR_YEARS : yearsToComeOfAge(years, race)
+  const days = Math.max(3, Math.min(20, wait) * DAYS_PER_YEAR)
+  return { days, ...(years === undefined ? {} : { age: years + Math.floor(days / DAYS_PER_YEAR) }) }
+}
+
 /** The family, for the DM: who they married, and their children with their ages. */
 export function familyBrief(memory: Memory, state: Pick<GameState, 'time' | 'character'>): string {
   const spouse = spouseOf(memory)
@@ -49,7 +64,7 @@ export function familyBrief(memory: Memory, state: Pick<GameState, 'time' | 'cha
   if (kids.length) {
     const told = kids.map((k) => {
       const y = yearsOld(k, state.time.day)
-      return `${k.name}${y !== undefined ? ` (${y}, ${childStage(y, race)})` : ''}${k.status === 'dead' ? ', dead' : ''}`
+      return `${k.name}${y !== undefined ? ` (${y}, ${childStage(y, k.race ?? race)})` : ''}${k.status === 'dead' ? ', dead' : ''}`
     })
     lines.push(`Children: ${told.join('; ')}.`)
   }
@@ -61,7 +76,10 @@ export function marriageEvent(state: Pick<GameState, 'time' | 'character'>, name
   return { type: 'entity', kind: 'person', name, relation: 'spouse', attitude: 'devoted', facts: [`Married ${state.character.build.name} on day ${state.time.day}`], day: state.time.day }
 }
 
-/** A child is born to the character (and their spouse, if they have one). */
+/**
+ * A child is born to the character (and their spouse, if they have one). Their card starts with
+ * what's known at birth: their people (the character's) and their sex (people.ts).
+ */
 export function birthEvent(state: Pick<GameState, 'time' | 'character'>, child: { name: string; sex: SexId }, spouse?: string, born = state.time.day): MemoryEvent {
   const pc = state.character.build.name
   const kin = child.sex === 'female' ? 'daughter' : 'son'
@@ -72,6 +90,8 @@ export function birthEvent(state: Pick<GameState, 'time' | 'character'>, child: 
     summary: `${pc}'s ${kin}${spouse ? ` with ${spouse}` : ''}`,
     relation: 'child',
     attitude: 'devoted',
+    race: state.character.build.race,
+    sex: child.sex,
     born,
     facts: [`Born on day ${born}`],
     ...(spouse ? { ties: [{ how: `${kin} of`, name: spouse }] } : {}),

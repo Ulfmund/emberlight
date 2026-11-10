@@ -26,13 +26,17 @@ import {
   type SkillId,
   type SkillMods
 } from './tables'
+import { ageRange, stageAt, typicalAge } from './calendar'
 
 /** Everything the player chooses in the character creator. */
 export type CharacterBuild = {
   name: string
   race: RaceId
   sex: SexId
+  /** The stage of life (it sets the limits); it follows from `years` when that's given. */
   age: AgeId
+  /** Their age in years when the story begins (the creator's age slider). Older saves have none. */
+  years?: number
   background: BackgroundId
   /** Humans only: the two attributes that get +1 cap. */
   humanBonus: Attr[]
@@ -145,6 +149,11 @@ export function validateBuild(b: CharacterBuild, sexMode: SexMode): string[] {
   if (!b.name.trim()) errors.push('Give your character a name.')
   if (b.race === 'human' && new Set(b.humanBonus).size !== 2) errors.push('Pick two attributes for Adaptable.')
   if (!RACE_BACKGROUNDS[b.race].includes(b.background)) errors.push(`${RACES[b.race].plural} don't have the calling ${BACKGROUNDS[b.background].label}. Pick another.`)
+  if (b.years !== undefined) {
+    const { min, max } = ageRange(b.race, 'adventurer')
+    if (!Number.isInteger(b.years) || b.years < min || b.years > max) errors.push(`An adventurer among the ${RACES[b.race].plural.toLowerCase()} is between ${min} and ${max} years old.`)
+    else if (stageAt(b.years, b.race) !== b.age) errors.push(`At ${b.years}, ${RACES[b.race].plural.toLowerCase()} are ${AGES[stageAt(b.years, b.race)].label.toLowerCase()}, not ${AGES[b.age].label.toLowerCase()}.`)
+  }
   const caps = attrCaps(b, sexMode)
   for (const a of ATTRS) {
     if (b.attributes[a] < ATTR_START) errors.push(`${a} can't go below ${ATTR_START}.`)
@@ -206,7 +215,9 @@ export const pick = <T>(rng: Rng, items: readonly T[]): T => items[Math.floor(rn
 export function randomBuild(rng: Rng, sexMode: SexMode, name: string, fixed: Partial<CharacterBuild> = {}): CharacterBuild {
   const race = fixed.race ?? pick(rng, Object.keys(RACES) as RaceId[])
   const sex = fixed.sex ?? pick(rng, ['male', 'female'] as SexId[])
-  const age = fixed.age ?? pick(rng, ['young', 'adult', 'adult', 'adult', 'middle', 'elder'] as AgeId[])
+  const age = fixed.years !== undefined ? stageAt(fixed.years, race) : (fixed.age ?? pick(rng, ['young', 'adult', 'adult', 'adult', 'middle', 'elder'] as AgeId[]))
+  // An age in years within that stage (most elders are well short of ninety).
+  const years = fixed.years ?? randomAgeIn(rng, age, race)
   // Each people has its own callings.
   const background = fixed.background && RACE_BACKGROUNDS[race].includes(fixed.background) ? fixed.background : pick(rng, RACE_BACKGROUNDS[race])
   const bg = BACKGROUNDS[background]
@@ -251,6 +262,7 @@ export function randomBuild(rng: Rng, sexMode: SexMode, name: string, fixed: Par
     race,
     sex,
     age,
+    years,
     background,
     humanBonus,
     attributes,
@@ -258,4 +270,16 @@ export function randomBuild(rng: Rng, sexMode: SexMode, name: string, fixed: Par
     appearance: fixed.appearance ?? '',
     personality: fixed.personality ?? ''
   }
+}
+
+/** A random age in years at a stage of life, for someone setting out on an adventure. */
+export function randomAgeIn(rng: Rng, age: AgeId, race: RaceId): number {
+  const { min, max } = ageRange(race, 'adventurer')
+  const typical = typicalAge(age, race)
+  // From where the stage begins to a little past its typical age, kept inside the stage.
+  let lo = typical
+  while (lo - 1 >= min && stageAt(lo - 1, race) === age) lo--
+  let hi = typical
+  while (hi + 1 <= max && stageAt(hi + 1, race) === age && hi + 1 <= typical + (typical - lo)) hi++
+  return lo + Math.floor(rng() * (hi - lo + 1))
 }

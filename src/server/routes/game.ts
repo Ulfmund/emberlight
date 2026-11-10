@@ -21,6 +21,7 @@ import type { CardLibrary } from '../cards/library'
 import { applyRename, previewRename } from '../core/rename'
 import { MAX_COMPANIONS, type CastMember } from '@shared/cards'
 import { MAX_FACTS, type MemoryEvent } from '@shared/memory'
+import { PERSON_LIMITS } from '@shared/people'
 import { findWorld } from '@shared/worlds'
 import { AGES, ageYears, BACKGROUNDS, HOME_KINDS, PRACTICE_MAX, RACES, SEXES, SKIP_MAX_DAYS } from '@shared/rules'
 import { attachment } from './cards'
@@ -34,6 +35,7 @@ const BuildSchema = z.object({
   race: z.enum(tuple(RACE_IDS)),
   sex: z.enum(['male', 'female']),
   age: z.enum(tuple(AGE_IDS)),
+  years: z.number().int().min(0).max(1000).optional(),
   background: z.enum(tuple(BACKGROUND_IDS)),
   humanBonus: z.array(z.enum(tuple(ATTRS))).max(2),
   attributes: z.record(z.enum(tuple(ATTRS)), z.number().int()),
@@ -87,7 +89,14 @@ const JournalEditSchema = z.discriminatedUnion('type', [
     faction: short(80).nullable().optional(),
     ties: z.array(z.object({ how: short(60), name: short(60) })).max(8).optional(),
     giver: short(80).nullable().optional(),
-    holder: short(80).nullable().optional()
+    holder: short(80).nullable().optional(),
+    // People: who they are, by the creator's criteria (people.ts).
+    race: z.enum(tuple(RACE_IDS)).nullable().optional(),
+    sex: z.enum(['male', 'female']).nullable().optional(),
+    born: z.number().int().min(-1_000_000).max(1_000_000).nullable().optional(),
+    calling: short(PERSON_LIMITS.calling).nullable().optional(),
+    appearance: short(PERSON_LIMITS.appearance).optional(),
+    personality: short(PERSON_LIMITS.personality).optional()
   }),
   z.object({ type: z.literal('entity_forget'), id: short(200) }),
   z.object({ type: z.literal('summary_edit'), level: z.enum(['scene', 'chapter']), to: short(80), title: short(120), text: short(4000) }),

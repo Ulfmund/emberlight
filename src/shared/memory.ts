@@ -6,6 +6,8 @@
  * Memory is built from events, like the rest of the game state, so it follows the branch
  * being played: rewind past the moment you met someone and the record of them is gone too.
  */
+import type { RaceId, SexId } from './rules/tables'
+import { bornAt, isRace, PERSON_LIMITS, personTags } from './people'
 
 export type EntityKind = 'person' | 'place' | 'faction' | 'quest' | 'item'
 export type Attitude = 'hostile' | 'unfriendly' | 'neutral' | 'friendly' | 'devoted'
@@ -76,8 +78,17 @@ export type Entity = {
   standing?: number
   /** People only: how they're tied to other characters. */
   ties?: Tie[]
-  /** People only: the day they were born, when the story knows it (a child of the character). */
+  /**
+   * People only: who they are, by the character creator's own criteria (people.ts): their race
+   * and sex, the day they were born (their age follows the calendar), what they do, what they
+   * look like and how they carry themselves.
+   */
+  race?: RaceId
+  sex?: SexId
   born?: number
+  calling?: string
+  appearance?: string
+  personality?: string
   /** Quests only: who asked it of the character. */
   giver?: string
   /** Items only: who has it now ("you": the player character). */
@@ -134,6 +145,17 @@ export type MemoryEvent =
       ties?: Tie[]
       /** People: the day they were born (family.ts). */
       born?: number
+      /**
+       * People: who they are, as the creator has it (people.ts). The Scribe's reading of the story
+       * fills only what isn't known yet, so a guess never drifts and the Journal's word stands.
+       * `age` is their age in years on `day`.
+       */
+      race?: RaceId
+      sex?: SexId
+      age?: number
+      calling?: string
+      appearance?: string
+      personality?: string
       /** Quests: who asked it. Items: who has it now. */
       giver?: string
       holder?: string
@@ -166,6 +188,13 @@ export type JournalEdit =
       /** Quests: who asked it; items: who has it (null: nobody known). */
       giver?: string | null
       holder?: string | null
+      /** People: who they are (people.ts); null or "" clears it. */
+      race?: RaceId | null
+      sex?: SexId | null
+      born?: number | null
+      calling?: string | null
+      appearance?: string
+      personality?: string
     }
   | { type: 'entity_forget'; id: string }
   | { type: 'summary_edit'; level: Summary['level']; to: string; title: string; text: string }
@@ -319,6 +348,19 @@ export function applyMemoryEvent(m: Memory, ev: MemoryEvent, counter: { n: numbe
         e.ties = ties.slice(-8)
       }
       if (ev.born !== undefined && e.kind === 'person') e.born = ev.born
+      if (e.kind === 'person') {
+        // What the story shows of who they are fills the gaps; it never overwrites.
+        if (isRace(ev.race) && !e.race) e.race = ev.race
+        if ((ev.sex === 'female' || ev.sex === 'male') && !e.sex) e.sex = ev.sex
+        if (ev.age !== undefined && Number.isFinite(ev.age) && ev.age >= 0 && e.born === undefined) e.born = bornAt(ev.age, ev.day)
+        const fill = (k: 'calling' | 'appearance' | 'personality') => {
+          const t = ev[k]?.replace(/\s+/g, ' ').trim()
+          if (t && !e![k]) e![k] = t.slice(0, PERSON_LIMITS[k])
+        }
+        fill('calling')
+        fill('appearance')
+        fill('personality')
+      }
       if (ev.giver?.trim() && e.kind === 'quest') e.giver = ev.giver.trim()
       if (ev.holder?.trim() && e.kind === 'item') e.holder = ev.holder.trim()
       e.lastSeenDay = ev.day
@@ -354,6 +396,18 @@ export function applyMemoryEvent(m: Memory, ev: MemoryEvent, counter: { n: numbe
       if (ev.image !== undefined) e.image = ev.image ?? undefined
       if (ev.standing !== undefined && e.kind === 'faction') e.standing = clampStanding(ev.standing ?? 0)
       if (ev.faction !== undefined && e.kind === 'person') e.faction = ev.faction?.trim() || undefined
+      if (e.kind === 'person') {
+        if (ev.race !== undefined) e.race = isRace(ev.race) ? ev.race : undefined
+        if (ev.sex !== undefined) e.sex = ev.sex === 'female' || ev.sex === 'male' ? ev.sex : undefined
+        if (ev.born !== undefined) e.born = ev.born === null || !Number.isFinite(ev.born) ? undefined : Math.round(ev.born)
+        const set = (k: 'calling' | 'appearance' | 'personality') => {
+          const v = ev[k]
+          if (v !== undefined) e[k] = v?.replace(/\s+/g, ' ').trim().slice(0, PERSON_LIMITS[k]) || undefined
+        }
+        set('calling')
+        set('appearance')
+        set('personality')
+      }
       break
     }
     case 'entity_forget':
@@ -435,8 +489,14 @@ export function relevantEntities(m: Memory, recent: string, location: string | n
   return picked
 }
 
-export function entityLine(e: Entity, facts: number): string {
+/**
+ * One line for the DM (or the Scribe) about someone or something. `day` is today, for people's
+ * ages; `looks` adds what they look like and how they carry themselves, when there's room.
+ */
+export function entityLine(e: Entity, facts: number, opts: { day?: number; looks?: boolean } = {}): string {
+  const who = e.kind === 'person' && opts.day !== undefined ? personTags(e, opts.day) : ''
   const tags = [
+    who || null,
     e.kind === 'place' ? 'place' : null,
     e.kind === 'faction' ? `faction; the player is ${standingLabel(e.standing).toLowerCase()} by them (${fmtStanding(e.standing ?? 0)})` : null,
     e.aliases.length ? `also called ${e.aliases.slice(0, 3).join(', ')}` : null,
@@ -450,7 +510,12 @@ export function entityLine(e: Entity, facts: number): string {
     `last seen day ${e.lastSeenDay}`
   ].filter(Boolean)
   const f = facts > 0 && e.facts.length ? ` Known: ${e.facts.slice(-facts).join('; ')}.` : ''
-  return `- ${e.name} (${tags.join(', ')}): ${e.summary || 'no description yet'}.${f}`.replace(/\.\./g, '.')
+  const cut = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1).replace(/\s+\S*$/, '')}…` : t)
+  const looks =
+    opts.looks && e.kind === 'person'
+      ? `${e.appearance ? ` Appearance: ${cut(e.appearance, 160)}.` : ''}${e.personality ? ` Personality: ${cut(e.personality, 120)}.` : ''}`
+      : ''
+  return `- ${e.name} (${tags.join(', ')}): ${e.summary || 'no description yet'}.${looks}${f}`.replace(/\.\./g, '.').replace(/…\./g, '…')
 }
 
 /** The quests still open, newest first. */

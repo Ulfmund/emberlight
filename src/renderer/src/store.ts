@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { SettingsView } from '@shared/types'
-import type { Attr, CampaignSettings, CharacterBuild, CheckResult, CombatAction, RaceId, SkipPlan, Work } from '@shared/rules'
+import type { Attr, CampaignSettings, CharacterBuild, CheckResult, CombatAction, RaceId, SexId, SkipPlan, Work } from '@shared/rules'
 import type { CampaignSummary, CampaignView, Comparison, MessageView, TurnEvent } from '@shared/view'
 import { api, showingHead, type CreateOptions } from './api'
 import type { MemoryEvent } from '@shared/memory'
@@ -11,7 +11,12 @@ import { useFx } from './fx'
 export type Screen = 'title' | 'connect' | 'creator' | 'play' | 'load'
 
 /** After a death: whoever takes up the tale is made in the creator (a stranger, or a child). */
-export type Heir = { campaignId: string; settings: CampaignSettings; dead: string; child?: { id: string; name: string }; race?: RaceId }
+/**
+ * Who takes up the tale after a death. A child brings their card from the Journal (people.ts)
+ * and when they set out: `days` after the death, at `age` if the story knows when they were born.
+ */
+export type HeirChild = { id: string; name: string; race?: RaceId; sex?: SexId; calling?: string; appearance?: string; personality?: string; days: number; age?: number }
+export type Heir = { campaignId: string; settings: CampaignSettings; dead: string; child?: HeirChild; race?: RaceId }
 
 /** Something worth celebrating or warning about, shown as a toast. */
 export type Toast = { id: number; title: string; text?: string; tone: 'good' | 'bad' | 'level' | 'info'; icon: string }

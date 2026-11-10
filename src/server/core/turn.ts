@@ -629,8 +629,10 @@ export class TurnEngine {
     }
     const me = after.character.build.name
     const party = after.party ?? []
+    // Who people are (race, sex, age, calling); with room, how they look and carry themselves too.
+    const looks = { day: after.time.day, looks: tier.facts >= 4 }
     const people = relevantEntities(memory, path.slice(-6).map((m) => m.content).join('\n'), after.location, tier.people, [me, ...party.map((a) => a.name)], recalled.entities)
-      .map((e) => entityLine(e, tier.facts))
+      .map((e) => entityLine(e, tier.facts, looks))
       .join('\n')
     // Companions met in the story are described from their record (card companions by their card).
     const companions = Object.fromEntries(
@@ -638,7 +640,7 @@ export class TurnEngine {
         .filter((a) => !a.card)
         .map((a) => {
           const e = memory.entities.find((x) => x.kind === 'person' && [x.name, ...x.aliases].some((n) => sameName(n, a.name)))
-          return [a.id, e ? entityLine(e, tier.facts) : '']
+          return [a.id, e ? entityLine(e, tier.facts, looks) : '']
         })
     )
     const index = new Map(path.map((m, i) => [m.id, i]))

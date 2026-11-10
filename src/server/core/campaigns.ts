@@ -46,7 +46,7 @@ import {
   type SexId,
   type SkillId
 } from '@shared/rules'
-import { birthEvent, childrenOf, marriageEvent, MAX_CHILDREN, spouseOf, yearsOld, yearsToComeOfAge } from '@shared/family'
+import { birthEvent, childrenOf, HEIR_YEARS, heirStart, marriageEvent, MAX_CHILDREN, spouseOf } from '@shared/family'
 import type { CampaignSummary, CampaignView, ChangeLine, Comparison, MessageView } from '@shared/view'
 import type { CastMember } from '@shared/cards'
 import { projectMemory, sameName, samePlace, type MemoryEvent } from '@shared/memory'
@@ -58,14 +58,13 @@ import { GameDb, newId, type CampaignRow, type EventRow, type LorebookRow, type 
 
 export const OPENING_TEXT = '((Begin the adventure: set an opening scene for my character.))'
 
-/** A child takes up the tale this many years after their parent's death. */
-export const HEIR_YEARS = 10
-
-/** The hidden nudge that opens a successor's story. */
-export function successorOpening(f: Fallen, build: CharacterBuild, child: boolean): string {
+/** The hidden nudge that opens a successor's story. `days`: how long after the death it begins. */
+export function successorOpening(f: Fallen, build: CharacterBuild, child: boolean, days = child ? HEIR_YEARS * DAYS_PER_YEAR : 3): string {
   const who = `${build.name.trim()}, ${RACES[build.race].label.toLowerCase()} ${BACKGROUNDS[build.background].label.toLowerCase()}`
+  const years = Math.floor(days / DAYS_PER_YEAR)
+  const later = years >= 2 ? `${years} years later` : years === 1 ? 'A year later' : 'A few days later'
   return `((A new chapter. ${f.name} is dead: ${f.cause}. ${
-    child ? `${HEIR_YEARS} years later, their child ${who}, takes up the road.` : `A few days later, a new adventurer comes to the same lands: ${who}.`
+    child ? `${later}, their child ${who}, takes up the road.` : `A few days later, a new adventurer comes to the same lands: ${who}.`
   } Set an opening scene for them, somewhere that fits who they are. The world goes on: its people and places are still there and remember what happened, and ${f.name} may turn up in the story again, in a grave, a rumour or a belonging found.))`
 }
 
@@ -325,10 +324,8 @@ export class Campaigns {
       ? { coins: dead.coins, renown: Math.floor(dead.renown / 2), items: weapon.unarmed ? [] : [{ name: `${first}'s ${weapon.name.toLowerCase()}`, qty: 1 }] }
       : undefined
     // A child born in the story takes up the tale when they've come of age; one met in it, years on.
-    const years = child ? yearsOld(child, state.time.day) : undefined
-    const wait = years === undefined ? HEIR_YEARS : yearsToComeOfAge(years, b.race)
-    const days = child ? Math.max(3, Math.min(20, wait) * DAYS_PER_YEAR) : 3
-    const age = years === undefined ? undefined : years + Math.floor(days / DAYS_PER_YEAR)
+    const start = child ? heirStart(child, state.time.day, b.race) : { days: 3 }
+    const { days, age } = start as { days: number; age?: number }
 
     const events: (GameEvent | MemoryEvent)[] = [{ type: 'new_character', build, days, fallen, inherit, ...(age !== undefined ? { age } : {}) }]
     // The world remembers the dead…
@@ -361,7 +358,7 @@ export class Campaigns {
       campaign_id: id,
       parent_id: head.id,
       role: 'user',
-      content: successorOpening(fallen, build, Boolean(child)),
+      content: successorOpening(fallen, build, Boolean(child), days),
       thinking: '',
       meta: { hidden: true, kind: 'opening' }
     })
