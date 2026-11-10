@@ -14,6 +14,7 @@ import {
   derived,
   ENEMY_TIERS,
   foeHealth,
+  rangeOf,
   knownSpells,
   SPELLS,
   capacityKg,
@@ -64,6 +65,14 @@ import { peoplesBlock } from '@shared/cultures'
  */
 
 const LENGTH = { short: '1–2 short paragraphs', medium: '2–4 paragraphs', long: '4–6 paragraphs' }
+const CONTENT: Record<CampaignSettings['content'], string> = {
+  mild: 'Keep it suitable for any audience: danger and violence without gore, romance without sex, no crude talk beyond mild oaths.',
+  mature:
+    "This is fiction for adults. Tell the world frankly and don't sanitise it: people's bodies, looks and appetites, flirting and lust, crude talk and swearing, drink and squalor, cruelty, and violence with its blood and wounds shown plainly. Characters are as they would really be: the barmaid of a seedy tavern can be bawdy and showing a lot, a mercenary foul-mouthed. Sex happens off the page: lead up to it, then cut away.",
+  explicit:
+    "This is fiction for adults, told with nothing held back: people's bodies, looks and appetites, crude talk, cruelty, and violence with its blood and wounds shown plainly. Characters are as they would really be. When the story goes there with the player's lead, sex may be described explicitly. Never any sexual content involving anyone under 18 or who seems to be a child."
+}
+
 const TONE = {
   grim: 'grim and unforgiving: the world is cruel, hope is scarce',
   grounded: 'grounded and dangerous: a believable world where actions have weight',
@@ -192,18 +201,21 @@ export function narratorSystem(
   // The peoples' ways (cultures.ts): the world's defaults, unless its lore says otherwise.
   const peoples = peoplesBlock(settings, b)
   const limits = settings.limits.trim() ? `\n- Content to avoid, or to fade to black instead of describing: ${settings.limits.trim().replace(/\s+/g, ' ')}.` : ''
+  // How frankly to tell it. Left unsaid, models sanitise everyone (a seedy tavern's barmaid turns PG).
+  const content = CONTENT[settings.content] ?? CONTENT.mature
 
   // Fights (docs/spec/04-rules-system.md#combat): on the tracker, the engine owns every blow.
   const cb = state.combat
   const fight = cb
     ? `\n\nTHE FIGHT (the game engine runs it)
-Round ${cb.round}. ${cb.foes.map((f) => `${f.name}: ${foeHealth(f)}`).join('; ')}.
-Only these foes are in the fight. The [GAME ENGINE] block says what every blow did: narrate exactly that, in order. Never add attacks, wounds, deaths or enemies of your own, and never end the fight yourself; the engine says when it's over. End each reply at a moment where the character must act.`
+Round ${cb.round}. ${cb.foes.map((f) => `${f.name}: ${foeHealth(f)}, ${rangeOf(f)}`).join('; ')}.
+Only these foes are in the fight. The [GAME ENGINE] block says what every blow did: narrate exactly that, in order. Never add attacks, wounds, deaths or enemies of your own, and never end the fight yourself; the engine says when it's over. Keep each foe where the engine says it is (close: within reach; near: a few strides off; far: a bowshot away). End each reply at a moment where the character must act.
+While the fight lasts, keep it lean, like a battle log: two to four short sentences a round, one beat for each blow that matters, plain and quick. Save the scenery for after.`
     : settings.combat !== 'narrative' && c.status === 'alive'
       ? `\n\nSTARTING A FIGHT
 If enemies attack the character on their own (not because of what the player just did: the game engine handles that), end your reply with one line in this form, and stop before any blow lands:
 [[FIGHT: 2 bandit, 1 bandit captain (elite) | ambush]]
-List who attacks: how many of each and what they are. Mark a veteran or a big beast (elite), a legendary foe (boss), and weak ones (minion). Add "| ambush" if they strike from hiding. The engine then runs the fight. Never use it when the [GAME ENGINE] block says a fight has begun.`
+List who attacks: how many of each and what they are. Mark a veteran or a big beast (elite), a legendary foe (boss), and weak ones (minion), and anyone not within a blade's reach as (near) or (far), like [[FIGHT: 1 bandit archer (far)]]. Add "| ambush" if they strike from hiding. The engine then runs the fight. Never use it when the [GAME ENGINE] block says a fight has begun.`
       : ''
   const askRoll = cb
     ? ''
@@ -215,10 +227,11 @@ Skills: ${SKILL_IDS.join(', ')}. Difficulty: ${DIFFICULTIES.join(', ')}. Use thi
   return `You are the Dungeon Master of a ${TONE[settings.tone]} fantasy roleplaying game.${voice}
 
 HOW TO RUN THE GAME
-- ${third ? `Write in third person about ${b.name}, present tense` : 'Write in second person ("you"), present tense'}, vivid but economical. Aim for ${LENGTH[settings.length]}.
+- ${third ? `Write in third person about ${b.name}, present tense` : 'Write in second person ("you"), present tense'}, vivid but economical. Aim for ${cb ? 'two to four short sentences while the fight lasts' : LENGTH[settings.length]}.
 - ${acting}
 - In the player's messages, text "in quotation marks" is what the character says aloud; everything else is what they do. ${ooc}
-- ${pacing}${limits}
+- ${pacing}
+- ${content}${limits}
 - A game engine rolls the dice. When the player's message ends with a [GAME ENGINE] block, it states what happened. Narrate exactly that outcome. Never turn a failure into a success or a success into a failure, never ignore damage, and never rescue the character at the last moment.${settings.failForward ? ' On a narrow failure, the character may succeed at a cost instead.' : ''}
 - Match the outcome's strength: a critical success is memorable and brings something extra; a narrow success is a close call; a critical failure goes wrong in a way that matters.
 - Stay in the story. Never write out-of-character notes, questions or ((bracketed)) asides yourself. If the player's action doesn't quite fit the scene (it mentions someone who isn't there, or an item they don't have), interpret it in the most sensible way the scene allows and narrate that; what the dice decided still stands.
@@ -234,7 +247,7 @@ HOW TO RUN THE GAME
 ${peoples ? `${peoples}
 
 ` : ''}${loreAt(lore, 'before_char')}THE PLAYER CHARACTER
-${b.name}: ${RACES[b.race].label.toLowerCase()}, ${sex.label.toLowerCase()}, ${ageYears(state)} years old (${AGES[b.age].label.toLowerCase()}), ${BACKGROUNDS[b.background].label.toLowerCase()}.${b.appearance ? `\nAppearance: ${b.appearance}` : ''}${b.personality ? `\nPersonality: ${b.personality}` : ''}
+${b.name}: ${RACES[b.race].label.toLowerCase()}, ${sex.label.toLowerCase()}, ${ageYears(state)} years old (${AGES[b.age].label.toLowerCase()}), ${b.job?.trim() || BACKGROUNDS[b.background].label.toLowerCase()}.${b.appearance ? `\nAppearance: ${b.appearance}` : ''}${b.personality ? `\nPersonality: ${b.personality}` : ''}${b.details?.trim() ? `\nAlso: ${b.details.trim()}` : ''}
 Level ${c.level}. Health ${c.hp}/${d.maxHp}, stamina ${c.stamina}/${d.maxStamina}${d.maxMana ? `, mana ${c.mana}/${d.maxMana}` : ''}.${c.conditions.length ? `\nConditions: ${c.conditions.map((x) => CONDITIONS[x].label).join(', ')}.` : ''}
 Best skills: ${skills || 'none trained yet'}.
 Renown: ${tier}${deeds ? `, known for: ${deeds}` : ''}. ${renownGuide(tier, b.sex, settings)}
@@ -420,12 +433,13 @@ export function extractFight(text: string): { text: string; fight?: { foes: FoeS
   const foes: FoeSpec[] = []
   for (const part of m[1].split(/,|\band\b|\+/i)) {
     const tier = /\((minion|standard|elite|boss)\)/i.exec(part)?.[1].toLowerCase() as EnemyTier | undefined
+    const range = /\((close|near|far)\)/i.exec(part)?.[1].toLowerCase() as FoeSpec['range']
     const rest = part.replace(/\([^)]*\)/g, '').trim()
     const num = /^(\d+|an?|one|two|three|four|five|six|some|several)\s+(.+)$/i.exec(rest)
     const count = num ? Number(num[1]) || COUNT_WORDS[num[1].toLowerCase()] || 1 : 1
     const kind = (num ? num[2] : rest).trim()
     if (!kind) continue
-    foes.push({ kind: kind.slice(0, 60), count: Math.max(1, Math.min(6, count)), tier: tier && ENEMY_TIERS.includes(tier) ? tier : undefined })
+    foes.push({ kind: kind.slice(0, 60), count: Math.max(1, Math.min(6, count)), tier: tier && ENEMY_TIERS.includes(tier) ? tier : undefined, ...(range ? { range } : {}) })
   }
   if (!foes.length) return { text: cleaned }
   return { text: cleaned, fight: { foes: foes.slice(0, 6), ambush: /ambush|hidden|surprise|unseen/i.test(m[2] ?? '') } }

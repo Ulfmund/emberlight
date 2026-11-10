@@ -42,7 +42,9 @@ const BuildSchema = z.object({
   skills: z.partialRecord(z.enum(tuple(SKILL_IDS)), z.number().int()),
   // Long enough for an imported card's description.
   appearance: z.string().max(8000),
-  personality: z.string().max(4000)
+  personality: z.string().max(4000),
+  job: z.string().max(80).optional(),
+  details: z.string().max(4000).optional()
 })
 
 const SettingsSchema = z.object({
@@ -62,7 +64,8 @@ const SettingsSchema = z.object({
   perspective: z.enum(['second', 'third']),
   limits: z.string().max(1000),
   persona: z.string().max(80),
-  cultures: z.boolean()
+  cultures: z.boolean(),
+  content: z.enum(['mild', 'mature', 'explicit'])
 })
 
 /** A time-skip from the dialog or the Sheet's work buttons (skips.ts). */
@@ -304,6 +307,29 @@ export function registerGameRoutes(app: Hono, campaigns: Campaigns, turns: TurnE
   })
 
   // ---- help with what to do ------------------------------------------------------------------
+
+  /** The Quick Hero's stats (hero.ts): the calling and strengths their description suggests. */
+  app.post('/api/hero/suggest', async (c) => {
+    const b = await body(
+      c,
+      z.object({
+        race: z.enum(tuple(RACE_IDS)),
+        sex: z.enum(['male', 'female']),
+        years: z.number().int().min(0).max(1000),
+        job: z.string().max(80),
+        appearance: z.string().max(8000),
+        personality: z.string().max(4000),
+        details: z.string().max(4000)
+      })
+    )
+    if (!b) return c.json({ error: 'Describe the hero first.' }, 400)
+    try {
+      return c.json(await turns.hero(b, c.req.raw.signal))
+    } catch (err) {
+      const why = (err as Error).message
+      return c.json({ error: /JSON|schema|format|pars/i.test(why) ? "The AI's answer didn't come out right. Try again." : why }, 502)
+    }
+  })
 
   app.post('/api/campaigns/:id/suggest', async (c) => {
     try {

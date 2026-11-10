@@ -30,7 +30,7 @@ import type { CheckResult } from './checks'
 import { isMemoryEvent, sameName, samePlace, type MemoryEvent } from '../memory'
 import { COMPANION_ROLES, companionStats, PARTY_MAX, type Companion, type CompanionRole } from './party'
 import { findTemplate, itemTemplate, type ItemTemplate, type Slot } from './items'
-import type { Combat, CombatOutcome, FoeStatus } from './combat'
+import type { Combat, CombatOutcome, FoeStatus, Range } from './combat'
 import { startingSpells } from './spellbook'
 import { buildNow, SKIP_MAX_DAYS, startingAge } from './calendar'
 import type { Home, Job } from './life'
@@ -64,6 +64,12 @@ export type CampaignSettings = {
   persona: string
   /** The peoples' ways and customs, told to the DM (cultures.ts). */
   cultures: boolean
+  /**
+   * How frankly the story is told (docs/spec/06-ai-dm.md#content): mild for any audience; mature,
+   * fiction for adults with sex off the page; explicit, nothing faded out. Without a word on it,
+   * models write everyone PG, however grim the tone.
+   */
+  content: 'mild' | 'mature' | 'explicit'
 }
 
 export const DEFAULT_SETTINGS: CampaignSettings = {
@@ -83,6 +89,7 @@ export const DEFAULT_SETTINGS: CampaignSettings = {
   perspective: 'second',
   limits: '',
   cultures: true,
+  content: 'mature',
   persona: 'chronicler'
 }
 
@@ -249,6 +256,8 @@ export type GameEvent =
   /** A blow on a foe: the character's, or a companion's (`by`). */
   | { type: 'foe_hit'; id: string; amount: number; name?: string; by?: string }
   | { type: 'foe_status'; id: string; status: FoeStatus; name?: string }
+  /** A foe moves nearer (or further) in a fight (combat.ts, range). */
+  | { type: 'foe_move'; id: string; range: Range; name?: string }
   /**
    * A foe's attack (for the log): on the player (the damage is a "damage" event), or on a
    * companion, `target` (the damage is an "ally_hit" event).
@@ -595,6 +604,11 @@ export function applyEvent(prev: GameState, ev: GameEvent, settings: CampaignSet
     case 'foe_status': {
       const f = s.combat?.foes.find((x) => x.id === ev.id)
       if (f) f.status = ev.status
+      break
+    }
+    case 'foe_move': {
+      const f = s.combat?.foes.find((x) => x.id === ev.id)
+      if (f) f.range = ev.range
       break
     }
     case 'foe_attack':

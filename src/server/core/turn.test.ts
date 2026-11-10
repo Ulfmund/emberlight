@@ -439,7 +439,7 @@ describe('turn engine', () => {
   const banditFight = (count: number, playerAttacks = true) => ({
     intent: 'combat',
     checks: [attackCheck],
-    fight: { starts: true, foes: [{ kind: 'bandits', count, tier: 'standard', name: '' }], playerAttacks, sneakAttack: false }
+    fight: { starts: true, foes: [{ kind: 'bandits', count, tier: 'standard', name: '', range: 'near' }], playerAttacks, sneakAttack: false }
   })
   const lastNotes = () => fake.lastMessages.at(-1)!.content
 
@@ -460,7 +460,9 @@ describe('turn engine', () => {
     expect(cb.foes[0].hp).toBeLessThan(cb.foes[0].maxHp)
     expect(lastNotes()).toContain('THE FIGHT (the engine decides every blow')
     expect(lastNotes()).toContain('A FIGHT BEGINS against Bandit 1 and Bandit 2.')
-    expect(lastNotes()).toMatch(/Bandit 2 slashes at the character: rolled 11/)
+    // A few strides off, the bandits spend the first round closing in (combat.ts, range).
+    expect(lastNotes()).toContain('Bandit 2 closes in (now close).')
+    expect(cb.foes.map((f) => f.range)).toEqual(['close', 'close'])
     expect(fake.lastSystem).toContain('THE FIGHT (the game engine runs it)\nRound 2.')
     expect(fake.lastSystem).not.toContain('ASKING FOR A ROLL')
     expect(v.messages.at(-1)!.changes.some((c) => c.text.startsWith('Hit Bandit 1 for'))).toBe(true)

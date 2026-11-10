@@ -477,3 +477,16 @@ Story first, so the player can always overrule the dice, but openly:
 - **Edit any number** on the sheet (pencil icon). This is logged as a "manual edit" event (visible, can be undone).
 - **Free reroll** on any roll. It's logged but has no penalty.
 - **Ironman mode** (optional campaign setting): turns off manual edits and rerolls for players who want real stakes.
+
+## Range
+
+*Built (1.3.0)* (`src/shared/rules/combat.ts`). On the tracker every foe is **Close** (within a blade's reach), **Near** (a few strides: a rush away) or **Far** (a bowshot). The Referee sets where each starts from the story (and the DM can mark them in its fight line, "(far)"); without a word, archers start Near and everyone else Close.
+
+- **A blade only reaches someone Close.** Attacking a foe further off with a melee weapon becomes a move toward them instead. **Close In** does it on purpose: one step nearer (two moves from Far).
+- **Attacks of opportunity:** any foe already Close (and fighting hand to hand) gets a free swing at the character as they move off toward someone else.
+- **Foes** who fight hand to hand spend their turn closing in until they're Close; archers and other shooters attack from wherever they are.
+- **Bows and spells** reach any range; a bow against someone Close has disadvantage.
+- **Fleeing** has advantage with nobody Close.
+- Companions aren't placed: they fight wherever they're needed.
+- **Lean text:** while a fight is on the tracker the DM writes two to four short sentences a round, like a battle log, and keeps each foe where the engine says it is.
+

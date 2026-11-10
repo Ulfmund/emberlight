@@ -49,7 +49,11 @@ const FoeSchema = z.object({
   kind: z.string().describe('What they are, as the story says: "bandit", "cave bear", "wolves", "guard"'),
   count: z.number().int().describe('How many of them'),
   tier: z.enum(ENEMY_TIERS).describe('minion: weak, untrained or small; standard: an ordinary armed foe or dangerous animal; elite: a veteran, a leader, a big beast; boss: a legendary foe or warlord'),
-  name: z.string().describe('Their name if they have one, otherwise empty')
+  name: z.string().describe('Their name if they have one, otherwise empty'),
+  range: z
+    .enum(['close', 'near', 'far'])
+    .describe("How far they are from the character when it starts, as the story has it: close (within a blade's reach), near (a few strides off), far (a bowshot away: on a wall, across a field)")
+    .default('close')
 })
 
 export const RefereeSchema = z.object({
@@ -149,7 +153,7 @@ export async function runReferee(
   const foes: FoeSpec[] = fight.foes
     .filter((f) => f.kind.trim())
     .slice(0, 6)
-    .map((f) => ({ kind: f.kind.trim().slice(0, 60), count: Math.max(1, Math.min(6, Math.round(f.count || 1))), tier: f.tier, name: f.name.trim().slice(0, 60) || undefined }))
+    .map((f) => ({ kind: f.kind.trim().slice(0, 60), count: Math.max(1, Math.min(6, Math.round(f.count || 1))), tier: f.tier, name: f.name.trim().slice(0, 60) || undefined, range: f.range }))
   const work = out.work.kind !== 'none' && out.work.what.trim() ? { kind: out.work.kind, what: out.work.what.trim().slice(0, 80) } : undefined
   const spell = out.spell.trim() ? findSpell(out.spell)?.id : undefined
   return {
@@ -164,8 +168,8 @@ export async function runReferee(
 // ---- In a fight ---------------------------------------------------------------------------------
 
 export const CombatRefereeSchema = z.object({
-  action: z.enum(['attack', 'power_attack', 'cast', 'defend', 'flee', 'use_item', 'talk', 'surrender', 'other']),
-  target: z.string().describe('For attacks: the id of the foe attacked (e.g. "f2"); otherwise empty'),
+  action: z.enum(['attack', 'power_attack', 'cast', 'close_in', 'defend', 'flee', 'use_item', 'talk', 'surrender', 'other']),
+  target: z.string().describe('For attacks and close_in: the id of the foe (e.g. "f2"); otherwise empty'),
   item: z.string().describe('For use_item: the name of the item from the pack; otherwise empty'),
   spell: z.string().describe('For cast: the name of the spell, if they say which; otherwise empty').default(''),
   checks: z.array(CheckSchema).describe('For talk or other only: at most one check (risk none: the foes are the danger). Empty otherwise')
@@ -175,6 +179,7 @@ const COMBAT_SYSTEM = `You are the Referee in the middle of a fight in a fantasy
 - attack: attacking a foe with their weapon (target: the foe's id). If they attack several, pick the main one.
 - power_attack: an all-out, heavy blow (costs stamina, hits harder).
 - cast: casting a spell: attacking with magic, healing themselves, a ward or a curse (spell: its name).
+- close_in: rushing, charging or moving toward a foe who isn't within reach (target: the foe's id). Attacking someone near or far with a blade is close_in too: the engine handles it.
 - defend: guarding, parrying, dodging, taking cover, backing off.
 - flee: running away, breaking off, escaping.
 - use_item: drinking a potion, bandaging a wound, eating (item: its name from the pack).
@@ -206,6 +211,8 @@ export async function runCombatReferee(provider: Provider, model: string, state:
       return { kind: 'power', target: out.target.trim() }
     case 'cast':
       return { kind: 'cast', target: out.target.trim(), spell: findSpell(out.spell)?.id }
+    case 'close_in':
+      return { kind: 'close_in', target: out.target.trim() || undefined }
     case 'defend':
       return { kind: 'defend' }
     case 'flee':

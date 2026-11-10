@@ -188,3 +188,46 @@ describe('starting a fight', () => {
     expect(sneak.state.combat?.surprise).toBe('foes')
   })
 })
+
+describe('range', () => {
+  it('starts foes where the story puts them; archers keep their distance', () => {
+    const [archer] = buildFoes([{ kind: 'archer' }], 1, always(0.5))
+    const [bandit] = buildFoes([{ kind: 'bandit' }], 1, always(0.5))
+    const [far] = buildFoes([{ kind: 'bandit', range: 'far' }], 1, always(0.5))
+    expect([archer.range, bandit.range, far.range]).toEqual(['near', 'close', 'far'])
+  })
+
+  it("won't let a blade reach a foe far off: the swing becomes a move, and those in reach get a free swing", () => {
+    const foes = buildFoes([{ kind: 'archer', range: 'far' }, { kind: 'bandit' }], 1, always(0.5))
+    // The player goes first (initiative 30), so the free swing is the only blow before the move.
+    const st = inFight(foes, initialState(build(), S), 30)
+    const r = resolveRound(st, S, { kind: 'attack', target: foes[0].id }, dice(15))
+    expect(r.log.join('\n')).toContain('is too far off to reach (far)')
+    expect(r.log.join('\n')).toMatch(/Bandit slashes at the character as they break away \(a free swing\)/)
+    expect(r.state.combat!.foes[0].range).toBe('near')
+    expect(r.state.combat!.foes[0].hp).toBe(r.state.combat!.foes[0].maxHp)
+    // Close In from near puts them within reach.
+    // (Low dice: the foes miss, so the fight goes on.)
+    const r2 = resolveRound(r.state, S, { kind: 'close_in', target: foes[0].id }, dice(2))
+    expect(r2.state.combat!.foes[0].range).toBe('close')
+  })
+
+  it('makes foes who fight hand to hand close in first; archers shoot from where they are', () => {
+    const foes = buildFoes([{ kind: 'bandit', range: 'near' }, { kind: 'archer', range: 'far' }], 1, always(0.5))
+    const st = inFight(foes, initialState(build(), S), 1)
+    const r = resolveRound(st, S, { kind: 'defend' }, dice(12))
+    const log = r.log.join('\n')
+    expect(log).toContain('Bandit closes in (now close).')
+    expect(log).toMatch(/Archer shoots at the character/)
+  })
+
+  it('makes shooting at close quarters awkward, and fleeing easier with nobody in reach', () => {
+    const archerPc = initialState(build({ background: 'hunter', attributes: { STR: 10, AGI: 15, END: 12, INT: 9, ARC: 8, WIT: 14, PRE: 10 } }), S)
+    const [bandit] = buildFoes([{ kind: 'bandit' }], 1, always(0.5))
+    const shot = resolveRound(inFight([bandit], archerPc, 30), S, { kind: 'attack', target: bandit.id }, dice(15))
+    expect(shot.results[0].advantage).toBe('disadvantage')
+    const [farOne] = buildFoes([{ kind: 'bandit', range: 'far' }], 1, always(0.5))
+    const run = resolveRound(inFight([farOne], undefined, 30), S, { kind: 'flee' }, dice(15))
+    expect(run.results[0].advantage).toBe('advantage')
+  })
+})

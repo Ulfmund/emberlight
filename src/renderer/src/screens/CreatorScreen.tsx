@@ -47,6 +47,7 @@ import { cardImageUrl, fillMacros, guessFromCard, type CardSummary } from '@shar
 import { APPEARANCE_IDEAS as APPEARANCE, callingFor, PERSONALITY_IDEAS as PERSONALITY } from '@shared/people'
 import { useGame } from '../store'
 import { AgeSlider, stageYears } from '../components/AgeSlider'
+import { QuickHero } from './QuickHero'
 import { api } from '../api'
 import { CardLibrary } from './CardLibrary'
 import { LoreEditor } from './LoreEditor'
@@ -67,6 +68,8 @@ const STEPS = [
   { id: 'identity', label: 'Identity', icon: 'quill' },
   { id: 'adventure', label: 'Adventure', icon: 'map' }
 ] as const
+/** The Quick Hero (QuickHero.tsx): one page for the hero, then the adventure. */
+const QUICK_STEPS = [{ id: 'hero', label: 'Hero', icon: 'quill' }, STEPS[5]] as const
 
 const rng = () => Math.random()
 
@@ -111,7 +114,10 @@ function normalize(b00: CharacterBuild, sexMode: SexMode): CharacterBuild {
 export function CreatorScreen() {
   const { go, create, heir, takeUp, cancelHeir } = useGame()
   /** After a death, this makes whoever takes up the tale in the same story (no world to pick). */
-  const steps = heir ? STEPS.slice(0, STEPS.length - 1) : STEPS
+  /** Step by step, or the Quick Hero. */
+  const [quick, setQuick] = useState(false)
+  const [suggested, setSuggested] = useState(false)
+  const steps: readonly { id: string; label: string; icon: string }[] = quick ? (heir ? QUICK_STEPS.slice(0, 1) : QUICK_STEPS) : heir ? STEPS.slice(0, STEPS.length - 1) : STEPS
   const [settings, setSettings] = useState<CampaignSettings>(() => (heir ? { ...heir.settings } : { ...DEFAULT_SETTINGS }))
   /** A child of the dead whose birth the story knows sets out at the age they are then. */
   const heirAge = heir?.child?.age
@@ -214,7 +220,7 @@ export function CreatorScreen() {
     setBuild(heir?.child ? normalize({ ...rolled, name: build.name, race: build.race, sex: build.sex, years: heirAge ?? rescaleAge(rolled.years ?? startingAge(rolled), rolled.race, build.race) }, sexMode) : rolled)
     setPlayerCard(null)
     setRolling((r) => r + 1)
-    setStep(4)
+    setStep(quick ? 0 : 4)
   }
 
   const begin = async () => {
@@ -334,14 +340,41 @@ export function CreatorScreen() {
               </p>
             </div>
           )}
+          <div className="mb-6 flex flex-wrap items-center gap-3">
+            <Segmented
+              value={quick ? 'quick' : 'steps'}
+              onChange={(v) => {
+                setQuick(v === 'quick')
+                setStep(0)
+              }}
+              options={[
+                { id: 'steps', label: 'Step by Step', hint: 'Choose every part of your hero yourself.' },
+                { id: 'quick', label: 'Quick Hero', hint: 'Describe your hero in your own words; the AI suggests the stats.' }
+              ]}
+            />
+          </div>
           <AnimatePresence mode="wait">
-            <motion.div key={step} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.22 }}>
-              {step === 0 && <OriginStep build={build} update={update} settings={settings} setSettings={(s) => { setSettings(s); setBuild((b) => normalize(b, s.sexModifiers)) }} ageFixed={heirAge !== undefined} />}
-              {step === 1 && <CallingStep build={build} update={update} />}
-              {step === 2 && <AttributesStep build={build} update={update} sexMode={sexMode} />}
-              {step === 3 && <SkillsStep build={build} update={update} sexMode={sexMode} />}
-              {step === 4 && <IdentityStep build={build} update={update} onNameDone={syncName} playerCard={playerCard} onUnlink={() => setPlayerCard(null)} />}
-              {step === 5 && (
+            <motion.div key={`${quick}-${step}`} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.22 }}>
+              {steps[step]?.id === 'hero' && (
+                <QuickHero
+                  build={build}
+                  update={update}
+                  sexMode={sexMode}
+                  suggested={suggested}
+                  onSuggested={() => setSuggested(true)}
+                  onAdjust={() => {
+                    setQuick(false)
+                    setStep(2)
+                  }}
+                  ageFixed={heirAge !== undefined}
+                />
+              )}
+              {steps[step]?.id === 'origin' && <OriginStep build={build} update={update} settings={settings} setSettings={(s) => { setSettings(s); setBuild((b) => normalize(b, s.sexModifiers)) }} ageFixed={heirAge !== undefined} />}
+              {steps[step]?.id === 'calling' && <CallingStep build={build} update={update} />}
+              {steps[step]?.id === 'attributes' && <AttributesStep build={build} update={update} sexMode={sexMode} />}
+              {steps[step]?.id === 'skills' && <SkillsStep build={build} update={update} sexMode={sexMode} />}
+              {steps[step]?.id === 'identity' && <IdentityStep build={build} update={update} onNameDone={syncName} playerCard={playerCard} onUnlink={() => setPlayerCard(null)} />}
+              {steps[step]?.id === 'adventure' && (
                 <AdventureStep
                   settings={settings}
                   setSettings={setSettings}
@@ -950,6 +983,17 @@ function AdventureStep({
         )}
         <Row label="Tone" text="The feel of the world">
           <Segmented value={settings.tone} onChange={(tone) => set({ tone })} options={[{ id: 'grim', label: 'Grim' }, { id: 'grounded', label: 'Grounded' }, { id: 'heroic', label: 'Heroic' }, { id: 'whimsical', label: 'Whimsical' }, { id: 'horror', label: 'Horror' }]} />
+        </Row>
+        <Row label="Content" text="How frankly the story is told">
+          <Segmented
+            value={settings.content}
+            onChange={(content) => set({ content })}
+            options={[
+              { id: 'mild', label: 'Mild', hint: 'For any audience: no gore, no sex.' },
+              { id: 'mature', label: 'Mature', hint: 'For adults: frank and unsanitised, sex off the page.' },
+              { id: 'explicit', label: 'Explicit', hint: 'For adults, nothing held back.' }
+            ]}
+          />
         </Row>
         <Row label="Mercy" text="What happens at zero health">
           <Segmented

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'motion/react'
-import { findTemplate, itemTemplate, knownSpells, SPELL_COST, type CombatAction, type Foe, type Spell } from '@shared/rules'
+import { findTemplate, itemTemplate, knownSpells, RANGE_LABEL, rangeOf, SPELL_COST, type CombatAction, type Foe, type Range, type Spell } from '@shared/rules'
 import type { CampaignView } from '@shared/view'
 import { useGame } from '../../store'
 import { Icon } from '../../components/Icon'
@@ -41,7 +41,19 @@ export function CombatTracker({ view }: { view: CampaignView }) {
     send(aimed(sp) ? `I cast ${sp.name}${sp.area ? '' : ` at ${chosen.name}`}.` : `I cast ${sp.name}.`, { kind: 'cast', target: aimed(sp) ? chosen.id : undefined, spell: sp.id })
   }
   const moves: Move[] = []
-  if (chosen) {
+  // A blade only reaches someone close (combat.ts, range): further off, the first move is closing in.
+  const outOfReach = chosen && weapon.skill === 'melee' && rangeOf(chosen) !== 'close'
+  // Anyone already within reach gets a free swing as the character moves off.
+  const swingers = fighting.filter((f) => f.id !== chosen?.id && !f.ranged && rangeOf(f) === 'close').length
+  if (chosen && outOfReach) {
+    moves.push({
+      id: 'close',
+      label: 'Close In',
+      icon: 'boot',
+      tip: `${chosen.name} is ${rangeOf(chosen)}: move in${rangeOf(chosen) === 'far' ? ' (two moves from far)' : ''}.${swingers ? ` ${swingers === 1 ? 'The foe' : `The ${swingers} foes`} beside you get${swingers === 1 ? 's' : ''} a free swing.` : ''}`,
+      go: () => send(`I close in on ${chosen.name}.`, { kind: 'close_in', target: chosen.id })
+    })
+  } else if (chosen) {
     moves.push({
       id: 'attack',
       label: 'Attack',
@@ -49,6 +61,8 @@ export function CombatTracker({ view }: { view: CampaignView }) {
       tip: `Attack ${chosen.name} with ${weapon.unarmed ? 'your fists' : `your ${weapon.name.toLowerCase()}`}.`,
       go: () => send(`I attack ${chosen.name} with ${weapon.unarmed ? 'my fists' : `my ${weapon.name.toLowerCase()}`}.`, { kind: 'attack', target: chosen.id })
     })
+  }
+  if (chosen && !outOfReach) {
     moves.push({
       id: 'power',
       label: 'Power',
@@ -57,6 +71,8 @@ export function CombatTracker({ view }: { view: CampaignView }) {
       disabled: c.stamina < 2,
       go: () => send(`I throw everything into a heavy blow at ${chosen.name}.`, { kind: 'power', target: chosen.id })
     })
+  }
+  if (chosen) {
     if (spells.length === 1) {
       const sp = spells[0]
       moves.push({ id: 'cast', label: sp.name, icon: 'sparkle', tip: c.mana < sp.cost ? `Out of mana: ${sp.name} takes ${sp.cost}.` : `${sp.blurb} (${sp.cost} mana)`, disabled: c.mana < sp.cost, go: () => castSpell(sp) })
@@ -167,6 +183,8 @@ export function CombatTracker({ view }: { view: CampaignView }) {
   )
 }
 
+const RANGE_HINT: Record<Range, string> = { close: 'Within reach', near: 'A few strides away', far: 'A bowshot away' }
+
 const OUT_LABEL: Record<Foe['status'], string> = { fighting: '', fled: 'Fled', down: 'Down', surrendered: 'Yielded', asleep: 'Asleep' }
 
 function FoeChip({ foe, selected, onSelect }: { foe: Foe; selected: boolean; onSelect: () => void }) {
@@ -191,6 +209,12 @@ function FoeChip({ foe, selected, onSelect }: { foe: Foe; selected: boolean; onS
         <span className="min-w-0 truncate">{foe.name}</span>
         {big && <span className="ml-auto shrink-0 rounded bg-gold-500/20 px-1 text-[0.6rem] tracking-wide text-gold-200 uppercase">{foe.tier}</span>}
       </div>
+      {!out && (
+        <div className="mt-0.5 flex items-center gap-1 text-[0.66rem] text-parchment-400" title={RANGE_HINT[rangeOf(foe)]}>
+          <span className={`font-semibold tracking-wide uppercase ${rangeOf(foe) === 'close' ? 'text-blood-300' : rangeOf(foe) === 'near' ? 'text-gold-300' : 'text-parchment-300'}`}>{RANGE_LABEL[rangeOf(foe)]}</span>
+          {foe.ranged && <span>· shoots</span>}
+        </div>
+      )}
       {out ? (
         <div className="mt-1 text-xs text-parchment-500">{OUT_LABEL[foe.status]}</div>
       ) : (

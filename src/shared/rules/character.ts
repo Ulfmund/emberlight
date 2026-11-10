@@ -46,6 +46,10 @@ export type CharacterBuild = {
   skills: SkillMods
   appearance: string
   personality: string
+  /** Quick Hero: what they do, in the player's words ("apothecary"), told to the DM over the calling's name. */
+  job?: string
+  /** Quick Hero: anything else the world should know about them. */
+  details?: string
 }
 
 export const mod = (score: number) => Math.floor((score - 10) / 2)

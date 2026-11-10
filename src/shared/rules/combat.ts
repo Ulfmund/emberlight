@@ -18,6 +18,19 @@ import { TIER_INFO } from './tables'
 
 export type FoeStatus = 'fighting' | 'fled' | 'down' | 'surrendered' | 'asleep'
 
+/**
+ * How far a foe is from the character (docs/spec/04-rules-system.md#range): close (within a
+ * blade's reach), near (a few strides: a rush away) or far (a bowshot). Blades only reach the
+ * close; bows and spells reach anyone, though shooting someone at your elbow is awkward.
+ */
+export const RANGES = ['close', 'near', 'far'] as const
+export type Range = (typeof RANGES)[number]
+export const RANGE_LABEL: Record<Range, string> = { close: 'Close', near: 'Near', far: 'Far' }
+/** One step nearer. */
+const nearer = (r: Range): Range => (r === 'far' ? 'near' : 'close')
+/** Older fights had no range: everyone was within reach. */
+export const rangeOf = (f: Pick<Foe, 'range'>): Range => f.range ?? 'close'
+
 export type Foe = {
   id: string
   name: string
@@ -35,6 +48,8 @@ export type Foe = {
   behavior: Behavior
   verb: string
   ranged?: boolean
+  /** How far they are from the character (missing: close). */
+  range?: Range
   xp: number
   loot: Loot[]
 }
@@ -53,11 +68,13 @@ export type Combat = {
 }
 
 /** What the Referee or the DM asks for. `kind` is free text ("cave bear"); the engine picks the template. */
-export type FoeSpec = { kind: string; count?: number; tier?: EnemyTier; name?: string; strength?: 'weaker' | 'even' | 'stronger' }
+export type FoeSpec = { kind: string; count?: number; tier?: EnemyTier; name?: string; strength?: 'weaker' | 'even' | 'stronger'; range?: Range }
 
 export type CombatAction =
   | { kind: 'attack' | 'power' | 'cast'; target?: string; spell?: string }
   | { kind: 'defend' }
+  /** Closing the gap to a foe at range; foes already in reach get a free swing. */
+  | { kind: 'close_in'; target?: string }
   | { kind: 'flee' }
   | { kind: 'use_item'; item: string }
   | { kind: 'talk'; checks: CheckRequest[] }
@@ -151,6 +168,8 @@ export function buildFoes(specs: FoeSpec[], playerLevel: number, rng: Rng): Foe[
         behavior: tpl.behavior,
         verb: tpl.verb,
         ranged: tpl.ranged,
+        // Where the story put them; else archers keep their distance and the rest are at hand.
+        range: spec.range && RANGES.includes(spec.range) ? spec.range : tpl.ranged ? 'near' : 'close',
         xp: Math.round(tpl.xp * m.xp * level),
         loot: tpl.loot
       })
@@ -301,6 +320,13 @@ export function resolveRound(
       log.push(`${f.name} ${leave === 'fled' ? 'breaks and flees' : 'throws down their weapon and yields'}.`)
       return
     }
+    // A foe who fights hand to hand spends the turn closing in when they're not yet in reach.
+    if (!f.ranged && rangeOf(f) !== 'close') {
+      const to = nearer(rangeOf(f))
+      push({ type: 'foe_move', id: f.id, range: to, name: f.name })
+      log.push(`${f.name} closes in (now ${to}).`)
+      return
+    }
     // Who it goes for: mostly the character; fighters draw blows, archers and mages hang back.
     const lvl = working.character.level
     const allies = standing(working.party)
@@ -312,6 +338,11 @@ export function resolveRound(
         r -= draws[i]
       }
     }
+    strikeCharacter(f)
+  }
+
+  /** A foe's blow at the character (`why`: a free swing as they move past). */
+  const strikeCharacter = (f: Foe, why = '') => {
     const c = working.character
     const def = defenseValue(c, (working.combat?.dodging ? 2 : 0) + (working.combat?.ward ?? 0)).total
     const roll = d(rng, 20)
@@ -322,12 +353,12 @@ export function resolveRound(
     if (hit) damage = Math.max(1, rollDice(f.damage[0] * (crit ? 2 : 1), f.damage[1], rng) + f.damage[2])
     push({ type: 'foe_attack', id: f.id, roll, total, defense: def, hit, crit, damage, name: f.name })
     if (!hit) {
-      log.push(`${f.name} ${f.verb} the character: rolled ${roll} + ${f.attack} = ${total} vs Defense ${def}: MISS${roll === 1 ? ' (a natural 1)' : ''}.`)
+      log.push(`${f.name} ${f.verb} the character${why}: rolled ${roll} + ${f.attack} = ${total} vs Defense ${def}: MISS${roll === 1 ? ' (a natural 1)' : ''}.`)
       return
     }
     push({ type: 'damage', amount: damage, source: HARM_FROM[f.family], reason: `${f.name} ${f.verb.replace(/ (at|for)$/, '')} you` })
     const max = derivedMax(working, settings)
-    log.push(`${f.name} ${f.verb} the character: rolled ${roll} + ${f.attack} = ${total} vs Defense ${def}: ${crit ? 'CRITICAL HIT' : 'HIT'}, ${damage} damage (the character now has ${Math.max(0, working.character.hp)}/${max} health).`)
+    log.push(`${f.name} ${f.verb} the character${why}: rolled ${roll} + ${f.attack} = ${total} vs Defense ${def}: ${crit ? 'CRITICAL HIT' : 'HIT'}, ${damage} damage (the character now has ${Math.max(0, working.character.hp)}/${max} health).`)
     for (const ev of defeatEvents(working, settings, HARM_FROM[f.family], rng)) push(ev)
     const after = working.character
     if (after.status !== 'alive' || after.conditions.includes('captured')) {
@@ -485,6 +516,20 @@ export function resolveRound(
     }
   }
 
+  // ---- closing the gap ------------------------------------------------------------------
+  /** The character moves toward a foe at range; anyone already in reach swings as they go. */
+  const closeIn = (target: Foe, why: string) => {
+    for (const f of fighting(working)) {
+      if (over()) return
+      if (f.id === target.id || f.ranged || rangeOf(f) !== 'close') continue
+      strikeCharacter(f, ' as they break away (a free swing)')
+    }
+    if (over()) return
+    const to = nearer(rangeOf(target))
+    push({ type: 'foe_move', id: target.id, range: to, name: target.name })
+    log.push(`${why}The character closes in on ${target.name} (now ${to}${to === 'close' ? ', within reach' : ''}).`)
+  }
+
   // ---- the player's turn --------------------------------------------------------------
   const playerTurn = () => {
     if (over()) return
@@ -519,15 +564,21 @@ export function resolveRound(
             weapon = { name: `the ${weapon.name.toLowerCase()} as a club`, dice: [1, 3], skill: 'melee', attr: 'STR', unarmed: true }
           }
         }
+        // A blade only reaches someone close: swinging at a foe further off means closing in first.
+        if (weapon.skill === 'melee' && rangeOf(target) !== 'close') {
+          return closeIn(target, `${target.name} is too far off to reach (${rangeOf(target)}). `)
+        }
         const power = action.kind === 'power' && working.character.stamina >= 2
+        // Shooting someone at your elbow is awkward.
+        const pointBlank = weapon.skill === 'ranged' && rangeOf(target) === 'close'
         const req: CheckRequest = {
           skill: weapon.skill,
           difficulty: 'moderate',
           dcOverride: target.defense,
           against: `${target.name}'s Defense`,
           modifier: 0,
-          advantage: combat.surprise === 'foes' && round === 1 ? 'advantage' : 'none',
-          reason: `${power ? 'a powerful blow' : 'attacking'} ${target.name}`,
+          advantage: combat.surprise === 'foes' && round === 1 ? 'advantage' : pointBlank ? 'disadvantage' : 'none',
+          reason: `${power ? 'a powerful blow' : 'attacking'} ${target.name}${pointBlank ? ' (shooting at close quarters)' : ''}`,
           dramatic: target.tier === 'elite' || target.tier === 'boss',
           withStrangers: false,
           risk: { severity: 'none', source: 'environment' }
@@ -552,6 +603,11 @@ export function resolveRound(
         if (now && now.status === 'down') push({ type: 'xp', amount: now.xp, reason: `Defeated ${now.name}` })
         return
       }
+      case 'close_in': {
+        const target = foes.find((f) => f.id === action.target) ?? [...foes].sort((x, y) => RANGES.indexOf(rangeOf(x)) - RANGES.indexOf(rangeOf(y))).find((f) => rangeOf(f) !== 'close')
+        if (!target || rangeOf(target) === 'close') return void log.push(`The character is already within reach${target ? ` of ${target.name}` : ''}.`)
+        return closeIn(target, '')
+      }
       case 'defend': {
         push({ type: 'combat_dodge' })
         if (c.stamina > 0) push({ type: 'stamina', delta: -1 })
@@ -560,7 +616,9 @@ export function resolveRound(
       }
       case 'flee': {
         const beasts = foes.some((f) => f.family === 'beast')
-        const req: CheckRequest = { skill: 'athletics', difficulty: beasts ? 'hard' : 'moderate', modifier: 0, advantage: 'none', reason: 'breaking away to flee', dramatic: true, withStrangers: false, risk: { severity: 'none', source: 'environment' } }
+        // Easier with nobody in reach.
+        const clear = !foes.some((f) => rangeOf(f) === 'close')
+        const req: CheckRequest = { skill: 'athletics', difficulty: beasts ? 'hard' : 'moderate', modifier: 0, advantage: clear ? 'advantage' : 'none', reason: clear ? 'breaking away to flee, with nobody in reach' : 'breaking away to flee', dramatic: true, withStrangers: false, risk: { severity: 'none', source: 'environment' } }
         const r = resolveCheck(working, settings, req, rng)
         results.push(r.result)
         r.events.forEach(push)
@@ -703,6 +761,8 @@ export function actionLabel(action: CombatAction, st?: GameState): string {
       return `a spell at ${foe(action.target)}`
     case 'defend':
       return 'fighting defensively'
+    case 'close_in':
+      return `closing in on ${foe(action.target)}`
     case 'flee':
       return 'trying to flee'
     case 'use_item':
@@ -722,7 +782,7 @@ export function actionLabel(action: CombatAction, st?: GameState): string {
 export function combatSummary(st: GameState): string {
   const cb = st.combat
   if (!cb) return ''
-  return cb.foes.map((f) => `${f.name} (${f.id}, ${f.tier !== 'standard' ? `${f.tier} ` : ''}${enemyTemplate(f.template)?.name.toLowerCase() ?? f.template}): ${foeHealth(f)}`).join('; ')
+  return cb.foes.map((f) => `${f.name} (${f.id}, ${f.tier !== 'standard' ? `${f.tier} ` : ''}${enemyTemplate(f.template)?.name.toLowerCase() ?? f.template}, ${rangeOf(f)}${f.ranged ? ', shoots' : ''}): ${foeHealth(f)}`).join('; ')
 }
 
 /** The character's companions and how they're faring ("Mira (healer): hurt"); empty if none. */

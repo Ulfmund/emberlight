@@ -28,6 +28,7 @@ import {
   type CombatAction,
   type GameEvent,
   type GameState,
+  type HeroWishes,
   type TurnPlan,
   type Work,
   parseSkip,
@@ -53,6 +54,7 @@ import { createProvider, type Provider } from '../ai/providers'
 import { runCombatReferee, runReferee } from '../ai/jobs/referee'
 import { runScribe } from '../ai/jobs/scribe'
 import { writeEpitaph } from '../ai/jobs/epitaph'
+import { suggestHero, type HeroAsk } from '../ai/jobs/hero'
 import { ghostText, suggestActions, type Suggestion } from '../ai/jobs/suggest'
 import { describeImage } from '../ai/jobs/vision'
 import { engineNotes, extractFight, extractRollRequest, fitHistory, NameFilter, narratorSystem, pastRollNote, skipNote, type PersonaText } from '../ai/narrator'
@@ -298,6 +300,12 @@ export class TurnEngine {
     const ctx = await this.ctx()
     const who = this.campaigns.state(this.campaigns.get(id)).character.build.name
     return describeImage(ctx.provider, ctx.model, { mime: m.mime, data: Buffer.from(m.data).toString('base64') }, purpose === 'portrait' ? { kind: 'portrait', who } : { kind: 'story', said }, signal)
+  }
+
+  /** The Quick Hero's stats, from how the player describes them (hero.ts). */
+  async hero(ask: HeroAsk, signal?: AbortSignal): Promise<HeroWishes> {
+    const ctx = await this.ctx()
+    return suggestHero(ctx.provider, ctx.model, ask, signal)
   }
 
   /** Three things the character could do now (the Ideas button). */

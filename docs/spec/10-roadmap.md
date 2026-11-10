@@ -79,6 +79,11 @@ Built in milestones. Each one ends with something playable, so the artist can te
 ## 1.2 — Lorebooks from Chub ✅ (1.2.0, 2026-11-10)
 - **Find on Chub** ✅: search the lorebooks shared on chub.ai from the lorebook library (fantasy only and NSFW off to begin with, adult books screened out a second time, instructions and game systems labelled), and add one to the library with credit to its author ([07](07-memory-and-lore.md#finding-lorebooks-on-chub))
 
+## 1.3 — Range, Quick Hero, Content ✅ (1.3.0, 2026-11-10)
+- **Range in fights** ✅: close / near / far, Close In with free swings, lean battle-log narration ([04](04-rules-system.md#range))
+- **Quick Hero** ✅: a one-page creator in your own words, with AI-suggested stats fitted to the rules ([03](03-characters-and-cards.md#quick-hero))
+- **Content setting** ✅: Mild, Mature (default) or Explicit, so the world isn't sanitised ([06](06-ai-dm.md#content))
+
 ## 1.2.2 — What's New ✅ (2026-11-10)
 - **What's New** ✅: after an update, what changed since you last played, on each screen ([08](08-ui-ux.md#whats-new))
 

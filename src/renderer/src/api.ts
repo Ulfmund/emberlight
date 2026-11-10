@@ -1,5 +1,5 @@
 import type { Connection, RemoteView, SettingsView, TestResult, UpdateStatus } from '@shared/types'
-import type { CampaignSettings, CharacterBuild, Attr, CompanionRole, HomeKind, SkillId } from '@shared/rules'
+import type { CampaignSettings, CharacterBuild, Attr, CompanionRole, HeroWishes, HomeKind, RaceId, SexId, SkillId } from '@shared/rules'
 import type { CampaignSummary, CampaignView, Comparison, TurnEvent } from '@shared/view'
 import type { CardDetail, CardSummary } from '@shared/cards'
 import type { MemoryEvent } from '@shared/memory'
@@ -79,6 +79,8 @@ export const api = {
     }).then((r) => json<Lorebook>(r)),
   deleteLorebook: (id: string) => fetch(`/api/lorebooks/${encodeURIComponent(id)}`, { method: 'DELETE' }).then((r) => json<LorebookSummary[]>(r)),
   lorebookExportUrl: (id: string) => `/api/lorebooks/${encodeURIComponent(id)}/export`,
+  /** The Quick Hero's stats from their description (hero.ts). */
+  heroSuggest: (ask: { race: RaceId; sex: SexId; years: number; job: string; appearance: string; personality: string; details: string }) => post('/api/hero/suggest', ask).then((r) => json<HeroWishes>(r)),
   /** Lorebooks on Chub, through this app's server (chub.ts). */
   chubSearch: (s: ChubSearch, signal?: AbortSignal) =>
     fetch(`/api/chub/search?${new URLSearchParams({ q: s.query, page: String(s.page), sort: s.sort, nsfw: s.nsfw ? '1' : '0', fantasy: s.fantasy ? '1' : '0' })}`, { signal }).then((r) => json<ChubResults>(r)),

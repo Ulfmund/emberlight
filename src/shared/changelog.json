@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.3.0",
+    "date": "2026-11-10",
+    "title": "Range in fights, a Quick Hero, and a world told frankly.",
+    "items": [
+      "**Range in fights.** Every foe is Close, Near or Far, shown on the tracker. A sword only reaches someone Close: an archer described as far away can't be slashed any more. **Close In** moves you toward them, and anyone already at sword's reach gets a free swing as you go. Foes who fight hand to hand close in on you too; archers shoot from where they stand. Bows and spells reach any range, but shooting someone at your elbow is awkward, and running away is easier with nobody in reach.",
+      "**Lean fight text.** While a fight is on the tracker, the DM keeps it short and quick, like a battle log: who did what and how it landed.",
+      "**Quick Hero.** A looser way to make a character: name, sex, race, age, job, appearance, personality and extra details, in your own words. **Suggest Stats** has the AI set the calling, attributes and skills to fit what you wrote (a scholar comes out clever and not strong), always within the rules, and **Adjust Stats** lets you change anything after. Sex stays male or female, so its stat differences still mean something for everyone in the world. The DM hears your hero's job and extra details in your words.",
+      "**Content: Mild, Mature or Explicit.** People were coming out PG because the DM was never told it could be frank. Now **Mature** (the default) tells it the story is for adults: bodies, appetites, crude talk and violence shown plainly, a seedy tavern's barmaid as bawdy as she'd really be, with sex off the page. **Explicit** holds nothing back. Change it in the creator's Adventure step or under the Sheet's campaign settings."
+    ]
+  },
+  {
     "version": "1.2.2",
     "date": "2026-11-10",
     "title": "What's new, after every update.",

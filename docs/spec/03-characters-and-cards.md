@@ -76,6 +76,11 @@ A step-by-step screen with big illustrated choices. Every step shows how the cho
 
 **Quick create:** a single **🎲 Roll a New Adventurer** button that fills every step at random in one go. Each field has its own small dice button to reroll just that field, and a 🔒 lock to keep it while rerolling everything else. This is the fast path after a character dies.
 
+
+### Quick Hero
+
+*Built (1.3.0)* (`src/renderer/src/screens/QuickHero.tsx`, `src/shared/rules/hero.ts`, `src/server/ai/jobs/hero.ts`). The creator's top switch, **Step by Step** or **Quick Hero**. The Quick Hero is one page in the player's own words: name, sex (male or female, so its stat differences stay meaningful for everyone in the world), race (one of the five, each with its own limits), age (the slider), job, appearance, personality and extra details. **Suggest Stats** asks the AI what fits: the calling closest to the job among that people's, how strong each attribute should be (8 to 18), and the skills they'd have practised. The engine then fits those wishes to the rules (the point-buy, the limits, the starting skill levels), so the build is always legal; without a model, the calling's own leanings are used. **Adjust Stats** opens the step-by-step creator at Attributes. The DM is told the job and the extra details in the player's words.
+
 ## Editing characters (and updating the story)
 
 Name, description and details can be edited at any time from the character panel.

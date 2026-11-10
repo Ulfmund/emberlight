@@ -209,3 +209,8 @@ Models overuse the same names (Kael, Elara, Lyra, Seraphina, Thorne…) and phra
 3. **Logit bias** is added where the server supports it (llama.cpp-based servers), as an extra layer.
 4. **Phrase list:** each banned phrase is either **Reduce** (the prompt says to avoid it; it's tracked in stats) or **Ban** (triggers a rewrite of that sentence or a regenerate).
 5. Both lists are editable in settings, with a starter preset.
+
+## Content
+
+*Built (1.3.0)*. A campaign setting, **Mild**, **Mature** (the default) or **Explicit**, told to the DM as one line. Left unsaid, models write everyone PG however grim the tone (a seedy tavern's barmaid came out sanitised on DeepSeek), so Mature says plainly that the story is for adults: bodies, appetites, crude talk, cruelty and violence shown frankly, characters as they'd really be, sex off the page. Explicit lets sex be described when the player leads there, and never anything sexual involving anyone under 18 or who seems to be a child. Mild keeps it for any audience. The player's own **limits** still apply on top.
+
