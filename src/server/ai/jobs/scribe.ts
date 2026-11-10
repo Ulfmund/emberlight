@@ -35,13 +35,13 @@ const RecordSchema = z.object({
   ties: z.array(z.string()).describe('People only: their ties to other named characters the story states, each as "how: name" ("granddaughter of: Old Tam", "owes money to: Sergeant Pell"). Not ties to the player character').default([]),
   race: z
     .enum(['unknown', ...RACE_IDS] as [string, ...string[]])
-    .describe("People only: their people (human, dwarf, elf, halfling or orc). Someone new: the likeliest if the story doesn't say. Unknown for someone in KNOWN, or someone of none of these peoples")
+    .describe("People only: their people (human, dwarf, elf, halfling or orc); the likeliest if the story doesn't say. Unknown if their record in KNOWN already gives it, or for someone of none of these peoples")
     .default('unknown'),
-  sex: z.enum(['female', 'male', 'unknown']).describe('People only. Someone new: always female or male').default('unknown'),
-  age: z.number().int().describe('People only: their age in years. Someone new: always your best guess from how the story shows them. 0 for someone in KNOWN').default(0),
-  calling: z.string().describe('People only: what they do, in a word or two ("smith", "innkeeper", "hedge witch"). Someone new: always').default(''),
-  appearance: z.string().describe('People only, someone new: what they look like, in one short line').default(''),
-  personality: z.string().describe('People only, someone new: how they carry themselves, in one short line, from how they act').default(''),
+  sex: z.enum(['female', 'male', 'unknown']).describe('People only: always female or male, unless their record in KNOWN already gives it').default('unknown'),
+  age: z.number().int().describe('People only: their age in years, your best guess from how the story shows them. 0 if their record in KNOWN already gives it').default(0),
+  calling: z.string().describe('People only: what they do, in a word or two ("smith", "innkeeper", "hedge witch"), unless their record in KNOWN already gives it').default(''),
+  appearance: z.string().describe('People only: what they look like, in one short line, unless their record in KNOWN already gives it').default(''),
+  personality: z.string().describe('People only: how they carry themselves, in one short line, from how they act; unless their record in KNOWN already gives it').default(''),
   standingChange: z
     .number()
     .int()
