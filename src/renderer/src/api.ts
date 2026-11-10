@@ -4,6 +4,7 @@ import type { CampaignSummary, CampaignView, Comparison, TurnEvent } from '@shar
 import type { CardDetail, CardSummary } from '@shared/cards'
 import type { MemoryEvent } from '@shared/memory'
 import type { Lorebook, LorebookSummary } from '@shared/lore'
+import type { ChubResults, ChubSearch } from '@shared/chub'
 import type { ImageSettings } from '@shared/images'
 import type { EmbeddingSettings } from '@shared/embeddings'
 
@@ -78,6 +79,10 @@ export const api = {
     }).then((r) => json<Lorebook>(r)),
   deleteLorebook: (id: string) => fetch(`/api/lorebooks/${encodeURIComponent(id)}`, { method: 'DELETE' }).then((r) => json<LorebookSummary[]>(r)),
   lorebookExportUrl: (id: string) => `/api/lorebooks/${encodeURIComponent(id)}/export`,
+  /** Lorebooks on Chub, through this app's server (chub.ts). */
+  chubSearch: (s: ChubSearch, signal?: AbortSignal) =>
+    fetch(`/api/chub/search?${new URLSearchParams({ q: s.query, page: String(s.page), sort: s.sort, nsfw: s.nsfw ? '1' : '0', fantasy: s.fantasy ? '1' : '0' })}`, { signal }).then((r) => json<ChubResults>(r)),
+  chubAdd: (path: string) => post('/api/chub/add', { path }).then((r) => json<{ book: Lorebook; existing: boolean }>(r)),
   campaignExportUrl: (id: string) => `/api/campaigns/${encodeURIComponent(id)}/export`,
   // ---- pictures
   uploadMedia: (id: string, file: File, kind: 'portrait' | 'story') =>

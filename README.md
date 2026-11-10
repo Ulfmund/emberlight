@@ -7,7 +7,7 @@ A roleplaying app with an AI Dungeon Master that works with local models (LM Stu
 The full design is in [docs/spec/](docs/spec/README.md). **Current state: 1.1.** What's in it:
 
 - **A real game under the story:** a character creator where race, sex, age and calling shape every limit; a rules engine with dice on screen, degrees of success and free rerolls; skills that grow by use; fights on a turn tracker the engine rolls blow by blow; gear, money, hunger and sleep, gathering and crafting, spells, random events, and real death with a Hall of the Fallen.
-- **A DM that remembers:** people (each with a card like a character's: race, sex, age, calling, looks and manner), places, groups, quests and notable things in an editable Journal, a timeline and a map, layered summaries for long stories, lorebooks (SillyTavern-compatible) and memory by meaning. It also has a context inspector that shows everything the DM was sent.
+- **A DM that remembers:** people (each with a card like a character's: race, sex, age, calling, looks and manner), places, groups, quests and notable things in an editable Journal, a timeline and a map, layered summaries for long stories, lorebooks (SillyTavern-compatible, and searchable on Chub from inside the app) and memory by meaning. It also has a context inspector that shows everything the DM was sent.
 - **Storytellers, RimWorld-style:** eleven built-in DMs (Whalechan, the Veteran, the Romance Writer, the Old Soul and more), each with a voice and a lean toward the kinds of things that happen; or any character card as the DM. The peoples (humans, dwarves, elves) have their own ways.
 - **A life to live:** a calendar with seasons; characters who grow older; long time-skips told as montages; homes, work and wages; marriage and children who grow up and can take up the tale.
 - **Companions** from cards or the story, who fight beside you; **pictures** (portraits, places, things) from your own image generator; **music and sound** made on the spot or from your own tracks.
@@ -34,6 +34,8 @@ This opens the app window. Changes to the interface reload instantly; changes un
 | `npm test` | Runs the rules and game tests |
 | `npm run build` | Builds the app into `out/` |
 | `npm start` | Runs the built app (like the finished version) |
+
+For a test copy, `EMBERLIGHT_DATA_DIR=<folder>` keeps its saves, keys and settings apart from your real ones, and `EMBERLIGHT_MUTED=1` keeps its window quiet (handy when it's only there to serve a phone).
 | `npm run package` | Builds a Windows installer into `release/` |
 
 ## Making a new release (no command line)

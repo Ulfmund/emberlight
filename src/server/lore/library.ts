@@ -43,7 +43,12 @@ export class LoreLibrary {
     }
     const parsed = fromWorldInfo(raw, filename.replace(/\.json$/i, '') || 'Imported lorebook')
     if (!parsed.entries.length) throw new LoreError('This lorebook has no usable entries.')
-    const book: Lorebook = { id: newId('lore'), ...parsed }
+    return this.add(parsed)
+  }
+
+  /** A book read from somewhere else (a file, Chub), saved as a new one. */
+  add(parsed: Omit<Lorebook, 'id'>): Lorebook {
+    const book: Lorebook = { id: newId('lore'), ...parsed, name: parsed.name.trim().slice(0, 120) || 'Imported lorebook', description: parsed.description.slice(0, 2000) }
     this.db.saveLorebook(book)
     return book
   }

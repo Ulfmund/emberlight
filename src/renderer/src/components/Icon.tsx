@@ -354,6 +354,12 @@ const paths: Record<string, React.ReactNode> = {
       <path d="M12 6.5v13" />
     </>
   ),
+  search: (
+    <>
+      <circle cx="10.5" cy="10.5" r="6" />
+      <path d="m15 15 5 5" />
+    </>
+  ),
   pin: (
     <>
       <path d="M9 3.5h6l-1 5 3.5 3.5h-11L10 8.5z" />

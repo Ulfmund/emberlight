@@ -33,6 +33,8 @@ async function createWindow() {
     webPreferences: { contextIsolation: true, sandbox: true }
   })
   win.once('ready-to-show', () => win.show())
+  // Testing aid: a test copy playing to a phone (or for a test run) stays quiet on this computer.
+  if (process.env.EMBERLIGHT_MUTED === '1') win.webContents.setAudioMuted(true)
 
   // Links to other sites open in the normal browser, never inside the app.
   win.webContents.setWindowOpenHandler(({ url }) => {

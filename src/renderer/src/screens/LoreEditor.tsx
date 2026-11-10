@@ -5,6 +5,7 @@ import { LOGIC_LABEL, normalizeEntry, newEntryId, POSITION_LABEL, selectLore, ty
 import { api } from '../api'
 import { Button } from '../components/Button'
 import { Icon } from '../components/Icon'
+import { ChubBrowser } from './ChubBrowser'
 
 /**
  * The lorebook library and editor (docs/spec/07-memory-and-lore.md#lorebooks): a list of
@@ -27,6 +28,8 @@ export function LoreEditor({
 }) {
   const [books, setBooks] = useState<LorebookSummary[] | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
+  /** Finding lorebooks on Chub (ChubBrowser), in place of the book being edited. */
+  const [browsing, setBrowsing] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const input = useRef<HTMLInputElement>(null)
@@ -37,6 +40,7 @@ export function LoreEditor({
     if (!open) return
     void refresh()
     setSelected(null)
+    setBrowsing(false)
     setError('')
     setNotice('')
   }, [open])
@@ -99,16 +103,19 @@ export function LoreEditor({
             className="panel relative flex h-full w-full max-w-6xl flex-col overflow-hidden md:h-[min(90vh,56rem)] md:rounded-2xl"
           >
             <div className="flex items-center gap-3 border-b border-gold-500/15 px-4 py-3 md:px-6">
-              {selected && (
-                <button onClick={() => setSelected(null)} className="no-drag grid h-8 w-8 cursor-pointer place-items-center rounded-lg text-parchment-300 md:hidden" aria-label="All lorebooks">
+              {(selected || browsing) && (
+                <button onClick={() => (setSelected(null), setBrowsing(false))} className="no-drag grid h-8 w-8 cursor-pointer place-items-center rounded-lg text-parchment-300 md:hidden" aria-label="All lorebooks">
                   <Icon name="left" size={18} />
                 </button>
               )}
               <Icon name="scroll" size={22} className="hidden text-gold-300 md:block" />
               <div className="min-w-0 flex-1">
-                <h2 className="font-display text-xl tracking-wider text-gold-300">Lorebooks</h2>
+                <h2 className="truncate font-display text-xl tracking-wider text-gold-300">Lorebooks</h2>
                 <p className="hidden text-xs text-parchment-400 md:block">World knowledge the DM is given only when the story touches it. SillyTavern World Info files work too.</p>
               </div>
+              <Button size="sm" variant={browsing ? 'secondary' : 'ghost'} icon="search" onClick={() => (setBrowsing(true), setSelected(null))} title="Find lorebooks others have shared on chub.ai">
+                <span className="hidden sm:inline">Find on Chub</span>
+              </Button>
               <Button size="sm" variant="ghost" icon="upload" onClick={() => input.current?.click()}>
                 <span className="hidden sm:inline">Import</span>
               </Button>
@@ -127,13 +134,13 @@ export function LoreEditor({
               <div className={`border-b border-gold-500/10 px-6 py-2 text-sm ${error ? 'text-blood-400' : 'text-moss-400'}`}>{error || notice}</div>
             )}
             <div className="flex min-h-0 flex-1">
-              <aside className={`${selected ? 'hidden md:flex' : 'flex'} w-full shrink-0 flex-col overflow-y-auto border-r border-gold-500/15 p-3 md:w-72`}>
-                {books?.length === 0 && <p className="p-4 text-sm text-parchment-400">No lorebooks yet. Import one, or start a new one.</p>}
+              <aside className={`${selected || browsing ? 'hidden md:flex' : 'flex'} w-full shrink-0 flex-col overflow-y-auto border-r border-gold-500/15 p-3 md:w-72`}>
+                {books?.length === 0 && <p className="p-4 text-sm text-parchment-400">No lorebooks yet. Find one on Chub, import one, or start a new one.</p>}
                 {books?.map((b) => {
                   const on = attached?.includes(b.id)
                   return (
                     <div key={b.id} className={`group mb-1 flex items-center gap-2 rounded-lg px-2 py-2 ${selected === b.id ? 'bg-gold-500/10 ring-1 ring-gold-400/40' : 'hover:bg-white/5'}`}>
-                      <button onClick={() => setSelected(b.id)} className="no-drag min-w-0 flex-1 cursor-pointer text-left">
+                      <button onClick={() => (setSelected(b.id), setBrowsing(false))} className="no-drag min-w-0 flex-1 cursor-pointer text-left">
                         <div className="truncate text-sm text-parchment-100">{b.name}</div>
                         <div className="text-[0.7rem] text-parchment-500">
                           {b.entries} entr{b.entries === 1 ? 'y' : 'ies'}
@@ -153,8 +160,20 @@ export function LoreEditor({
                   )
                 })}
               </aside>
-              <section className={`${selected ? 'flex' : 'hidden md:flex'} min-w-0 flex-1 flex-col`}>
-                {selected ? (
+              <section className={`${selected || browsing ? 'flex' : 'hidden md:flex'} min-w-0 flex-1 flex-col`}>
+                {browsing ? (
+                  <ChubBrowser
+                    library={books}
+                    attached={attached}
+                    onToggleAttach={onToggleAttach}
+                    context={context}
+                    onAdded={(b, existing) => {
+                      setError('')
+                      setNotice(existing ? `${b.name} is already in your library.` : `Added ${b.name} (${b.entries.length} entries).`)
+                      void refresh()
+                    }}
+                  />
+                ) : selected ? (
                   <BookEditor key={selected} id={selected} onChanged={() => void refresh()} onDeleted={() => { setSelected(null); void refresh() }} />
                 ) : (
                   <p className="m-auto max-w-sm p-6 text-center font-story text-lg text-parchment-400 italic">Pick a lorebook to read or edit it.</p>
@@ -245,7 +264,7 @@ function BookEditor({ id, onChanged, onDeleted }: { id: string; onChanged: () =>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-48 flex-1">
             <Icon name="sparkle" size={15} className="absolute top-1/2 left-3 -translate-y-1/2 text-ember-400" />
-            <input value={test} onChange={(e) => setTest(e.target.value)} placeholder="Test: type a sentence to see which entries wake up" className="input py-1.5 pl-9 text-sm" />
+            <input value={test} onChange={(e) => setTest(e.target.value)} placeholder="Test: type a sentence to see which entries wake up" className="input py-1.5 text-sm" style={{ paddingLeft: '2.25rem' }} />
           </div>
           {fired && <span className="text-xs text-ember-400">{fired.size} would be used</span>}
           {book.entries.length > 8 && <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Find…" className="input w-32 py-1.5 text-sm" />}

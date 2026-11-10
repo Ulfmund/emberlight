@@ -52,6 +52,17 @@ Lorebooks can be linked to a **campaign** (world lore), a **card** (a character'
 
 *Built (0.6.1):* a library of lorebooks (SQLite `lorebooks` table), attached to a campaign at creation (Adventure step) or later (Journal → Lore). Campaigns read their lorebooks live, so edits apply on the next turn. The editor saves by itself, can export, and has the test box. Card books stay linked to their card. Global books: 0.15.0.
 
+### Finding lorebooks on Chub
+
+*Built (1.2.0)* (`src/server/lore/chub.ts`, `src/renderer/src/screens/ChubBrowser.tsx`). **Find on Chub** in the lorebook library searches the lorebooks shared on [chub.ai](https://chub.ai), the biggest collection of them. Chub was the clear choice: its search needs no account and SillyTavern uses the same API for its own Chub import, while the other card sites (JanitorAI, RisuRealm, Pygmalion, AICharacterCards) only hand out single cards, and Rentry pages are manual downloads. Each lorebook comes as a SillyTavern World Info file, which the library already reads.
+
+- **Searching:** words, an order (most downloaded, top rated, newest, recently updated), **Fantasy only** (on to begin with; Chub's own Fantasy tag) and **Show NSFW** (off). Each result shows its name, author, size in tokens, tagline and tags, with **About it** for the full description and a link to its Chub page.
+- **NSFW off is checked twice.** Chub's own switch lets a lot through: in a test, the most downloaded "SFW" lorebook was "Fetish items". So with NSFW off, a book whose name, tagline or tags say it's adult (including "SFW <-> NSFW") is left out too, and the page says some were.
+- **Not every lorebook is a world.** Some are instructions for the AI, game systems or add-ons ("RPG System", "Dating addon"); they're labelled **Instructions, not a world**, since they may fight Emberlight's own rules. Many popular ones are big fandom wikis (tens of thousands of tokens); the size is shown, and the DM only ever gets the entries the story wakes.
+- **Add** copies the book into the library with credit to its author and a link to its page (in its description). Adding the same book again finds the copy already there. In the creator or the Journal, an added book has **Use** right there. Its entries can be edited like any other book's.
+- **Only Chub's own API is asked**, at fixed addresses, through the app's server: `api.chub.ai/search` for the search, then the book's page and its World Info file. The player's choice is checked to be one of Chub's lorebook paths first. A paired phone can browse and add too; nothing secret is involved.
+- Chub publishes no terms for apps using its API; this is the same read-only use SillyTavern makes of it, one request per search or added book. If Chub changes its API, searching shows a plain "the site may have changed" until the app is updated. Shipping lorebooks *with* Emberlight (as starter worlds) still needs each author's permission: see the roadmap.
+
 ---
 
 ## Entity registry

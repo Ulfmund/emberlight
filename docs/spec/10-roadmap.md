@@ -76,10 +76,13 @@ Built in milestones. Each one ends with something playable, so the artist can te
 - **Age as a slider** ✅: in years, in the creator and on people's cards, at each people's pace; the stage of life follows from it ([03](03-characters-and-cards.md#character-creator))
 - **Speech tags put right** ✅ 1.0.4: an "@Name:" in the middle of a sentence, or for the player character, no longer shows in the story ([06](06-ai-dm.md#speech-lines))
 
+## 1.2 — Lorebooks from Chub ✅ (1.2.0, 2026-11-10)
+- **Find on Chub** ✅: search the lorebooks shared on chub.ai from the lorebook library (fantasy only and NSFW off to begin with, adult books screened out a second time, instructions and game systems labelled), and add one to the library with credit to its author ([07](07-memory-and-lore.md#finding-lorebooks-on-chub))
+
 ## After 1.0
 *Added 2026-11-09.*
 - **Multiplayer** (big): several players in one story, each with their own character, taking turns or acting together, on their own devices. Turn order, who the DM is answering, and how dice and memory work with more than one player all need designing first.
-- **More built-in worlds and lorebooks** (small): a few more ready-made worlds next to *The Cinder Marches*, picked from community lorebooks (Chub). Only ones whose authors allow it (an open licence, or asking), with credit.
+- **More built-in worlds and lorebooks** (small): a few more ready-made worlds next to *The Cinder Marches*, picked from community lorebooks (Chub). Only ones whose authors allow it (an open licence, or asking), with credit. *(1.2.0 did the other half: **Find on Chub** lets players search Chub's lorebooks and add them to their own library, with credit, so nothing is shipped with the app. See [07](07-memory-and-lore.md#finding-lorebooks-on-chub).)*
 - **A grimdark sci-fi ruleset** (big): a second rules system in the spirit of the Warhammer 40,000 tabletop RPGs (percentile characteristics, careers, wounds, corruption and insanity), for a grimdark sci-fi campaign. It would use its own names and setting, not Games Workshop's.
 
 ## Not planned

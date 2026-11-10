@@ -1,7 +1,9 @@
 import type { Hono } from 'hono'
 import { z } from 'zod'
 import { LoreError } from '@shared/lore'
+import { CHUB_SORTS, type ChubSort } from '@shared/chub'
 import { MAX_LORE_FILE, type LoreLibrary } from '../lore/library'
+import { addFromChub, searchChub } from '../lore/chub'
 
 const EntrySchema = z.object({
   id: z.string().max(80),
@@ -37,8 +39,11 @@ const BookSchema = z.object({
   budget: z.number().int().min(0).max(200_000).optional()
 })
 
-/** The lorebook library: list, import, edit, export. */
-export function registerLoreRoutes(app: Hono, lore: LoreLibrary) {
+/**
+ * The lorebook library: list, import, edit, export, and find more on Chub. `chub` is swapped
+ * for a stand-in in tests, so they never reach the real site.
+ */
+export function registerLoreRoutes(app: Hono, lore: LoreLibrary, chub = { search: searchChub, add: addFromChub }) {
   const fail = (err: unknown) => (err instanceof LoreError ? err.message : `Something went wrong (${(err as Error).message}).`)
 
   app.get('/api/lorebooks', (c) => c.json(lore.list()))
@@ -88,5 +93,26 @@ export function registerLoreRoutes(app: Hono, lore: LoreLibrary) {
   app.delete('/api/lorebooks/:id', (c) => {
     lore.delete(c.req.param('id'))
     return c.json(lore.list())
+  })
+
+  // ---- Finding lorebooks on Chub (chub.ts). The phone can browse too: nothing secret is used.
+  app.get('/api/chub/search', async (c) => {
+    const q = c.req.query()
+    const sort: ChubSort = (CHUB_SORTS as readonly string[]).includes(q.sort ?? '') ? (q.sort as ChubSort) : 'downloads'
+    try {
+      return c.json(await chub.search({ query: q.q ?? '', page: Number(q.page) || 1, sort, nsfw: q.nsfw === '1', fantasy: q.fantasy !== '0' }))
+    } catch (err) {
+      return c.json({ error: fail(err) }, 502)
+    }
+  })
+
+  app.post('/api/chub/add', async (c) => {
+    const b = z.object({ path: z.string().max(320) }).safeParse(await c.req.json().catch(() => null))
+    if (!b.success) return c.json({ error: 'Which lorebook?' }, 400)
+    try {
+      return c.json(await chub.add(lore, b.data.path))
+    } catch (err) {
+      return c.json({ error: fail(err) }, err instanceof LoreError ? 400 : 502)
+    }
   })
 }
