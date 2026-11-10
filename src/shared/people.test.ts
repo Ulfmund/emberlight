@@ -181,6 +181,8 @@ describe('children and heirs', () => {
     expect(heirStart({ born: 400 - 20 * 360 }, 400, 'human')).toEqual({ days: 3, age: 20 })
     // Not known when they were born: years on, at an age the player chooses.
     expect(heirStart({}, 400, 'human')).toEqual({ days: HEIR_YEARS * 360 })
+    // An elf of five isn't grown in twenty years: they set out then, as the youngest elf adventurer.
+    expect(heirStart({ born: 400 - 5 * 360 }, 400, 'elf')).toEqual({ days: 20 * 360, age: 80 })
     expect(callingFor('Hunter', 'human')).toBe('hunter')
     expect(callingFor('grove healer', 'elf')).toBe('grovehealer')
     expect(callingFor('the village smith', 'human')).toBe('smith')

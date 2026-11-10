@@ -1,4 +1,4 @@
-import { AGE_SCALE, ageYears, DAYS_PER_YEAR, generateName, type GameState, type RaceId, type Rng, type SexId } from './rules'
+import { AGE_SCALE, ageRange, ageYears, DAYS_PER_YEAR, generateName, type GameState, type RaceId, type Rng, type SexId } from './rules'
 import { sameName, type Entity, type Memory, type MemoryEvent } from './memory'
 
 /**
@@ -49,8 +49,10 @@ export const HEIR_YEARS = 10
 export function heirStart(child: Pick<Entity, 'born'>, day: number, race: RaceId): { days: number; age?: number } {
   const years = yearsOld(child, day)
   const wait = years === undefined ? HEIR_YEARS : yearsToComeOfAge(years, race)
+  // At most twenty years on; a long-lived people's child who isn't grown by then sets out as the
+  // youngest an adventurer of their people can be.
   const days = Math.max(3, Math.min(20, wait) * DAYS_PER_YEAR)
-  return { days, ...(years === undefined ? {} : { age: years + Math.floor(days / DAYS_PER_YEAR) }) }
+  return { days, ...(years === undefined ? {} : { age: Math.max(ageRange(race, 'adventurer').min, years + Math.floor(days / DAYS_PER_YEAR)) }) }
 }
 
 /** The family, for the DM: who they married, and their children with their ages. */
