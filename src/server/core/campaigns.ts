@@ -46,6 +46,7 @@ import {
   type SexId,
   type SkillId
 } from '@shared/rules'
+import { resolveGenre, type Genre } from '@shared/genre'
 import { birthEvent, childrenOf, HEIR_YEARS, heirStart, marriageEvent, MAX_CHILDREN, spouseOf } from '@shared/family'
 import type { CampaignSummary, CampaignView, ChangeLine, Comparison, MessageView } from '@shared/view'
 import type { CastMember } from '@shared/cards'
@@ -262,6 +263,7 @@ export class Campaigns {
         load: encumbrance(state.character),
         needs: needs(state, c.settings.survival)
       },
+      genre: this.genreOf(c),
       cast: c.cast.map((m) => ({ cardId: m.cardId, role: m.role, name: m.name, hasImage: m.hasImage })),
       memory: timeline.memory,
       journey,
@@ -588,6 +590,25 @@ export class Campaigns {
     const ids = new Set(c.lorebooks)
     for (const b of this.db.listLorebooks()) if (b.global) ids.add(b.id)
     return [...ids].map((lid) => this.db.getLorebook(lid)).filter((b): b is LorebookRow => b !== null)
+  }
+
+  private genres = new Map<string, { key: string; genre: Genre }>()
+  /**
+   * The genre the story is told in: the setting, or on auto, read from its lorebooks and its
+   * characters' books (genre.ts). Remembered until a book changes.
+   */
+  genreOf(c: CampaignRow): Genre {
+    if (c.settings.genre === 'fantasy' || c.settings.genre === 'scifi') return c.settings.genre
+    const books = this.loreBooks(c)
+    const key = [...books.map((b) => `${b.id}@${b.updated_at}`), ...c.cast.map((m) => m.cardId)].join('|')
+    const known = this.genres.get(c.id)
+    if (known?.key === key) return known.genre
+    const genre = resolveGenre('auto', () => [
+      ...books.flatMap((b) => [b.name, b.description, ...b.entries.map((e) => `${(e.keys ?? []).join(' ')} ${e.content ?? ''}`)]),
+      ...c.cast.flatMap((m) => [m.description, m.scenario, ...m.book.map((e) => e.content ?? '')])
+    ])
+    this.genres.set(c.id, { key, genre })
+    return genre
   }
 
   /** Entries for the DM, each tagged with its book (for that book's own budget). */

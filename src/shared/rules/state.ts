@@ -70,6 +70,8 @@ export type CampaignSettings = {
    * models write everyone PG, however grim the tone.
    */
   content: 'mild' | 'mature' | 'explicit'
+  /** Fantasy or grimdark sci-fi; on auto, read from the world's lorebooks (genre.ts). */
+  genre: 'auto' | 'fantasy' | 'scifi'
 }
 
 export const DEFAULT_SETTINGS: CampaignSettings = {
@@ -90,6 +92,7 @@ export const DEFAULT_SETTINGS: CampaignSettings = {
   limits: '',
   cultures: true,
   content: 'mature',
+  genre: 'auto',
   persona: 'chronicler'
 }
 

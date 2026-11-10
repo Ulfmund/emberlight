@@ -421,6 +421,7 @@ function SavesTab({ view }: { view: CampaignView }) {
       <section>
         <h3 className="mb-1 text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">Campaign settings</h3>
         <Opt k="tone" label="Tone" options={[{ id: 'grim', label: 'Grim' }, { id: 'grounded', label: 'Grounded' }, { id: 'heroic', label: 'Heroic' }, { id: 'whimsical', label: 'Whimsical' }, { id: 'horror', label: 'Horror' }]} />
+        <Opt k="genre" label="Genre" options={[{ id: 'auto', label: 'Auto' }, { id: 'fantasy', label: 'Fantasy' }, { id: 'scifi', label: 'Sci-Fi' }]} />
         <Opt k="content" label="Content" options={[{ id: 'mild', label: 'Mild' }, { id: 'mature', label: 'Mature' }, { id: 'explicit', label: 'Explicit' }]} />
         <Opt k="mercy" label="Mercy" options={[{ id: 'brutal', label: 'Brutal' }, { id: 'harsh', label: 'Harsh' }, { id: 'forgiving', label: 'Forgiving' }]} />
         <Opt k="rollMode" label="Dice" options={[{ id: 'auto', label: 'Automatic' }, { id: 'dramatic', label: 'Big moments' }, { id: 'always', label: 'Always' }]} />

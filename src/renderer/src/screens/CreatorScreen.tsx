@@ -53,6 +53,7 @@ import { CardLibrary } from './CardLibrary'
 import { LoreEditor } from './LoreEditor'
 import { LimitsField, StorytellerPicker } from './DmStyle'
 import { WORLDS } from '@shared/worlds'
+import { detectGenre, GENRE_LABEL, type Genre } from '@shared/genre'
 import type { LorebookSummary } from '@shared/lore'
 import { Button } from '../components/Button'
 import { Icon } from '../components/Icon'
@@ -898,6 +899,33 @@ function AdventureStep({
   lorebooks: string[]
   setLorebooks: (ids: string[]) => void
 }) {
+  // What Auto would pick, read from the chosen world and lorebooks (genre.ts), and its look.
+  const [detected, setDetected] = useState<Genre>('fantasy')
+  useEffect(() => {
+    let live = true
+    const ids = [...(world ? [WORLDS.find((w) => w.id === world)?.lorebook.id].filter((x): x is string => Boolean(x)) : []), ...lorebooks]
+    if (!ids.length) {
+      setDetected('fantasy')
+      return
+    }
+    Promise.all(ids.map((id) => api.lorebook(id).catch(() => null)))
+      .then((books) => {
+        if (live) setDetected(detectGenre(books.flatMap((b) => (b ? [b.name, b.description, ...b.entries.map((e) => `${e.keys.join(' ')} ${e.content}`)] : []))))
+      })
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [world, lorebooks])
+  const genre: Genre = settings.genre === 'auto' ? detected : settings.genre
+  useEffect(() => {
+    if (genre === 'scifi') document.documentElement.dataset.genre = 'scifi'
+    else delete document.documentElement.dataset.genre
+    return () => {
+      delete document.documentElement.dataset.genre
+    }
+  }, [genre])
+
   const greeter = companions[0]?.greetings ? companions[0] : null
   const [loreOpen, setLoreOpen] = useState(false)
   const [library, setLibrary] = useState<LorebookSummary[]>([])
@@ -983,6 +1011,17 @@ function AdventureStep({
         )}
         <Row label="Tone" text="The feel of the world">
           <Segmented value={settings.tone} onChange={(tone) => set({ tone })} options={[{ id: 'grim', label: 'Grim' }, { id: 'grounded', label: 'Grounded' }, { id: 'heroic', label: 'Heroic' }, { id: 'whimsical', label: 'Whimsical' }, { id: 'horror', label: 'Horror' }]} />
+        </Row>
+        <Row label="Genre" text={settings.genre === 'auto' ? `Auto: ${GENRE_LABEL[detected]}${detected === 'scifi' ? ', from your lorebooks' : ''}` : 'Fantasy, or grimdark science fiction'}>
+          <Segmented
+            value={settings.genre}
+            onChange={(genre) => set({ genre })}
+            options={[
+              { id: 'auto', label: 'Auto', hint: 'Read from your world and lorebooks: a far-future lorebook makes it sci-fi.' },
+              { id: 'fantasy', label: 'Fantasy', hint: 'Swords, sorcery and the old kingdoms.' },
+              { id: 'scifi', label: 'Sci-Fi', hint: 'A grim far future: guns, voidships, hive cities. The rules are told in its terms.' }
+            ]}
+          />
         </Row>
         <Row label="Content" text="How frankly the story is told">
           <Segmented

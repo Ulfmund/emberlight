@@ -65,7 +65,8 @@ const SettingsSchema = z.object({
   limits: z.string().max(1000),
   persona: z.string().max(80),
   cultures: z.boolean(),
-  content: z.enum(['mild', 'mature', 'explicit'])
+  content: z.enum(['mild', 'mature', 'explicit']),
+  genre: z.enum(['auto', 'fantasy', 'scifi'])
 })
 
 /** A time-skip from the dialog or the Sheet's work buttons (skips.ts). */

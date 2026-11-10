@@ -186,6 +186,8 @@ function PlayerTurn({ m, onUndo }: { m: MessageView; onUndo?: () => void }) {
 }
 
 const RUNES = ['ᚠ', 'ᚱ', 'ᛟ', 'ᚨ', 'ᛉ']
+/** A far-future story thinks in machine glyphs (genre.ts). */
+const GLYPHS = ['⌬', '⏣', '⎔', '⏢', '⍟']
 
 function DmTurn({ m, streaming, held }: { m: MessageView; streaming: boolean; held?: boolean }) {
   const waiting = streaming && !m.content
@@ -224,11 +226,12 @@ function Changes({ changes }: { changes: MessageView['changes'] }) {
 
 function Thinking({ text, active, label }: { text: string; active: boolean; label?: string }) {
   const [open, setOpen] = useState(false)
+  const marks = useGame((g) => g.view?.genre) === 'scifi' ? GLYPHS : RUNES
   return (
     <div className="mb-4">
       <button onClick={() => text && setOpen((o) => !o)} className={`no-drag flex items-center gap-3 text-sm ${text ? 'cursor-pointer' : 'cursor-default'} text-parchment-400 hover:text-gold-300`}>
         <span className="flex gap-1.5 font-display text-lg text-ember-400">
-          {RUNES.map((r, i) => (
+          {marks.map((r, i) => (
             <span key={r} className={active ? 'animate-rune-pulse inline-block' : 'inline-block opacity-40'} style={{ animationDelay: `${i * 0.18}s`, textShadow: active ? '0 0 10px var(--color-ember-500)' : undefined }}>
               {r}
             </span>

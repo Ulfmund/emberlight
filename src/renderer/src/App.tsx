@@ -12,11 +12,20 @@ import { LoadScreen } from './screens/LoadScreen'
 import { WhatsNew } from './components/WhatsNew'
 
 export function App() {
-  const { screen, loadSettings } = useGame()
+  const { screen, loadSettings, view } = useGame()
 
   useEffect(() => {
     void loadSettings()
   }, [loadSettings])
+
+  // A far-future story wears the grimdark sci-fi look while it's on screen (styles.css). The
+  // creator sets its own, from the genre being chosen.
+  const scifi = screen === 'play' && view?.genre === 'scifi'
+  useEffect(() => {
+    if (screen === 'creator') return
+    if (scifi) document.documentElement.dataset.genre = 'scifi'
+    else delete document.documentElement.dataset.genre
+  }, [scifi, screen])
 
   return (
     <div className="flex h-full flex-col bg-ink-950">

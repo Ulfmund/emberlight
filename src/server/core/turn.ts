@@ -44,6 +44,7 @@ import { estimateTokens, promptBlocks, type PromptReport } from '@shared/inspect
 import { entityLine, projectMemory, questBrief, relevantEntities, sameName, storySoFar, type Summary } from '@shared/memory'
 import { factionBrief, factionStanding, withReputation } from '@shared/factions'
 import { birthsDuring, familyBrief, yearsOld } from '@shared/family'
+import { scifiNames } from '@shared/genre'
 import { tidySpeech } from '@shared/speech'
 import type { LoreEntry } from '@shared/lore'
 import type { Memory } from '@shared/memory'
@@ -315,7 +316,7 @@ export class TurnEngine {
     const path = this.campaigns.path(c)
     const state = this.campaigns.state(c, { path })
     const recent = path.filter((m) => !m.meta.hidden).slice(-4).map((m) => ({ role: m.role, content: m.content }))
-    return suggestActions(ctx.provider, ctx.model, state, recent, signal)
+    return suggestActions(ctx.provider, ctx.model, state, recent, signal, this.campaigns.genreOf(c))
   }
 
   /** The rest of the sentence the player is typing (ghost text). */
@@ -325,7 +326,7 @@ export class TurnEngine {
     const path = this.campaigns.path(c)
     const state = this.campaigns.state(c, { path })
     const recent = path.filter((m) => !m.meta.hidden).slice(-2).map((m) => ({ role: m.role, content: m.content }))
-    return ghostText(ctx.provider, ctx.model, state, recent, typed, signal)
+    return ghostText(ctx.provider, ctx.model, state, recent, typed, signal, this.campaigns.genreOf(c))
   }
 
   /** Spend an unspent attribute point from a level-up. */
@@ -670,7 +671,10 @@ export class TurnEngine {
     const factions = factionStanding(memory)
     const quests = questBrief(memory)
     const family = familyBrief(memory, after)
-    const build = (story: string) => narratorSystem(after, c.settings, names, c.cast, lore, { story, people, notes: pinned, companions, factions, quests, family }, persona)
+    // The genre, for the DM: the setting, or read from the world's lore (genre.ts).
+    const genre = this.campaigns.genreOf(c)
+    const told = { ...c.settings, genre }
+    const build = (story: string) => narratorSystem(after, told, genre === 'scifi' ? scifiNames(this.rng) : names, c.cast, lore, { story, people, notes: pinned, companions, factions, quests, family }, persona)
     const storyBudget = Math.round(ctx.contextChars * tier.storyShare)
     const keep = new Set(recalled.summaries)
     let system = build(storySoFar(memory, storyBudget, () => false, keep))

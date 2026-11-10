@@ -79,6 +79,9 @@ Built in milestones. Each one ends with something playable, so the artist can te
 ## 1.2 — Lorebooks from Chub ✅ (1.2.0, 2026-11-10)
 - **Find on Chub** ✅: search the lorebooks shared on chub.ai from the lorebook library (fantasy only and NSFW off to begin with, adult books screened out a second time, instructions and game systems labelled), and add one to the library with credit to its author ([07](07-memory-and-lore.md#finding-lorebooks-on-chub))
 
+## 1.4 — Grimdark sci-fi ✅ (1.4.0, 2026-11-10)
+- **Genre** ✅: Auto / Fantasy / Sci-Fi, detected from the lore; a far-future DM, the rules' words translated, gothic names, and a grimdark look ([06](06-ai-dm.md#genre))
+
 ## 1.3 — Range, Quick Hero, Content ✅ (1.3.0, 2026-11-10)
 - **Range in fights** ✅: close / near / far, Close In with free swings, lean battle-log narration ([04](04-rules-system.md#range))
 - **Quick Hero** ✅: a one-page creator in your own words, with AI-suggested stats fitted to the rules ([03](03-characters-and-cards.md#quick-hero))
@@ -95,6 +98,7 @@ Built in milestones. Each one ends with something playable, so the artist can te
 *Added 2026-11-09.*
 - **Multiplayer** (big): several players in one story, each with their own character, taking turns or acting together, on their own devices. Turn order, who the DM is answering, and how dice and memory work with more than one player all need designing first.
 - **More built-in worlds and lorebooks** (small): a few more ready-made worlds next to *The Cinder Marches*, picked from community lorebooks (Chub). Only ones whose authors allow it (an open licence, or asking), with credit. *(1.2.0 did the other half: **Find on Chub** lets players search Chub's lorebooks and add them to their own library, with credit, so nothing is shipped with the app. See [07](07-memory-and-lore.md#finding-lorebooks-on-chub).)*
+- **Sci-fi gear and foes** (medium, *added 2026-11-10*): weapons, armour and kit the engine knows in far-future terms (pistols and rifles with ammunition and reloads, blades, flak and carapace, medkits and stimms), and foes to match (gangers, cultists, mutants, servitors, alien beasts), on the current combat engine with its ranges. The step between today's translated fantasy gear and a whole ruleset.
 - **A grimdark sci-fi ruleset** (big): a second rules system in the spirit of the Warhammer 40,000 tabletop RPGs (percentile characteristics, careers, wounds, corruption and insanity), for a grimdark sci-fi campaign. It would use its own names and setting, not Games Workshop's.
 - **A flagship default world** (medium): *added 2026-11-10.* A ready-made world that uses every mechanic: its peoples and their ways, factions with standing, places for the map, people with full cards, quests to take up, homes and work, the seasons, and room to raise a family. It would be built from the player's and their friend's own decades of worldbuilding, so there's no licence to ask for, and sit beside *The Cinder Marches* as the default. A world today is only a lorebook, a starting place and an opening scene ([worlds.ts](../../src/shared/worlds.ts)), so this needs a richer world format first: people, factions, places and quest hooks that start in the Journal, and the world's own peoples and customs in place of the built-in ones where it has them.
 

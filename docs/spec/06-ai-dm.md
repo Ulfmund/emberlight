@@ -214,3 +214,13 @@ Models overuse the same names (Kael, Elara, Lyra, Seraphina, Thorne…) and phra
 
 *Built (1.3.0)*. A campaign setting, **Mild**, **Mature** (the default) or **Explicit**, told to the DM as one line. Left unsaid, models write everyone PG however grim the tone (a seedy tavern's barmaid came out sanitised on DeepSeek), so Mature says plainly that the story is for adults: bodies, appetites, crude talk, cruelty and violence shown frankly, characters as they'd really be, sex off the page. Explicit lets sex be described when the player leads there, and never anything sexual involving anyone under 18 or who seems to be a child. Mild keeps it for any audience. The player's own **limits** still apply on top.
 
+## Genre
+
+*Built (1.4.0)* (`src/shared/genre.ts`). A campaign setting, **Auto** (the default), **Fantasy** or **Sci-Fi**. On Auto the story's lorebooks and its characters' books are read for far-future words (voidships, hive cities, las-weapons, xenos, augmetics, planets…) against fantasy ones; enough of the first makes it sci-fi. The answer is remembered until a book changes.
+
+In a sci-fi story:
+- **The DM** is told the game is "a science-fiction roleplaying game, set in a grim far future", and gets a block on the setting: decaying star-spanning empires, hive cities, voidships, faith and machine-rite, zealots, heretics and aliens, told with gothic weight and scale; names, places and technology come from the lore.
+- **The rules stay the same**, so their fantasy words are translated: the character's gear and money are rewritten before the DM sees them (a Shortbow is a rifle, Arrows rifle rounds, Leather armour flak armour, a Healing potion a medi-stimm, coins one count of scrip), and the DM is told the rest (a spell as a psychic power or a device's function, a calling as a trade or posting). The peoples' fantasy customs are left out; the other peoples become the setting's nearest kin.
+- **Names** for new people are gothic far-future ones. **Ideas**, **Autocomplete** and **pictures** ("grimdark science fiction") follow the genre.
+- **The look:** the story screen (and the creator, once the genre is chosen or detected) wears gunmetal and brass, hazard red, a phosphor glow and faint scanlines; the thinking runes become machine glyphs.
+- Not yet: sci-fi items, foes and rules of their own. A found laspistol isn't a weapon the engine knows; see the roadmap.

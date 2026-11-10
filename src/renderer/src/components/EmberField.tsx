@@ -97,5 +97,5 @@ function Embers({ density, className }: { density: number; className: string }) 
     }
   }, [density])
 
-  return <canvas ref={ref} className={`pointer-events-none absolute inset-0 h-full w-full ${className}`} />
+  return <canvas ref={ref} data-embers className={`pointer-events-none absolute inset-0 h-full w-full ${className}`} />
 }

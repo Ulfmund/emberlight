@@ -4,6 +4,7 @@ import { ImageSettingsSchema, emblemPrompt, portraitPrompt, scenePrompt, stillLi
 import { ageYears, BACKGROUNDS } from '@shared/rules'
 import { projectMemory, sameName, type Entity } from '@shared/memory'
 import { bornAt, personKind } from '@shared/people'
+import type { Genre } from '@shared/genre'
 import type { Campaigns } from '../core/campaigns'
 import type { TurnEngine } from '../core/turn'
 import type { SettingsStore } from '../store/settings'
@@ -152,7 +153,11 @@ export function registerMediaRoutes(app: Hono, campaigns: Campaigns, turns: Turn
  * a still life. A person is painted from their card when it has one (people.ts), as the player
  * character is from their sheet: "a 54-year-old dwarf woman, smith, grey braids…". `day` is today.
  */
-export function recordPrompt(style: string, e: Entity, day?: number): string {
+/** A cue for the image generator in a far-future story (genre.ts). */
+const SCIFI_CUE = 'grimdark science fiction'
+
+export function recordPrompt(style: string, e: Entity, day?: number, genre: Genre = 'fantasy'): string {
+  if (genre === 'scifi') return recordPrompt(`${style.trim() ? `${style.trim()}, ` : ''}${SCIFI_CUE}`, e, day)
   const what = e.summary ? `${e.name}, ${e.summary.replace(/\.$/, '')}` : e.name
   if (e.kind === 'place') return scenePrompt(style, { what, details: e.facts.slice(-2) })
   if (e.kind === 'faction') return emblemPrompt(style, { what, details: e.facts.filter((f) => !/\([+−-]\d\)$/.test(f)).slice(-1) })
@@ -192,7 +197,7 @@ export function makePainter(campaigns: Campaigns, settings: SettingsStore, secre
     busy.add(id)
     tried.add(`${id}:${who.id}`)
     return (async () => {
-      const pic = await generateImage(s, await secrets.get('images'), recordPrompt(s.style, who, now.time.day))
+      const pic = await generateImage(s, await secrets.get('images'), recordPrompt(s.style, who, now.time.day, campaigns.genreOf(c)))
       const media = campaigns.db.addMedia({ campaignId: id, kind: 'generated', mime: pic.mime, data: pic.data })
       campaigns.journal(id, { type: 'entity_edit', id: who.id, image: media })
     })()
@@ -207,10 +212,11 @@ function portraitFor(campaigns: Campaigns, settings: SettingsStore, id: string, 
   if (entityId) {
     const e = projectMemory(campaigns.activeEvents(campaigns.get(id), campaigns.path(campaigns.get(id))).map((x) => x.event)).entities.find((x) => x.id === entityId)
     if (!e) throw new Error('That is no longer in the Journal.')
-    return recordPrompt(style, e, view.state.time.day)
+    return recordPrompt(style, e, view.state.time.day, view.genre)
   }
   // The player character, the same way: race, sex and age in years, then calling and looks.
   const b = view.build
   const kind = personKind({ race: b.race, sex: b.sex, born: bornAt(ageYears(view.state), view.state.time.day) }, view.state.time.day)
-  return portraitPrompt(style, { kind, details: [BACKGROUNDS[b.background].label.toLowerCase(), b.appearance.slice(0, 500)] })
+  const cue = view.genre === 'scifi' ? `${style.trim() ? `${style.trim()}, ` : ''}${SCIFI_CUE}` : style
+  return portraitPrompt(cue, { kind, details: [b.job?.trim() || BACKGROUNDS[b.background].label.toLowerCase(), b.appearance.slice(0, 500)] })
 }

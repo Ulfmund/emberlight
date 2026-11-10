@@ -1,5 +1,17 @@
 [
   {
+    "version": "1.4.0",
+    "date": "2026-11-10",
+    "title": "Grimdark sci-fi.",
+    "items": [
+      "**Genre: Auto, Fantasy or Sci-Fi.** On Auto, Emberlight reads your world and lorebooks: a far-future lorebook (hive cities, voidships, las-weapons, xenos, augmetics) makes the story science fiction on its own. You can also pick it yourself, in the creator's Adventure step or the Sheet's campaign settings.",
+      "**A far-future DM.** In a sci-fi story the DM is told it isn't fantasy: vast decaying empires, hive cities and underhives, voidships, faith and machine-rite, zealots, heretics and alien things, told with gothic weight and grim scale. It takes names, places and technology from your lorebook, and suggests gothic far-future names for new people instead of fantasy ones.",
+      "**No more swords in space.** The rules underneath still use fantasy words, so they're translated before the DM sees them: your bow is a rifle, your arrows rifle rounds, your leather armour flak, potions medi-stimms, your coin scrip. Spells read as psychic powers or a device's work. The peoples' fantasy customs are left out, and the other peoples become the setting's nearest kin.",
+      "**A grimdark look.** Sci-fi stories wear gunmetal and brass, hazard red and a phosphor glow, with faint scanlines, and the DM thinks in machine glyphs. Ideas, Autocomplete and pictures follow the genre too.",
+      "Warhammer Fantasy-style worlds stay on the fantasy side, as before."
+    ]
+  },
+  {
     "version": "1.3.0",
     "date": "2026-11-10",
     "title": "Range in fights, a Quick Hero, and a world told frankly.",

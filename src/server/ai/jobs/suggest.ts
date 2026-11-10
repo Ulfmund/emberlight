@@ -1,3 +1,4 @@
+import type { Genre } from '@shared/genre'
 import { z } from 'zod'
 import { BACKGROUNDS, combatSummary, mainWeapon, partySummary, RACES, type GameState } from '@shared/rules'
 import type { ChatMessage } from '@shared/types'
@@ -18,7 +19,10 @@ const SuggestSchema = z.object({
   say: z.string().describe('Something to say aloud, in "quotation marks", maybe with a small action').catch('')
 })
 
-const SUGGEST_SYSTEM = `You help the player of a fantasy roleplaying game decide what to do next. Read the story and offer three different things their character could do right now, each in the player's own voice: first person, present tense, one or two short sentences, under 30 words. Speech goes in "quotation marks". Use only people, places and things that are in the story or in the character's pack. Don't decide outcomes; only say what they try.`
+/** The game, as each job names it (genre.ts). */
+const GAME: Record<Genre, string> = { fantasy: 'a fantasy roleplaying game', scifi: 'a grim far-future science-fiction roleplaying game' }
+
+const SUGGEST_SYSTEM = (genre: Genre) => `You help the player of ${GAME[genre]} decide what to do next. Read the story and offer three different things their character could do right now, each in the player's own voice: first person, present tense, one or two short sentences, under 30 words. Speech goes in "quotation marks". Use only people, places and things that are in the story or in the character's pack. Don't decide outcomes; only say what they try.`
 
 const storyOf = (recent: ChatMessage[]) =>
   recent
@@ -42,9 +46,9 @@ function tidy(s: string, speech: boolean): string {
   return t.slice(0, 300)
 }
 
-export async function suggestActions(provider: Provider, model: string, state: GameState, recent: ChatMessage[], signal?: AbortSignal): Promise<Suggestion[]> {
+export async function suggestActions(provider: Provider, model: string, state: GameState, recent: ChatMessage[], signal?: AbortSignal, genre: Genre = 'fantasy'): Promise<Suggestion[]> {
   const prompt = `The story so far (most recent last):\n${storyOf(recent) || '(the adventure is just starting)'}\n\n${who(state)}\n\nWhat could they do now? One bold option, one careful option, and one thing to say.`
-  const out = await provider.complete(model, { system: SUGGEST_SYSTEM, messages: [{ role: 'user', content: prompt }], schema: SuggestSchema, name: 'suggestions', signal })
+  const out = await provider.complete(model, { system: SUGGEST_SYSTEM(genre), messages: [{ role: 'user', content: prompt }], schema: SuggestSchema, name: 'suggestions', signal })
   const list: Suggestion[] = [
     { kind: 'bold', text: tidy(out.bold, false) },
     { kind: 'careful', text: tidy(out.careful, false) },
@@ -60,7 +64,7 @@ const GhostSchema = z.object({
   continuation: z.string().describe('The next few words the player would type, carrying on exactly where they stopped. Empty if their text already reads as finished')
 })
 
-const GHOST_SYSTEM = `You finish the player's sentence in a fantasy roleplaying game, like a phone keyboard's suggestion. Continue their text with the next few words (at most 12) in their voice, fitting the story. Never repeat what they already wrote, and never write what happens as a result: only more of what they do or say. If their text already reads as finished, answer with an empty continuation.`
+const GHOST_SYSTEM = (genre: Genre) => `You finish the player's sentence in ${GAME[genre]}, like a phone keyboard's suggestion. Continue their text with the next few words (at most 12) in their voice, fitting the story. Never repeat what they already wrote, and never write what happens as a result: only more of what they do or say. If their text already reads as finished, answer with an empty continuation.`
 
 /** The longest overlap between the end of what's typed and the start of the continuation. */
 function overlap(typed: string, cont: string): number {
@@ -70,9 +74,9 @@ function overlap(typed: string, cont: string): number {
   return 0
 }
 
-export async function ghostText(provider: Provider, model: string, state: GameState, recent: ChatMessage[], typed: string, signal?: AbortSignal): Promise<string> {
+export async function ghostText(provider: Provider, model: string, state: GameState, recent: ChatMessage[], typed: string, signal?: AbortSignal, genre: Genre = 'fantasy'): Promise<string> {
   const prompt = `The story so far (most recent last):\n${storyOf(recent.slice(-2)) || '(the adventure is just starting)'}\n\n${who(state)}\n\nThe player has typed so far:\n"""${typed}"""\n\nContinue it.`
-  const out = await provider.complete(model, { system: GHOST_SYSTEM, messages: [{ role: 'user', content: prompt }], schema: GhostSchema, name: 'ghost_text', signal })
+  const out = await provider.complete(model, { system: GHOST_SYSTEM(genre), messages: [{ role: 'user', content: prompt }], schema: GhostSchema, name: 'ghost_text', signal })
   let cont = out.continuation.replace(/\s+/g, ' ')
   // Models sometimes echo the typed text back first.
   if (cont.trim().toLowerCase().startsWith(typed.trim().toLowerCase()) && typed.trim().length > 3) cont = cont.trim().slice(typed.trim().length)

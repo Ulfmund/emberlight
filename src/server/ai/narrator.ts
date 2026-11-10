@@ -58,6 +58,7 @@ import type { ChatMessage } from '@shared/types'
 import type { CardBookEntry, CastMember } from '@shared/cards'
 import { formatCoins } from '../core/campaigns'
 import { peoplesBlock } from '@shared/cultures'
+import { scifiTerms } from '@shared/genre'
 
 /**
  * The Narrator's prompt (docs/spec/06-ai-dm.md#6-narrate). The engine has already decided
@@ -65,6 +66,18 @@ import { peoplesBlock } from '@shared/cultures'
  */
 
 const LENGTH = { short: '1–2 short paragraphs', medium: '2–4 paragraphs', long: '4–6 paragraphs' }
+/**
+ * A grim far-future story (docs/spec/06-ai-dm.md#genre). The rules underneath stay fantasy-shaped
+ * (callings, items, spells), so the DM tells them in the setting's terms; the world's own lore
+ * supplies the names and the particulars.
+ */
+const SCIFI = `THE SETTING IS SCIENCE FICTION, NOT FANTASY
+- A grim far future: vast, decaying empires that spread across the stars; hive cities stacked into the smog and sprawling underhives; voidships, orbital stations and the black between worlds; faith and machine-rite side by side; old technology half understood and kept by ritual; zealots, heretics, mutants and alien things. Life is cheap and grinding, and authority is enormous, cruel and far away.
+- Tell it with gothic weight: grand, grim and a little baroque. Let the scale dwarf the people in it; let dread, faith and filth sit side by side; give the setting's institutions a cold, bureaucratic menace. Plain, sardonic soldiers' talk is welcome.
+- Describe the world in its own terms, never fantasy ones: guns, blades and armour, augmetics and machines, rations and stimms, uniforms and vox-casters, not taverns, swords and spellbooks, unless the setting's lore has them. Take names, places, factions, ranks and technology from the world's lore whenever it has them.
+- The game's rules use fantasy words for some things. Tell each as its nearest equivalent in this setting: a sword or axe as a combat blade or chainblade, a bow or crossbow as a rifle or pistol and its arrows as ammunition, armour as flak or carapace, a spell as a psychic power or a device's function and mana as the strain of it, herbs and potions as medicae supplies and stimms, coin as the setting's currency, a calling as their trade or posting, an inn as a hab, mess or drinking den. The character's gear and money below are listed in those fantasy words: never use them in the story (no swords, bows, arrows, spells, mana, potions, or gold, silver and copper coins); say the setting's equivalent instead. The engine's numbers and outcomes stand exactly as given.
+- The game's peoples are the setting's: humans as humans, and the others as its nearest kin if it has them (long-lived, aloof aliens for elves; stout miners from heavy worlds for dwarves; brutish greenskins for orcs; small, quick folk for halflings).`
+
 const CONTENT: Record<CampaignSettings['content'], string> = {
   mild: 'Keep it suitable for any audience: danger and violence without gore, romance without sex, no crude talk beyond mild oaths.',
   mature:
@@ -173,8 +186,10 @@ export function narratorSystem(
   const load = encumbrance(c)
   const need = needs(state, settings.survival)
   const tiredness = need.exhaustion ? `exhausted (level ${need.exhaustion}, awake ${need.hoursAwake} hours)` : need.hoursAwake >= 14 ? `tired (awake ${need.hoursAwake} hours)` : 'rested'
-  const gear = `Wielding: ${weapon.unarmed ? 'nothing (bare fists)' : weapon.name}. Wearing: ${worn.join(', ') || 'ordinary clothes'}. Defense ${defenseValue(c).total}.`
-  const carrying = `Carrying: ${c.inventory.map((i) => `${i.name}${i.qty > 1 ? ` ×${i.qty}` : ''}`).join(', ') || 'nothing'}; ${formatCoins(c.coins)}.${load !== 'none' ? ` ${load === 'overloaded' ? 'OVERLOADED' : 'ENCUMBERED'}: carrying ${carriedKg(c)} kg of a comfortable ${capacityKg(c)} kg.` : ''}`
+  // In a far-future story the gear is told in its terms before the DM ever sees a sword (genre.ts).
+  const says = (t: string) => (settings.genre === 'scifi' ? scifiTerms(t) : t)
+  const gear = says(`Wielding: ${weapon.unarmed ? 'nothing (bare fists)' : weapon.name}. Wearing: ${worn.join(', ') || 'ordinary clothes'}. Defense ${defenseValue(c).total}.`)
+  const carrying = says(`Carrying: ${c.inventory.map((i) => `${i.name}${i.qty > 1 ? ` ×${i.qty}` : ''}`).join(', ') || 'nothing'}; ${settings.genre === 'scifi' ? `${c.coins} scrip` : formatCoins(c.coins)}.`) + (load !== 'none' ? ` ${load === 'overloaded' ? 'OVERLOADED' : 'ENCUMBERED'}: carrying ${carriedKg(c)} kg of a comfortable ${capacityKg(c)} kg.` : '')
   const body = settings.survival ? `\nHunger: ${HUNGER_LABEL[need.hunger].toLowerCase()} (last proper meal ${need.hoursSinceMeal} hours ago). Tiredness: ${tiredness}.` : ''
   // Magic (docs/spec/04-rules-system.md#spells-v1-simple): what they know, and what can be taught.
   const known = knownSpells(state)
@@ -198,8 +213,11 @@ export function narratorSystem(
     settings.pacing === 'guided'
       ? 'Keep a story moving: give the character a clear goal, raise the stakes, and steer gently toward the next turn of the plot, without taking choices away from the player.'
       : "Let the player lead. Offer hooks and let the world react to what they do, but don't push a plot on them."
-  // The peoples' ways (cultures.ts): the world's defaults, unless its lore says otherwise.
-  const peoples = peoplesBlock(settings, b)
+  // Grimdark science fiction (genre.ts): resolved before this, so 'auto' never reaches here as sci-fi.
+  const scifi = settings.genre === 'scifi'
+  // The peoples' ways (cultures.ts): the world's defaults, unless its lore says otherwise. They're
+  // a fantasy world's villages and crafts, so a far-future story goes by its own lore instead.
+  const peoples = scifi ? '' : peoplesBlock(settings, b)
   const limits = settings.limits.trim() ? `\n- Content to avoid, or to fade to black instead of describing: ${settings.limits.trim().replace(/\s+/g, ' ')}.` : ''
   // How frankly to tell it. Left unsaid, models sanitise everyone (a seedy tavern's barmaid turns PG).
   const content = CONTENT[settings.content] ?? CONTENT.mature
@@ -224,7 +242,7 @@ If something happens to the character that they might notice, resist or react to
 [[ROLL: skill | difficulty | short reason]]
 Skills: ${SKILL_IDS.join(', ')}. Difficulty: ${DIFFICULTIES.join(', ')}. Use this sparingly, at most once every few turns.`
 
-  return `You are the Dungeon Master of a ${TONE[settings.tone]} fantasy roleplaying game.${voice}
+  return `You are the Dungeon Master of a ${TONE[settings.tone]} ${scifi ? 'science-fiction roleplaying game, set in a grim far future' : 'fantasy roleplaying game'}.${voice}
 
 HOW TO RUN THE GAME
 - ${third ? `Write in third person about ${b.name}, present tense` : 'Write in second person ("you"), present tense'}, vivid but economical. Aim for ${cb ? 'two to four short sentences while the fight lasts' : LENGTH[settings.length]}.
@@ -244,7 +262,9 @@ HOW TO RUN THE GAME
 - People the story already knows keep who they are: their race, sex, age, calling, looks and manner as their record below gives them. ${agesBrief()}
 - Avoid stock phrases ("a shiver ran down your spine", "a testament to", "barely above a whisper").${askRoll}${fight}
 
-${peoples ? `${peoples}
+${scifi ? `${SCIFI}
+
+` : ''}${peoples ? `${peoples}
 
 ` : ''}${loreAt(lore, 'before_char')}THE PLAYER CHARACTER
 ${b.name}: ${RACES[b.race].label.toLowerCase()}, ${sex.label.toLowerCase()}, ${ageYears(state)} years old (${AGES[b.age].label.toLowerCase()}), ${b.job?.trim() || BACKGROUNDS[b.background].label.toLowerCase()}.${b.appearance ? `\nAppearance: ${b.appearance}` : ''}${b.personality ? `\nPersonality: ${b.personality}` : ''}${b.details?.trim() ? `\nAlso: ${b.details.trim()}` : ''}

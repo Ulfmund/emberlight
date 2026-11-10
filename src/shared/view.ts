@@ -1,3 +1,4 @@
+import type { Genre } from './genre'
 import type { CampaignSettings, CharacterBuild, CheckResult, GameState, Hunger, SkillId, Weapon } from './rules'
 import type { Journey } from './journey'
 import type { TimelineEntry } from './timeline'
@@ -35,6 +36,8 @@ export type CampaignView = {
   id: string
   name: string
   settings: CampaignSettings
+  /** The genre the story is told in (the setting, or read from its lore: genre.ts). */
+  genre: Genre
   build: CharacterBuild
   state: GameState
   derived: {
