@@ -5,6 +5,7 @@ import titleArt from '../assets/title.jpg'
 import logo from '../assets/logo-die.png'
 import { EmberField } from '../components/EmberField'
 import { UpdateNotice } from '../components/UpdateNotice'
+import { useWhatsNew } from '../components/WhatsNew'
 import { Button } from '../components/Button'
 import { Icon } from '../components/Icon'
 import { useGame } from '../store'
@@ -97,6 +98,9 @@ export function TitleScreen() {
                 Play on Phone
               </Button>
             )}
+            <Button variant="ghost" icon="sparkle" onClick={() => useWhatsNew.getState().open()} className={settings && !settings.remote ? '' : 'mt-1'}>
+              What's New
+            </Button>
           </motion.div>
         </motion.div>
 

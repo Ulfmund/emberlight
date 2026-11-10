@@ -40,6 +40,9 @@ For a test copy, `EMBERLIGHT_DATA_DIR=<folder>` keeps its saves, keys and settin
 
 ## Making a new release (no command line)
 
+First add the version's notes to the top of `src/shared/changelog.json`: they're what the app's **What's New** shows, and `node scripts/release-notes.mjs <version>` prints them for the release.
+
+
 On GitHub: **Releases → Draft a new release**, type a new tag (e.g. `v0.0.4`), add a few notes, and click **Publish release**. The *Build installer* action (`.github/workflows/release.yml`) builds the Windows installer and attaches it, plus the update files, to that release within ~10 minutes. The app's version number is taken from the tag. Installed copies then show an **Update** button.
 
 Don't attach files to the release yourself: GitHub's download links for a file that gets replaced can fail for a while afterwards, so the workflow should be the only thing that uploads.

@@ -64,6 +64,10 @@ The goal is that it **looks and feels like a game**: clear panels, icons for eve
 
 *Built (0.19.0).* The Journal's **Map** is a traveller's sketch rather than a survey: every place the character has been (from the Scribe's locations on the branch being played), drawn with an icon and colour for its kind (town, village, indoors, road, forest, hills, water, ruin, underground, wild), joined by the ways walked between them (thicker for ways walked more often), with a glowing ring where the character is now. The layout is worked out from the journey itself (places start along the way they were reached, then ways pull like strings and places push apart), so the same journey always draws the same way. Tap a place for its picture, what's known of it, and how often and when you were there. Code: `src/shared/journey.ts`, `src/renderer/src/screens/play/JourneyMap.tsx`.
 
+## What's New
+
+*Built (1.2.2)* (`src/renderer/src/components/WhatsNew.tsx`, `src/shared/changelog.json`). After an update, a window lists what was added or changed since that screen last showed the app; each screen (the PC, a phone) keeps its own place. Someone with no adventures yet (a new player) isn't shown it. The title screen's **What's New** opens it again. The notes live in the app (`changelog.json`, newest first), so they work offline and on the phone, and each GitHub release's notes are printed from the same entry (`node scripts/release-notes.mjs 1.2.2`). A test fails if the version being built has no entry.
+
 ## Mobile layout
 
 - The story feed fills the screen. HP / stamina / mana are thin bars pinned at the top.

@@ -1,0 +1,54 @@
+[
+  {
+    "version": "1.2.2",
+    "date": "2026-11-10",
+    "title": "What's new, after every update.",
+    "items": [
+      "**What's new.** After Emberlight updates, this window shows what was added or changed since you last played, on each screen you play from. You can open it again from the title screen."
+    ]
+  },
+  {
+    "version": "1.2.1",
+    "date": "2026-11-10",
+    "title": "Continue, and a death you can read.",
+    "items": [
+      "**Continue.** The Act button is always there now. With nothing typed it says **Continue**, and the story simply goes on with your character doing nothing in particular. In a fight, you hold back and your foes take their turn.",
+      "**The death screen no longer covers the story.** It now sits where the message box was, so you can scroll up and read how it happened. **Hide** folds it down to one line. Nothing more can happen in the story until you choose what's next."
+    ]
+  },
+  {
+    "version": "1.2.0",
+    "date": "2026-11-10",
+    "title": "Find lorebooks on Chub.",
+    "items": [
+      "**Find on Chub,** in the lorebook library (from the Adventure step, or Journal → Lore in a story), searches the lorebooks people share on chub.ai, the biggest collection there is. Search by words, sort by most downloaded, top rated or newest, and read about each one before you take it.",
+      "**Add** copies a lorebook into your library, with credit to the person who wrote it and a link to its page. Then tap **Use** to bring it into your adventure. You can edit it like any other lorebook.",
+      "**Fantasy only** and **NSFW off** to start with. Chub's own filter misses a lot, so Emberlight also leaves out anything whose name, tagline or tags say it's adult.",
+      "Some lorebooks are really instructions for the AI or their own game systems, not worlds. Those are marked **Instructions, not a world**, since they may clash with Emberlight's rules.",
+      "Works from the phone too."
+    ]
+  },
+  {
+    "version": "1.1.1",
+    "date": "2026-11-10",
+    "title": "People made like characters, and age on a slider.",
+    "items": [
+      "**Everyone in the Journal gets a card like yours.** The people you meet now have what the character creator asks of you: race, sex, age, calling, appearance and personality. The DM's Scribe fills it in when someone first appears, from the story (or what fits it, if the story hasn't said), and then leaves it alone, so people stay the same from scene to scene. Their card reads like \"Dwarf woman · 54 · smith\". People you met before this update get their cards filled in as they turn up again.",
+      "**Edit them the same way you made your character:** race and sex choices, an age slider, their calling, and their appearance and personality, with the dice for ideas. Your changes stick.",
+      "**People grow older with the calendar,** like you do. A Timeskip ages everyone.",
+      "**Age is a slider in the character creator too.** Pick an exact age; the stage of life (Young, Adult, Middle-aged, Elder) follows from it, with what it does to your limits. Changing race keeps the same point in life: a human of 27 becomes a dwarf of 68.",
+      "**The DM knows who people are** (their race, sex, age and calling, and their looks when there's room) and how fast each people ages. Portraits are painted from the card too.",
+      "**Your children** get a card when they're born. If one takes up the tale, they start from it at their real age, and the opening says how many years have passed.",
+      "Companions fight the way their calling suggests: a hunter shoots, a grove healer heals."
+    ]
+  },
+  {
+    "version": "1.0.4",
+    "date": "2026-11-10",
+    "title": "No more stray @names in the story.",
+    "items": [
+      "**Fixed: \"@Name:\" showing up in the middle of the text.** The DM writes each character's speech on its own line starting with \"@Name:\", which the app turns into a speech bubble. Sometimes it slipped that tag into the middle of a sentence or a quote, or used your own character's name in it (often for the person being spoken to). The tag is now taken out, and when it clearly starts a new speaker's words, they get their own bubble. Your character never gets a bubble from the DM, since it never speaks for you. Older replies read right too.",
+      "The DM is also told more plainly where the tag goes and whose name goes in it."
+    ]
+  }
+]

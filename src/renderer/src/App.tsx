@@ -9,6 +9,7 @@ import { ConnectScreen } from './screens/ConnectScreen'
 import { CreatorScreen } from './screens/CreatorScreen'
 import { PlayScreen } from './screens/PlayScreen'
 import { LoadScreen } from './screens/LoadScreen'
+import { WhatsNew } from './components/WhatsNew'
 
 export function App() {
   const { screen, loadSettings } = useGame()
@@ -38,6 +39,7 @@ export function App() {
           {screen === 'play' && <PlayScreen />}
         </motion.div>
       </AnimatePresence>
+      <WhatsNew />
     </div>
   )
 }

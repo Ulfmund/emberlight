@@ -79,6 +79,9 @@ Built in milestones. Each one ends with something playable, so the artist can te
 ## 1.2 — Lorebooks from Chub ✅ (1.2.0, 2026-11-10)
 - **Find on Chub** ✅: search the lorebooks shared on chub.ai from the lorebook library (fantasy only and NSFW off to begin with, adult books screened out a second time, instructions and game systems labelled), and add one to the library with credit to its author ([07](07-memory-and-lore.md#finding-lorebooks-on-chub))
 
+## 1.2.2 — What's New ✅ (2026-11-10)
+- **What's New** ✅: after an update, what changed since you last played, on each screen ([08](08-ui-ux.md#whats-new))
+
 ## 1.2.1 — Continue, and a death you can read ✅ (2026-11-10)
 - **Continue** ✅: the send button with nothing typed lets the story go on without the character doing anything ([08](08-ui-ux.md#in-game-layout-desktop))
 - **The death screen as a panel under the story** ✅, so the death itself can be read ([03](03-characters-and-cards.md#when-a-character-dies))
