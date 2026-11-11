@@ -30,6 +30,7 @@ import type { CheckResult } from './checks'
 import { isMemoryEvent, sameName, samePlace, type MemoryEvent } from '../memory'
 import { COMPANION_ROLES, companionStats, PARTY_MAX, type Companion, type CompanionRole } from './party'
 import { findTemplate, itemTemplate, type ItemTemplate, type Slot } from './items'
+import { scifiKitItem } from './scifi'
 import type { Combat, CombatOutcome, FoeStatus, Range } from './combat'
 import { startingSpells } from './spellbook'
 import { buildNow, SKIP_MAX_DAYS, startingAge } from './calendar'
@@ -345,7 +346,11 @@ export function initialState(build: CharacterBuild, settings: CampaignSettings):
     awakeMins: 120,
     spells: startingSpells(build.background, build.race)
   }
-  for (const k of bg.kit) addItem(character, k.name, 'qty' in k && k.qty ? k.qty : 1, k.icon)
+  // A far-future hero's calling kit, in its terms: a bow is a laser rifle (scifi.ts).
+  for (const k of bg.kit) {
+    const scifi = build.kit === 'scifi'
+    addItem(character, scifi ? scifiKitItem(findTemplate(k.name)?.id, k.name) : k.name, 'qty' in k && k.qty ? k.qty : 1, scifi ? undefined : k.icon)
+  }
   return { character, time: { day: 1, minute: 8 * 60 }, location: null, placeKind: null, combat: null, fallen: [], party: [] }
 }
 

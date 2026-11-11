@@ -123,6 +123,8 @@ export class Campaigns {
     const greetings = extras.greetings ?? []
     const world = extras.world
     const lorebooks = [...new Set([...(world ? [world.lorebook.id] : []), ...(extras.lorebooks ?? [])])]
+    // A far-future story's hero starts with far-future gear, decided once, now (scifi.ts).
+    if (this.genreOf({ id, settings, cast, lorebooks } as unknown as CampaignRow) === 'scifi') build = { ...build, kit: 'scifi' }
     this.db.transaction(() => {
       this.db.createCampaign({ id, name: name?.trim() || `The tale of ${build.name}`, head_id: opening, settings, build, cast, lorebooks })
       const now = Date.now()
@@ -298,6 +300,7 @@ export class Campaigns {
     if (!head) throw new Error('This story has no messages yet.')
     const errors = validateBuild(build, c.settings.sexModifiers)
     if (errors.length) throw new Error(errors[0])
+    if (this.genreOf(c) === 'scifi') build = { ...build, kit: 'scifi' }
     const rows = this.activeEvents(c, path)
     const memory = projectMemory(rows.map((e) => e.event))
     const child = childId ? memory.entities.find((e) => e.id === childId && e.kind === 'person' && e.relation === 'child' && e.status !== 'dead') : undefined

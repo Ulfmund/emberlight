@@ -490,3 +490,13 @@ Story first, so the player can always overrule the dice, but openly:
 - Companions aren't placed: they fight wherever they're needed.
 - **Lean text:** while a fight is on the tracker the DM writes two to four short sentences a round, like a battle log, and keeps each foe where the engine says it is.
 
+## Sci-fi gear and foes
+
+*Built (1.5.0)* (`src/shared/rules/scifi.ts`). Far-future items and enemies on the same engine as the fantasy ones, used whenever a story names them (the templates' names are generic; their aliases include the words far-future lore uses, so "a battered laspistol", "bolter" or "chainsword" are known).
+
+- **Guns** fire one unit of their ammunition a shot: power cells (laser pistol 1d6, laser rifle 1d8, plasma 2d6, flamer 2d4), rounds (autopistol 1d6, autogun 1d8, heavy pistol 1d10, heavy rifle 2d6) or shells (shotgun 1d10). Out of ammunition, the gun is a club. Range rules apply as for bows.
+- **Melee:** combat knife, combat blade, chainblade and chain-axe (1d10), power blade (2d6), shock maul. **Armour:** flak vest (+2), mesh (+3), carapace (+4), power armour (+6, heavy), flak helmet, riot shield. **Kit:** medi-kit and stimm (healing), antitox, ration bricks, recaf, glow-lamp, rebreather, data-slate, vox-bead, auspex, tool kit, frag grenade (no rules of its own yet).
+- **Foes:** ganger (shoots), trooper (shoots), mutant, servitor, alien beast, alien warrior (shoots), daemon, heavy gunner (shoots); orks and heretics join the orc and cultist templates. Any foe described with a gun, rifle, pistol or bow shoots and starts Near.
+- **Starting kit:** when a story begins in the sci-fi genre, the hero's build is marked (`kit: 'scifi'`) and their calling's kit is handed out in far-future form (bow → laser rifle, arrows → power cells, leathers → flak vest, rations → ration bricks, potions → stimms). Marked once, so changing the genre later never rewrites what they started with.
+- The DM sees far-future gear as it is; only fantasy gear is translated into the setting's words.
+

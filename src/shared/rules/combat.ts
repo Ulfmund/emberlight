@@ -2,7 +2,7 @@ import { maxHp, mod, type Rng } from './character'
 import { d, defeatEvents, resolveCheck, type CheckRequest, type CheckResult } from './checks'
 import { ENEMY_TIERS, enemyTemplate, findEnemy, HARM_FROM, TIER_MODS, TIER_WORDS, type Behavior, type EnemyFamily, type EnemyTier, type Loot } from './enemies'
 import { ammoFor, defenseValue, mainWeapon } from './gear'
-import { itemTemplate } from './items'
+import { AMMO_WORD, itemTemplate, type Ammo } from './items'
 import { backfire, knownSpells, spellAmount, spellCheck, type Spell } from './spells'
 import { applyEvent, type CampaignSettings, type CombatMode, type GameEvent, type GameState } from './state'
 import { allyHealth, companionHp, companionStats, ROLE_INFO, standing, type Companion } from './party'
@@ -129,6 +129,8 @@ const cid = (p: string) => `${p}_${Date.now().toString(36)}${(counter++).toStrin
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 /** Stat blocks for the foes asked for, scaled to the player's level and the foes' tier. */
+const GUN_WORDS = /\b(guns?|rifles?|pistols?|carbines?|shotguns?|autoguns?|lasguns?|laspistols?|bolters?|stubbers?|bows?|crossbows?|bowm[ae]n|archers?|snipers?|shooters?|gunm[ae]n|riflem[ae]n|marksm[ae]n)\b/i
+
 export function buildFoes(specs: FoeSpec[], playerLevel: number, rng: Rng): Foe[] {
   const foes: Foe[] = []
   const bases: string[] = []
@@ -148,6 +150,8 @@ export function buildFoes(specs: FoeSpec[], playerLevel: number, rng: Rng): Foe[
     const plain = !raw || [tpl.name, ...tpl.aliases].some((a) => a.toLowerCase() === raw.toLowerCase())
     const kindName = plain || raw.split(' ').length > 3 ? tpl.name : cap(count > 1 && /[^s]s$/i.test(raw) ? raw.slice(0, -1) : raw)
     const base = spec.name?.trim() || kindName || tpl.name
+    // Described with a gun or a bow ("cultists with autoguns"), they shoot whatever their kind.
+    const shoots = Boolean(tpl.ranged) || GUN_WORDS.test(`${spec.kind} ${spec.name ?? ''}`)
     for (let i = 0; i < count && foes.length < 8; i++) {
       const maxHp = Math.max(1, Math.round(tpl.hp * m.hp * (1 + 0.2 * (level - 1))))
       bases.push(base)
@@ -166,10 +170,10 @@ export function buildFoes(specs: FoeSpec[], playerLevel: number, rng: Rng): Foe[
         initiative: d(rng, 20) + tpl.initiative,
         status: 'fighting',
         behavior: tpl.behavior,
-        verb: tpl.verb,
-        ranged: tpl.ranged,
-        // Where the story put them; else archers keep their distance and the rest are at hand.
-        range: spec.range && RANGES.includes(spec.range) ? spec.range : tpl.ranged ? 'near' : 'close',
+        ranged: shoots,
+        verb: shoots && !tpl.ranged ? 'shoots at' : tpl.verb,
+        // Where the story put them; else shooters keep their distance and the rest are at hand.
+        range: spec.range && RANGES.includes(spec.range) ? spec.range : shoots ? 'near' : 'close',
         xp: Math.round(tpl.xp * m.xp * level),
         loot: tpl.loot
       })
@@ -547,7 +551,7 @@ export function resolveRound(
       case 'cast': {
         const target = foes.find((f) => f.id === action.target) ?? foes.find((f) => f.name.toLowerCase() === (action.target ?? '').toLowerCase()) ?? foes[0]
         if (!target) return
-        let weapon: { name: string; dice: [number, number]; skill: 'melee' | 'ranged' | 'spellcasting'; attr: 'STR' | 'AGI' | 'ARC'; ammo?: 'arrow' | 'bolt' | 'stone'; unarmed?: boolean } = mainWeapon(c)
+        let weapon: { name: string; dice: [number, number]; skill: 'melee' | 'ranged' | 'spellcasting'; attr: 'STR' | 'AGI' | 'ARC'; ammo?: Ammo; unarmed?: boolean } = mainWeapon(c)
         if (action.kind === 'cast') {
           // A plain attack spell: 2 mana for 1d8 + Arcane.
           if (c.mana < SPELL_COST) {
@@ -560,7 +564,7 @@ export function resolveRound(
           const ammo = ammoFor(c, weapon.ammo)
           if (ammo) push({ type: 'item', name: ammo.name, delta: -1, spent: true })
           else {
-            log.push(`The character has no ${weapon.ammo === 'stone' ? 'stones' : `${weapon.ammo}s`} left and has to make do in close.`)
+            log.push(`The character has no ${AMMO_WORD[weapon.ammo]} left and has to make do in close.`)
             weapon = { name: `the ${weapon.name.toLowerCase()} as a club`, dice: [1, 3], skill: 'melee', attr: 'STR', unarmed: true }
           }
         }
@@ -742,10 +746,10 @@ export function foeRoster(foes: Foe[]): string {
  */
 export function guessCombatAction(text: string): CombatAction {
   const t = text.toLowerCase()
-  if (/(surrender|yield|give up|i give in)/.test(t)) return { kind: 'surrender' }
-  if (/(flee|run|escape|retreat|bolt|get away)/.test(t)) return { kind: 'flee' }
-  if (/(block|parry|dodge|defend|guard|duck|cover)/.test(t)) return { kind: 'defend' }
-  if (/(spell|cast|magic|incant)/.test(t)) return { kind: 'cast' }
+  if (/\b(surrender|yield|give up|i give in)\b/.test(t)) return { kind: 'surrender' }
+  if (/\b(flee|run|escape|retreat|bolt|get away)\b/.test(t)) return { kind: 'flee' }
+  if (/\b(block|parry|dodge|defend|guard|duck|cover)\b/.test(t)) return { kind: 'defend' }
+  if (/\b(spell|cast|magic|incant)\b/.test(t)) return { kind: 'cast' }
   return { kind: 'attack' }
 }
 

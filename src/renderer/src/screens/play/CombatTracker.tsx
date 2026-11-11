@@ -57,7 +57,7 @@ export function CombatTracker({ view }: { view: CampaignView }) {
     moves.push({
       id: 'attack',
       label: 'Attack',
-      icon: weapon.skill === 'ranged' ? 'bow' : 'sword',
+      icon: weapon.skill === 'ranged' ? (weapon.ammo === 'cell' || weapon.ammo === 'round' || weapon.ammo === 'shell' ? 'gun' : 'bow') : 'sword',
       tip: `Attack ${chosen.name} with ${weapon.unarmed ? 'your fists' : `your ${weapon.name.toLowerCase()}`}.`,
       go: () => send(`I attack ${chosen.name} with ${weapon.unarmed ? 'my fists' : `my ${weapon.name.toLowerCase()}`}.`, { kind: 'attack', target: chosen.id })
     })

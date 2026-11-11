@@ -1,4 +1,5 @@
 import type { ConditionId, SkillId } from './tables'
+import { SCIFI_ITEMS } from './scifi'
 
 /**
  * Items (docs/spec/04-rules-system.md#items-equipment-money): what things weigh, cost, and do.
@@ -25,7 +26,9 @@ export const SLOT_LABEL: Record<Slot, string> = {
 export type Fit = 'hand' | 'shield' | 'head' | 'body' | 'hands' | 'feet' | 'back' | 'neck' | 'ring'
 
 export type ItemKind = 'weapon' | 'armor' | 'shield' | 'tool' | 'food' | 'drink' | 'medicine' | 'material' | 'ammo' | 'light' | 'clothing' | 'trinket' | 'book' | 'container' | 'misc'
-export type Ammo = 'arrow' | 'bolt' | 'stone'
+export type Ammo = 'arrow' | 'bolt' | 'stone' | 'cell' | 'round' | 'shell'
+/** What a quiver or a pouch of it is called, run dry ("no arrows left"). */
+export const AMMO_WORD: Record<Ammo, string> = { arrow: 'arrows', bolt: 'bolts', stone: 'stones', cell: 'power cells', round: 'rounds', shell: 'shells' }
 
 export type ItemTemplate = {
   id: string
@@ -172,7 +175,9 @@ export const ITEMS: ItemTemplate[] = [
   t({ id: 'common_herbs', name: 'Common herbs', aliases: ['common herbs', 'herbs', 'herb', 'yarrow', 'feverfew', 'thyme', 'sage'], kind: 'material', icon: 'herb', weight: 0.05, value: 1 }),
   t({ id: 'healing_moss', name: 'Healing moss', aliases: ['healing moss', 'bloodmoss', 'woundwort', 'moss'], kind: 'material', icon: 'herb', weight: 0.05, value: 6 }),
   t({ id: 'nightshade', name: 'Nightshade', aliases: ['nightshade', 'belladonna', 'deathcap', 'hemlock'], kind: 'material', icon: 'herb', weight: 0.05, value: 10 }),
-  t({ id: 'empty_vial', name: 'Empty vial', aliases: ['empty vial', 'vial', 'vials', 'bottle', 'flask'], kind: 'material', icon: 'flask', weight: 0.1, value: 2 })
+  t({ id: 'empty_vial', name: 'Empty vial', aliases: ['empty vial', 'vial', 'vials', 'bottle', 'flask'], kind: 'material', icon: 'flask', weight: 0.1, value: 2 }),
+  // ---- grim far-future gear (scifi.ts) ----------------------------------------------
+  ...SCIFI_ITEMS
 ]
 
 const BY_ID = new Map(ITEMS.map((x) => [x.id, x]))

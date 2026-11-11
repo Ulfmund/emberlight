@@ -1,4 +1,5 @@
 import type { HarmSource } from './tables'
+import { SCIFI_ENEMIES } from './scifi'
 
 /**
  * Enemies (docs/spec/04-rules-system.md#enemies). The DM never invents enemy numbers: it names
@@ -54,8 +55,8 @@ export const ENEMIES: EnemyTemplate[] = [
   e({ id: 'thug', name: 'Thug', family: 'humanoid', aliases: ['thug', 'brawler', 'ruffian', 'bruiser', 'drunk', 'enforcer', 'heavy'], hp: 13, defense: 11, attack: 3, damage: [1, 6, 2], initiative: 0, stealth: 0, perception: 1, behavior: 'cowardly', verb: 'swings at', xp: 10, loot: [{ coins: [1, 10], chance: 0.7 }, { item: 'Cudgel', chance: 0.3 }] }),
   e({ id: 'guard', name: 'Guard', family: 'humanoid', aliases: ['guard', 'guards', 'soldier', 'soldiers', 'watchman', 'sentry', 'militia', 'man-at-arms', 'constable', 'rider', 'riders'], hp: 16, defense: 15, attack: 4, damage: [1, 8, 1], initiative: 0, stealth: 0, perception: 3, behavior: 'cautious', verb: 'cuts at', xp: 18, loot: [{ coins: [5, 25], chance: 0.8 }, { item: 'Sword', chance: 0.25 }, { item: 'Iron helm', chance: 0.15 }] }),
   e({ id: 'knight', name: 'Knight', family: 'humanoid', aliases: ['knight', 'champion', 'paladin', 'sellsword', 'mercenary', 'duellist', 'duelist'], hp: 26, defense: 18, attack: 5, damage: [1, 8, 3], initiative: 0, stealth: -2, perception: 2, behavior: 'fearless', verb: 'strikes at', xp: 40, loot: [{ coins: [20, 80], chance: 0.9 }, { item: 'Sword', chance: 0.4 }, { item: 'Round shield', chance: 0.3 }] }),
-  e({ id: 'cultist', name: 'Cultist', family: 'humanoid', aliases: ['cultist', 'cultists', 'zealot', 'fanatic', 'acolyte', 'witch', 'warlock', 'necromancer', 'sorcerer', 'mage'], hp: 10, defense: 11, attack: 4, damage: [1, 8, 0], initiative: 1, stealth: 2, perception: 2, behavior: 'fearless', verb: 'lashes out at', xp: 14, loot: [{ coins: [1, 10], chance: 0.6 }, { item: 'Dagger', chance: 0.4 }, { item: 'Bone charms', chance: 0.2 }] }),
-  e({ id: 'orc', name: 'Orc raider', family: 'humanoid', aliases: ['orc', 'orcs', 'orc raider', 'half-orc', 'warband', 'war-band'], hp: 15, defense: 13, attack: 4, damage: [1, 8, 2], initiative: 1, stealth: 1, perception: 2, behavior: 'aggressive', verb: 'hacks at', xp: 18, loot: [{ coins: [1, 10], chance: 0.6 }, { item: 'Cleaver', chance: 0.25 }, { item: 'Hide armour', chance: 0.1 }] }),
+  e({ id: 'cultist', name: 'Cultist', family: 'humanoid', aliases: ['cultist', 'cultists', 'heretic', 'heretics', 'traitor', 'traitors', 'zealot', 'fanatic', 'acolyte', 'witch', 'warlock', 'necromancer', 'sorcerer', 'mage'], hp: 10, defense: 11, attack: 4, damage: [1, 8, 0], initiative: 1, stealth: 2, perception: 2, behavior: 'fearless', verb: 'lashes out at', xp: 14, loot: [{ coins: [1, 10], chance: 0.6 }, { item: 'Dagger', chance: 0.4 }, { item: 'Bone charms', chance: 0.2 }] }),
+  e({ id: 'orc', name: 'Orc raider', family: 'humanoid', aliases: ['orc', 'orcs', 'ork', 'orks', 'greenskin', 'greenskins', 'orc raider', 'half-orc', 'warband', 'war-band'], hp: 15, defense: 13, attack: 4, damage: [1, 8, 2], initiative: 1, stealth: 1, perception: 2, behavior: 'aggressive', verb: 'hacks at', xp: 18, loot: [{ coins: [1, 10], chance: 0.6 }, { item: 'Cleaver', chance: 0.25 }, { item: 'Hide armour', chance: 0.1 }] }),
   e({ id: 'goblin', name: 'Goblin', family: 'humanoid', aliases: ['goblin', 'goblins', 'kobold', 'imp', 'gremlin'], hp: 7, defense: 13, attack: 3, damage: [1, 6, 0], initiative: 3, stealth: 4, perception: 3, behavior: 'cowardly', verb: 'stabs at', xp: 8, loot: [{ coins: [0, 6], chance: 0.6 }, { item: 'Dagger', chance: 0.2 }] }),
   e({ id: 'villager', name: 'Villager', family: 'humanoid', aliases: ['villager', 'villagers', 'farmer', 'peasant', 'mob', 'townsfolk', 'miner', 'miners', 'fisherman', 'servant', 'commoner'], hp: 8, defense: 10, attack: 1, damage: [1, 4, 0], initiative: 0, stealth: 0, perception: 1, behavior: 'cowardly', verb: 'flails at', xp: 4, loot: [{ coins: [0, 5], chance: 0.5 }] }),
 
@@ -68,7 +69,9 @@ export const ENEMIES: EnemyTemplate[] = [
   // ---- monsters ------------------------------------------------------------------------
   e({ id: 'troll', name: 'Troll', family: 'monster', aliases: ['troll', 'ogre', 'giant', 'hill giant'], hp: 40, defense: 13, attack: 6, damage: [2, 6, 4], initiative: -1, stealth: 0, perception: 2, behavior: 'fearless', verb: 'smashes at', xp: 60 }),
   e({ id: 'horror', name: 'Horror', family: 'monster', aliases: ['horror', 'monster', 'creature', 'beast', 'thing', 'abomination', 'fiend', 'demon'], hp: 22, defense: 13, attack: 5, damage: [1, 10, 2], initiative: 1, stealth: 3, perception: 3, behavior: 'fearless', verb: 'tears at', xp: 30 }),
-  e({ id: 'wyrm', name: 'Young wyrm', family: 'monster', aliases: ['young wyrm', 'wyrm', 'drake', 'dragon', 'wyvern', 'basilisk'], hp: 45, defense: 16, attack: 6, damage: [2, 8, 3], initiative: 1, stealth: 1, perception: 5, behavior: 'fearless', verb: 'bites at', xp: 90 })
+  e({ id: 'wyrm', name: 'Young wyrm', family: 'monster', aliases: ['young wyrm', 'wyrm', 'drake', 'dragon', 'wyvern', 'basilisk'], hp: 45, defense: 16, attack: 6, damage: [2, 8, 3], initiative: 1, stealth: 1, perception: 5, behavior: 'fearless', verb: 'bites at', xp: 90 }),
+  // ---- grim far-future foes (scifi.ts) ----------------------------------------------
+  ...SCIFI_ENEMIES
 ]
 
 const BY_ID = new Map(ENEMIES.map((x) => [x.id, x]))

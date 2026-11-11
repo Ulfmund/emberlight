@@ -1,5 +1,5 @@
 import { mod, skillLevelFromXp } from './character'
-import { COINS_PER_KG, findTemplate, itemTemplate, UNKNOWN_WEIGHT, type ItemTemplate, type Slot } from './items'
+import { COINS_PER_KG, findTemplate, itemTemplate, UNKNOWN_WEIGHT, type Ammo, type ItemTemplate, type Slot } from './items'
 import type { SkillId } from './tables'
 import type { CharacterState, GameState, InventoryItem } from './state'
 
@@ -15,7 +15,7 @@ export function equippedIn(c: CharacterState, slot: Slot): { item: InventoryItem
   return item ? { item, template: templateOf(item) } : undefined
 }
 
-export type Weapon = { name: string; dice: [number, number]; skill: 'melee' | 'ranged'; attr: 'STR' | 'AGI'; ammo?: 'arrow' | 'bolt' | 'stone'; unarmed?: boolean }
+export type Weapon = { name: string; dice: [number, number]; skill: 'melee' | 'ranged'; attr: 'STR' | 'AGI'; ammo?: Ammo; unarmed?: boolean }
 
 /** The weapon in the main hand, or bare fists. */
 export function mainWeapon(c: CharacterState): Weapon {
@@ -27,7 +27,7 @@ export function mainWeapon(c: CharacterState): Weapon {
 }
 
 /** Ammunition carried for a weapon (arrows for a bow…). */
-export function ammoFor(c: CharacterState, kind: 'arrow' | 'bolt' | 'stone'): InventoryItem | undefined {
+export function ammoFor(c: CharacterState, kind: Ammo): InventoryItem | undefined {
   return c.inventory.find((i) => i.qty > 0 && templateOf(i)?.ammoKind === kind)
 }
 

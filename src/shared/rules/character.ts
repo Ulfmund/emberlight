@@ -50,6 +50,8 @@ export type CharacterBuild = {
   job?: string
   /** Quick Hero: anything else the world should know about them. */
   details?: string
+  /** Set when the story begins: a far-future story's hero starts with its gear (scifi.ts). */
+  kit?: 'scifi'
 }
 
 export const mod = (score: number) => Math.floor((score - 10) / 2)

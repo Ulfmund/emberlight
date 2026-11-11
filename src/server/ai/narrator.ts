@@ -59,6 +59,7 @@ import type { CardBookEntry, CastMember } from '@shared/cards'
 import { formatCoins } from '../core/campaigns'
 import { peoplesBlock } from '@shared/cultures'
 import { scifiTerms } from '@shared/genre'
+import { isScifiItem } from '@shared/rules'
 
 /**
  * The Narrator's prompt (docs/spec/06-ai-dm.md#6-narrate). The engine has already decided
@@ -182,14 +183,16 @@ export function narratorSystem(
 
   // Gear, load and needs (docs/spec/04-rules-system.md#items-equipment-money).
   const weapon = mainWeapon(c)
-  const worn = c.inventory.filter((i) => i.equipped && i.equipped !== 'main').map((i) => i.name)
+  // In a far-future story the fantasy gear is told in its terms before the DM ever sees a sword;
+  // gear that's already far-future is told as it is (genre.ts, scifi.ts).
+  const word = (i: { name: string; template?: string }) => (settings.genre === 'scifi' && !isScifiItem(i.template) ? scifiTerms(i.name) : i.name)
+  const worn = c.inventory.filter((i) => i.equipped && i.equipped !== 'main').map(word)
+  const held = c.inventory.find((i) => i.equipped === 'main')
   const load = encumbrance(c)
   const need = needs(state, settings.survival)
   const tiredness = need.exhaustion ? `exhausted (level ${need.exhaustion}, awake ${need.hoursAwake} hours)` : need.hoursAwake >= 14 ? `tired (awake ${need.hoursAwake} hours)` : 'rested'
-  // In a far-future story the gear is told in its terms before the DM ever sees a sword (genre.ts).
-  const says = (t: string) => (settings.genre === 'scifi' ? scifiTerms(t) : t)
-  const gear = says(`Wielding: ${weapon.unarmed ? 'nothing (bare fists)' : weapon.name}. Wearing: ${worn.join(', ') || 'ordinary clothes'}. Defense ${defenseValue(c).total}.`)
-  const carrying = says(`Carrying: ${c.inventory.map((i) => `${i.name}${i.qty > 1 ? ` ×${i.qty}` : ''}`).join(', ') || 'nothing'}; ${settings.genre === 'scifi' ? `${c.coins} scrip` : formatCoins(c.coins)}.`) + (load !== 'none' ? ` ${load === 'overloaded' ? 'OVERLOADED' : 'ENCUMBERED'}: carrying ${carriedKg(c)} kg of a comfortable ${capacityKg(c)} kg.` : '')
+  const gear = `Wielding: ${weapon.unarmed ? 'nothing (bare fists)' : held ? word(held) : weapon.name}. Wearing: ${worn.join(', ') || 'ordinary clothes'}. Defense ${defenseValue(c).total}.`
+  const carrying = `Carrying: ${c.inventory.map((i) => `${word(i)}${i.qty > 1 ? ` ×${i.qty}` : ''}`).join(', ') || 'nothing'}; ${settings.genre === 'scifi' ? `${c.coins} scrip` : formatCoins(c.coins)}.` + (load !== 'none' ? ` ${load === 'overloaded' ? 'OVERLOADED' : 'ENCUMBERED'}: carrying ${carriedKg(c)} kg of a comfortable ${capacityKg(c)} kg.` : '')
   const body = settings.survival ? `\nHunger: ${HUNGER_LABEL[need.hunger].toLowerCase()} (last proper meal ${need.hoursSinceMeal} hours ago). Tiredness: ${tiredness}.` : ''
   // Magic (docs/spec/04-rules-system.md#spells-v1-simple): what they know, and what can be taught.
   const known = knownSpells(state)

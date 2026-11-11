@@ -46,7 +46,7 @@ const CheckSchema = z.object({
 })
 
 const FoeSchema = z.object({
-  kind: z.string().describe('What they are, as the story says: "bandit", "cave bear", "wolves", "guard"'),
+  kind: z.string().describe('What they are, as the story says, with their guns or bows if they have them: "bandit", "cave bear", "wolves", "guard", "cultists with autoguns"'),
   count: z.number().int().describe('How many of them'),
   tier: z.enum(ENEMY_TIERS).describe('minion: weak, untrained or small; standard: an ordinary armed foe or dangerous animal; elite: a veteran, a leader, a big beast; boss: a legendary foe or warlord'),
   name: z.string().describe('Their name if they have one, otherwise empty'),

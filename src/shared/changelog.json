@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.5.0",
+    "date": "2026-11-10",
+    "title": "Sci-fi gear and foes.",
+    "items": [
+      "**Guns the game understands.** Laser pistols and rifles, autoguns, shotguns, heavy pistols and rifles, plasma and flamers, each using its own ammunition: power cells, rounds or shells, one a shot. Run dry and you're swinging the gun as a club. The story's own words work: a \"battered laspistol\", a bolter or a chainsword is known for what it is.",
+      "**Blades, armour and kit.** Combat knives, chainblades, chain-axes, power blades and shock mauls; flak vests, mesh, carapace and power armour, flak helmets and riot shields; medi-kits, stimms, antitox, ration bricks, glow-lamps, rebreathers, data-slates, vox-beads and more.",
+      "**Far-future foes.** Gangers, troopers, mutants, servitors, alien beasts and warriors, daemons and heavy gunners, each with their own way of fighting. Orks and heretics are recognised too. Anyone described with a gun (\"cultists with autoguns\") shoots, and keeps their distance.",
+      "**A sci-fi start.** A hero starting a sci-fi story gets their calling's kit in far-future form: a hunter's bow and arrows become a laser rifle and power cells, a farmhand's pitchfork a shock maul, leathers a flak vest. Fantasy stories are untouched."
+    ]
+  },
+  {
     "version": "1.4.0",
     "date": "2026-11-10",
     "title": "Grimdark sci-fi.",

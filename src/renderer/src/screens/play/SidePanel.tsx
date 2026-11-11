@@ -15,7 +15,7 @@ import {
   type CampaignSettings
 } from '@shared/rules'
 import type { CampaignView } from '@shared/view'
-import { findTemplate, itemTemplate, knownSpells, SLOT_LABEL, SLOTS } from '@shared/rules'
+import { AMMO_WORD, findTemplate, itemTemplate, knownSpells, SLOT_LABEL, SLOTS, type Ammo } from '@shared/rules'
 import { formatCoins } from './CharacterPanel'
 import { LifeSection } from './Life'
 import { FamilySection } from './Family'
@@ -341,9 +341,9 @@ function BagTab({ view }: { view: CampaignView }) {
   )
 }
 
-function ammoLeft(view: CampaignView, kind: 'arrow' | 'bolt' | 'stone') {
+function ammoLeft(view: CampaignView, kind: Ammo) {
   const a = view.state.character.inventory.find((i) => (itemTemplate(i.template) ?? findTemplate(i.name))?.ammoKind === kind)
-  return a ? `${a.qty} ${kind === 'stone' ? 'stones' : `${kind}s`}` : `no ${kind === 'stone' ? 'stones' : `${kind}s`}!`
+  return a ? `${a.qty} ${AMMO_WORD[kind]}` : `no ${AMMO_WORD[kind]}!`
 }
 
 /** One line about what an item does. */

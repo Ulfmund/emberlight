@@ -223,4 +223,4 @@ In a sci-fi story:
 - **The rules stay the same**, so their fantasy words are translated: the character's gear and money are rewritten before the DM sees them (a Shortbow is a rifle, Arrows rifle rounds, Leather armour flak armour, a Healing potion a medi-stimm, coins one count of scrip), and the DM is told the rest (a spell as a psychic power or a device's function, a calling as a trade or posting). The peoples' fantasy customs are left out; the other peoples become the setting's nearest kin.
 - **Names** for new people are gothic far-future ones. **Ideas**, **Autocomplete** and **pictures** ("grimdark science fiction") follow the genre.
 - **The look:** the story screen (and the creator, once the genre is chosen or detected) wears gunmetal and brass, hazard red, a phosphor glow and faint scanlines; the thinking runes become machine glyphs.
-- Not yet: sci-fi items, foes and rules of their own. A found laspistol isn't a weapon the engine knows; see the roadmap.
+- Sci-fi items and foes the engine knows: 1.5.0, see [04](04-rules-system.md#sci-fi-gear-and-foes). A ruleset of its own is still to come.
