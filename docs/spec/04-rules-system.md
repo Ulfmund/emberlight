@@ -137,6 +137,12 @@ Each sets starting skill levels, gear, coin and **+5 affinity** to 2–3 skills.
 
 More backgrounds are just more table rows.
 
+#### No Calling
+
+*Built (1.6.0), asked for by the main player: a sci-fi start kept opening on a farm, because the creator began on Farmhand and the DM built the first scene around it.* **No Calling** is the first choice for every people, and the creator starts on it (a roll still picks a real calling). It gives no skill affinities, a dagger, two rations and 6 silver, and the 10 starting skill levels a calling would set go to the player to spread instead. The Calling step also has **In your own words** (the same job the Quick Hero asks for): what the DM is told the character did, in place of the calling's name. With no calling and no words, the DM is told no trade at all.
+
+The opening nudge tells the DM that what the character did before is their past and needn't be where the story starts, with or without a calling (`OPENING_TEXT` and `successorOpening` in `src/server/core/campaigns.ts`). The Quick Hero's AI may pick No Calling when none of the callings fits the job.
+
 **Each people has its own callings** (0.7.0, `RACE_BACKGROUNDS` in `src/shared/rules/tables.ts`), because their cultures differ:
 
 | People | Callings |

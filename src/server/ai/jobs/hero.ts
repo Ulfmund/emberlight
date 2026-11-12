@@ -21,8 +21,8 @@ export const HeroSchema = z.object({
   skills: z.array(z.enum(SKILL_IDS as [string, ...string[]])).describe('Up to 6 skills they would have practised most, most practised first')
 })
 
-const SYSTEM = `You set up a character's game stats in a fantasy roleplaying game from how the player describes them. Read who they are (their people, age, job, looks, manner and anything else said) and judge what they'd be good at.
-- calling: pick the one from CALLINGS closest to what they do.
+const SYSTEM = `You set up a character's game stats in a roleplaying game from how the player describes them. Read who they are (their people, age, job, looks, manner and anything else said) and judge what they'd be good at.
+- calling: pick the one from CALLINGS closest to what they do, or none when none of them fits (their job is kept in their own words either way).
 - Attributes, 8 to 18: 10 is ordinary. Give their real strengths 14 to 17, what they're poor at 8 or 9, the rest 10 to 12. A scholar is high in Intellect and low in Strength; a dockhand the other way round. Age matters: the old are wiser, the young quicker.
 - skills: what they'd have practised, from SKILLS.`
 

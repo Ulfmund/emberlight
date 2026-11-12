@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { ATTITUDES, fmtStanding, MAX_FACTS, parseTie, QUEST_STATUSES, sameFaction, sameName, STANDINGS, standingLabel, type Attitude, type Entity, type EntityStatus, type MemoryEvent, type Summary, type Tie } from '@shared/memory'
 import { cardImageUrl } from '@shared/cards'
-import { BACKGROUNDS, RACE_IDS, RACES, rescaleAge, typicalAge, type RaceId, type SexId } from '@shared/rules'
+import { callingName, RACE_IDS, RACES, rescaleAge, typicalAge, type RaceId, type SexId } from '@shared/rules'
 import { ageOn, APPEARANCE_IDEAS, bornAt, PERSON_LIMITS, personLine, PERSONALITY_IDEAS } from '@shared/people'
 import { AgeSlider } from '../../components/AgeSlider'
 import type { CampaignView } from '@shared/view'
@@ -166,7 +166,7 @@ function FallenSection({ view }: { view: CampaignView }) {
               <span className="shrink-0 text-xs text-parchment-500">day {f.day} · level {f.level}</span>
             </div>
             <div className="mt-0.5 text-sm text-parchment-400">
-              {RACES[f.race].label} {BACKGROUNDS[f.background].label.toLowerCase()}: {f.cause}
+              {[RACES[f.race].label, callingName(f)].filter(Boolean).join(' ')}: {f.cause}
             </div>
             {f.epitaph && <p className="mt-2 font-story text-lg leading-relaxed text-parchment-200 italic">“{f.epitaph}”</p>}
             {f.deeds.length > 0 && <p className="mt-2 text-xs text-parchment-400">Remembered for: {f.deeds.slice(-3).join('; ')}</p>}

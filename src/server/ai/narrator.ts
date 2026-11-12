@@ -7,7 +7,7 @@ import {
   RENOWN_TIERS,
   SEXES,
   AGES,
-  BACKGROUNDS,
+  callingName,
   SKILL_IDS,
   SKILLS,
   TIER_INFO,
@@ -270,7 +270,7 @@ ${scifi ? `${SCIFI}
 ` : ''}${peoples ? `${peoples}
 
 ` : ''}${loreAt(lore, 'before_char')}THE PLAYER CHARACTER
-${b.name}: ${RACES[b.race].label.toLowerCase()}, ${sex.label.toLowerCase()}, ${ageYears(state)} years old (${AGES[b.age].label.toLowerCase()}), ${b.job?.trim() || BACKGROUNDS[b.background].label.toLowerCase()}.${b.appearance ? `\nAppearance: ${b.appearance}` : ''}${b.personality ? `\nPersonality: ${b.personality}` : ''}${b.details?.trim() ? `\nAlso: ${b.details.trim()}` : ''}
+${b.name}: ${RACES[b.race].label.toLowerCase()}, ${sex.label.toLowerCase()}, ${ageYears(state)} years old (${AGES[b.age].label.toLowerCase()})${callingName(b) ? `, ${callingName(b)}` : ''}.${b.appearance ? `\nAppearance: ${b.appearance}` : ''}${b.personality ? `\nPersonality: ${b.personality}` : ''}${b.details?.trim() ? `\nAlso: ${b.details.trim()}` : ''}
 Level ${c.level}. Health ${c.hp}/${d.maxHp}, stamina ${c.stamina}/${d.maxStamina}${d.maxMana ? `, mana ${c.mana}/${d.maxMana}` : ''}.${c.conditions.length ? `\nConditions: ${c.conditions.map((x) => CONDITIONS[x].label).join(', ')}.` : ''}
 Best skills: ${skills || 'none trained yet'}.
 Renown: ${tier}${deeds ? `, known for: ${deeds}` : ''}. ${renownGuide(tier, b.sex, settings)}
@@ -301,7 +301,7 @@ function fallenBlock(state: GameState, third: boolean): string {
   const me = state.character.build.name
   const lines = fallen.map((f) => {
     const kin = f.heirIsChild && f.heir === me ? ` ${third ? `${me}'s` : "The player character's"} ${f.sex === 'female' ? 'mother' : 'father'}.` : ''
-    return `- ${f.name}, ${RACES[f.race].label.toLowerCase()} ${BACKGROUNDS[f.background].label.toLowerCase()}, died on day ${f.day}: ${f.cause}.${f.deeds.length ? ` Known for: ${f.deeds.slice(-2).join('; ')}.` : ''}${kin}`
+    return `- ${f.name}, ${[RACES[f.race].label.toLowerCase(), callingName(f)].filter(Boolean).join(' ')}, died on day ${f.day}: ${f.cause}.${f.deeds.length ? ` Known for: ${f.deeds.slice(-2).join('; ')}.` : ''}${kin}`
   })
   return `\n\nTHE FALLEN (earlier adventurers of this story, now dead; the world remembers them, and they may come up: a grave, a rumour, a debt, a belonging found)\n${lines.join('\n')}`
 }

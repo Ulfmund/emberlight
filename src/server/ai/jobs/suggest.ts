@@ -1,6 +1,6 @@
 import type { Genre } from '@shared/genre'
 import { z } from 'zod'
-import { BACKGROUNDS, combatSummary, mainWeapon, partySummary, RACES, type GameState } from '@shared/rules'
+import { callingName, combatSummary, mainWeapon, partySummary, RACES, type GameState } from '@shared/rules'
 import type { ChatMessage } from '@shared/types'
 import type { Provider } from '../providers'
 
@@ -36,7 +36,7 @@ function who(state: GameState) {
   const weapon = mainWeapon(c)
   const pack = c.inventory.map((i) => `${i.name}${i.qty > 1 ? ` ×${i.qty}` : ''}`).join(', ') || 'nothing'
   const fight = state.combat ? `\nA fight is on: ${combatSummary(state)}.${partySummary(state) ? ` Fighting beside them: ${partySummary(state)}.` : ''}` : ''
-  return `The player character: ${b.name}, ${RACES[b.race].label.toLowerCase()} ${BACKGROUNDS[b.background].label.toLowerCase()}. Health ${c.hp}. Wielding ${weapon.unarmed ? 'nothing' : weapon.name}. Carrying: ${pack}.${fight}`
+  return `The player character: ${b.name}, ${[RACES[b.race].label.toLowerCase(), callingName(b)].filter(Boolean).join(' ')}. Health ${c.hp}. Wielding ${weapon.unarmed ? 'nothing' : weapon.name}. Carrying: ${pack}.${fight}`
 }
 
 /** Strips what models like to add: labels, numbering, wrapping quotes around a whole action. */

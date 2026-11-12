@@ -48,7 +48,7 @@ export function fitBuild(base: CharacterBuild, wishes: HeroWishes, sexMode: SexM
   const wished = wishes.skills.filter((s): s is SkillId => (SKILL_IDS as readonly string[]).includes(s))
   const order = [...new Set([...wished, ...(Object.keys(BACKGROUNDS[background].affinities) as SkillId[])])]
   const skills: SkillMods = {}
-  let budget = startingSkillBudget(base)
+  let budget = startingSkillBudget({ ...base, background })
   for (let guard = 0; budget > 0 && guard < 20; guard++) {
     let spent = false
     for (const s of order) {

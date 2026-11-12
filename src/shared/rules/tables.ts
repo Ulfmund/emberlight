@@ -236,6 +236,15 @@ export const AGE_IDS = Object.keys(AGES) as AgeId[]
 export type KitItem = { name: string; qty?: number; icon?: string }
 
 export const BACKGROUNDS = {
+  // No calling: nothing set in stone, so the story isn't steered by a trade (docs/spec/04-rules-system.md#no-calling).
+  none: {
+    label: 'No Calling',
+    blurb: 'Nothing set in stone. Spread your first skills as you like, and say what you did in your own words, or nothing at all.',
+    affinities: {},
+    skills: {},
+    kit: [{ name: 'Dagger', icon: 'dagger' }, { name: 'Travel rations', qty: 2, icon: 'bread' }],
+    coins: 60
+  },
   farmhand: {
     label: 'Farmhand',
     blurb: 'Up before dawn, strong from honest work, and never far from a cookpot.',
@@ -469,13 +478,15 @@ export const BACKGROUND_IDS = Object.keys(BACKGROUNDS) as BackgroundId[]
 
 /** Which callings each people has (docs/spec/04-rules-system.md#backgrounds). Their cultures differ, so do their trades. */
 export const RACE_BACKGROUNDS: Record<RaceId, BackgroundId[]> = {
-  human: ['farmhand', 'smith', 'acolyte', 'thief', 'hunter', 'hedgewitch', 'sellsword', 'fisher', 'peddler'],
-  dwarf: ['delver', 'smith', 'runecarver', 'brewer', 'shieldbearer', 'namekeeper'],
-  elf: ['grovewarden', 'loreward', 'moonsinger', 'grovehealer', 'bladedancer', 'bowyer'],
-  halfling: ['farmhand', 'hearthcook', 'peddler', 'thief', 'fisher', 'lanewarden'],
-  orc: ['raider', 'beasttamer', 'bonecaller', 'pitfighter', 'scrapsmith', 'hunter']
+  human: ['none', 'farmhand', 'smith', 'acolyte', 'thief', 'hunter', 'hedgewitch', 'sellsword', 'fisher', 'peddler'],
+  dwarf: ['none', 'delver', 'smith', 'runecarver', 'brewer', 'shieldbearer', 'namekeeper'],
+  elf: ['none', 'grovewarden', 'loreward', 'moonsinger', 'grovehealer', 'bladedancer', 'bowyer'],
+  halfling: ['none', 'farmhand', 'hearthcook', 'peddler', 'thief', 'fisher', 'lanewarden'],
+  orc: ['none', 'raider', 'beasttamer', 'bonecaller', 'pitfighter', 'scrapsmith', 'hunter']
 }
 export const backgroundsFor = (race: RaceId): BackgroundId[] => RACE_BACKGROUNDS[race]
+/** The starting skill levels a calling gives; with no calling, they're the player's to spread. */
+export const CALLING_LEVELS = 10
 
 // ---- Point-buy & creation -------------------------------------------------------------
 

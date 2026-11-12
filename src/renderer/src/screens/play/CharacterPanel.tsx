@@ -98,7 +98,7 @@ export function CharacterPanel({
         <div className="text-xs text-parchment-400">
           {RACES[b.race].label} · {SEXES[view.settings.sexModifiers][b.sex].label} · {AGES[b.age].label}, {ageYears(view.state)}
         </div>
-        <div className="text-xs text-gold-300/80">{BACKGROUNDS[b.background].label}</div>
+        <div className="text-xs text-gold-300/80">{b.job?.trim() || BACKGROUNDS[b.background].label}</div>
         <motion.div key={c.level} initial={{ scale: 1.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="mt-2 rounded-full border border-gold-400/50 bg-gold-500/15 px-3 py-0.5 font-display text-sm text-gold-200">
           Level {c.level}
         </motion.div>

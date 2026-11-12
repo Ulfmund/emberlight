@@ -76,6 +76,11 @@ Built in milestones. Each one ends with something playable, so the artist can te
 - **Age as a slider** ✅: in years, in the creator and on people's cards, at each people's pace; the stage of life follows from it ([03](03-characters-and-cards.md#character-creator))
 - **Speech tags put right** ✅ 1.0.4: an "@Name:" in the middle of a sentence, or for the player character, no longer shows in the story ([06](06-ai-dm.md#speech-lines))
 
+## 1.6 — No Calling ✅ (1.6.0, 2026-11-11)
+*Asked for by the main player: picking everything sci-fi still gave a farmer's start.*
+- **No Calling** ✅: an optional calling, and where the creator starts; its skill levels are the player's to spread, and the character's past can be put in their own words ([04](04-rules-system.md#no-calling))
+- **An open start** ✅: the DM is told a character's past needn't be where the story begins
+
 ## 1.2 — Lorebooks from Chub ✅ (1.2.0, 2026-11-10)
 - **Find on Chub** ✅: search the lorebooks shared on chub.ai from the lorebook library (fantasy only and NSFW off to begin with, adult books screened out a second time, instructions and game systems labelled), and add one to the library with credit to its author ([07](07-memory-and-lore.md#finding-lorebooks-on-chub))
 

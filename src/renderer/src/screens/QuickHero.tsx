@@ -154,8 +154,8 @@ export function QuickHero({
           {suggested && (
             <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="mt-3 space-y-1.5 text-sm">
               <p className="text-parchment-200">
-                <span className="text-parchment-500">Calling:</span> {BACKGROUNDS[build.background].label}
-                {build.job?.trim() && <span className="text-parchment-500"> (the closest to {build.job.trim().toLowerCase()})</span>}
+                <span className="text-parchment-500">Calling:</span> {build.background === 'none' ? 'none (none of them fit)' : BACKGROUNDS[build.background].label}
+                {build.job?.trim() && build.background !== 'none' && <span className="text-parchment-500"> (the closest to {build.job.trim().toLowerCase()})</span>}
               </p>
               <p className="flex flex-wrap gap-x-3 gap-y-1 tabular-nums">
                 {ATTRS.map((a) => (

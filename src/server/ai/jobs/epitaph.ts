@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { BACKGROUNDS, RACES, type GameState } from '@shared/rules'
+import { callingName, RACES, type GameState } from '@shared/rules'
 import type { ChatMessage } from '@shared/types'
 import type { Provider } from '../providers'
 
@@ -22,7 +22,7 @@ export async function writeEpitaph(provider: Provider, model: string, state: Gam
     .slice(-4)
     .map((m) => `${m.role === 'user' ? 'PLAYER' : 'DM'}: ${m.content.slice(0, 700)}`)
     .join('\n\n')
-  const prompt = `${b.name}, ${RACES[b.race].label.toLowerCase()} ${BACKGROUNDS[b.background].label.toLowerCase()}, level ${c.level}, died on day ${state.time.day}${state.location ? ` near ${state.location}` : ''}: ${cause}.${deeds ? `\nKnown for: ${deeds}.` : ''}${b.personality ? `\nWhat they were like: ${b.personality.slice(0, 300)}` : ''}
+  const prompt = `${b.name}, ${[RACES[b.race].label.toLowerCase(), callingName(b)].filter(Boolean).join(' ')}, level ${c.level}, died on day ${state.time.day}${state.location ? ` near ${state.location}` : ''}: ${cause}.${deeds ? `\nKnown for: ${deeds}.` : ''}${b.personality ? `\nWhat they were like: ${b.personality.slice(0, 300)}` : ''}
 
 The end of their story:
 ${story}

@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.6.0",
+    "date": "2026-11-11",
+    "title": "No Calling, and an open start.",
+    "items": [
+      "**No Calling.** Callings are optional now. The creator starts on **No Calling**, the first choice for every people: no trade, a dagger, two rations and 6 silver, and the 10 skill levels a calling would set are yours to spread however you like. Pick a calling if you want one; Roll a New Adventurer still picks one for you.",
+      "**In your own words.** The Calling step has a box for what you did before (a deserter, a ferryman, a hive ganger), the same job the Quick Hero asks for. The DM is told that instead of the calling's name, and with no calling and nothing written, it's told no trade at all.",
+      "**An open start.** The DM is now told that what your character did before is their past, and needn't be where the story starts. No more farm openings just because you began on Farmhand, in sci-fi or anywhere else.",
+      "**The Quick Hero** can pick No Calling too, when none of the callings fits the job you wrote."
+    ]
+  },
+  {
     "version": "1.5.0",
     "date": "2026-11-10",
     "title": "Sci-fi gear and foes.",

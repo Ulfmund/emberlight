@@ -6,6 +6,7 @@ import {
   ATTR_START,
   ATTRS,
   BACKGROUNDS,
+  CALLING_LEVELS,
   RACE_BACKGROUNDS,
   BASE_ATTR_CAP,
   LEVEL_MAX,
@@ -139,7 +140,17 @@ export function attrRange(attributes: Record<Attr, number>, a: Attr, cap: number
   return { min: ATTR_START, max }
 }
 
-export const startingSkillBudget = (b: Pick<CharacterBuild, 'age'>) => START_SKILL_LEVELS + AGES[b.age].skillLevels
+/** Starting skill levels the player spreads: by age, and a calling's own levels when there's no calling. */
+export const startingSkillBudget = (b: Pick<CharacterBuild, 'age'> & { background?: BackgroundId }) =>
+  START_SKILL_LEVELS + AGES[b.age].skillLevels + (b.background === 'none' ? CALLING_LEVELS : 0)
+
+/**
+ * What the character did before, for the DM, portraits and lists: the player's own words, or the
+ * calling's name; nothing with no calling.
+ */
+export function callingName(b: { background: BackgroundId; job?: string }): string {
+  return b.job?.trim() || (b.background === 'none' ? '' : BACKGROUNDS[b.background].label.toLowerCase())
+}
 
 /** Starting level of a skill: 1 + background levels + levels the player added. */
 export function startingSkillLevel(b: Pick<CharacterBuild, 'background' | 'skills'>, s: SkillId): number {
@@ -225,7 +236,7 @@ export function randomBuild(rng: Rng, sexMode: SexMode, name: string, fixed: Par
   // An age in years within that stage (most elders are well short of ninety).
   const years = fixed.years ?? randomAgeIn(rng, age, race)
   // Each people has its own callings.
-  const background = fixed.background && RACE_BACKGROUNDS[race].includes(fixed.background) ? fixed.background : pick(rng, RACE_BACKGROUNDS[race])
+  const background = fixed.background && RACE_BACKGROUNDS[race].includes(fixed.background) ? fixed.background : pick(rng, RACE_BACKGROUNDS[race].filter((id) => id !== 'none'))
   const bg = BACKGROUNDS[background]
 
   // Attributes the background relies on get priority.
@@ -251,10 +262,10 @@ export function randomBuild(rng: Rng, sexMode: SexMode, name: string, fixed: Par
   if (!fixed.skills) {
     const sCaps = skillCaps({ ...partial }, sexMode)
     const prefer = Object.keys(bg.affinities) as SkillId[]
-    let budget = startingSkillBudget({ age })
+    let budget = startingSkillBudget({ age, background })
     let guard = 0
     while (budget > 0 && guard++ < 500) {
-      const s = rng() < 0.5 ? pick(rng, prefer) : pick(rng, SKILL_IDS)
+      const s = rng() < 0.5 && prefer.length ? pick(rng, prefer) : pick(rng, SKILL_IDS)
       const next = startingSkillLevel({ background, skills }, s) + 1
       if (next <= Math.min(START_SKILL_MAX, sCaps[s])) {
         skills[s] = (skills[s] ?? 0) + 1

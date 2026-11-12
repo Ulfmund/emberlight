@@ -14,7 +14,7 @@ import {
   RACES,
   RENOWN_TIERS,
   SEXES,
-  BACKGROUNDS,
+  callingName,
   SKILL_IDS,
   SKILLS,
   CONDITIONS,
@@ -57,16 +57,18 @@ import { normalizeEntry, type LoreEntry } from '@shared/lore'
 import type { World } from '@shared/worlds'
 import { GameDb, newId, type CampaignRow, type EventRow, type LorebookRow, type MessageRow } from '../store/db'
 
-export const OPENING_TEXT = '((Begin the adventure: set an opening scene for my character.))'
+/** What they did before is their past: it shouldn't decide where the story starts. */
+const OPEN_START = "What they did before is their past, and needn't be where the story starts."
+export const OPENING_TEXT = `((Begin the adventure: set an opening scene for my character. ${OPEN_START}))`
 
 /** The hidden nudge that opens a successor's story. `days`: how long after the death it begins. */
 export function successorOpening(f: Fallen, build: CharacterBuild, child: boolean, days = child ? HEIR_YEARS * DAYS_PER_YEAR : 3): string {
-  const who = `${build.name.trim()}, ${RACES[build.race].label.toLowerCase()} ${BACKGROUNDS[build.background].label.toLowerCase()}`
+  const who = `${build.name.trim()}, ${[RACES[build.race].label.toLowerCase(), callingName(build)].filter(Boolean).join(' ')}`
   const years = Math.floor(days / DAYS_PER_YEAR)
   const later = years >= 2 ? `${years} years later` : years === 1 ? 'A year later' : 'A few days later'
   return `((A new chapter. ${f.name} is dead: ${f.cause}. ${
     child ? `${later}, their child ${who}, takes up the road.` : `A few days later, a new adventurer comes to the same lands: ${who}.`
-  } Set an opening scene for them, somewhere that fits who they are. The world goes on: its people and places are still there and remember what happened, and ${f.name} may turn up in the story again, in a grave, a rumour or a belonging found.))`
+  } Set an opening scene for them that fits this world. ${OPEN_START} The world goes on: its people and places are still there and remember what happened, and ${f.name} may turn up in the story again, in a grave, a rumour or a belonging found.))`
 }
 
 export function openingText(cast: CastMember[], world?: World): string {
@@ -75,7 +77,7 @@ export function openingText(cast: CastMember[], world?: World): string {
   const company = names.length ? ` ${list} ${names.length === 1 ? 'is' : 'are'} there too.` : ''
   if (world) return `((Begin the adventure in ${world.name}. ${world.opening}${company}))`
   if (!names.length) return OPENING_TEXT
-  return `((Begin the adventure: set an opening scene for my character, with ${list} there too.))`
+  return `((Begin the adventure: set an opening scene for my character, with ${list} there too. ${OPEN_START}))`
 }
 
 export type CreateExtras = {
@@ -105,7 +107,7 @@ export class Campaigns {
         characterName: st.character.build.name,
         race: RACES[st.character.build.race].label,
         sex: SEXES[c.settings.sexModifiers][st.character.build.sex].label,
-        background: BACKGROUNDS[st.character.build.background].label,
+        background: callingName(st.character.build),
         level: st.character.level,
         status: st.character.status,
         location: st.location,
@@ -338,7 +340,7 @@ export class Campaigns {
       type: 'entity',
       kind: 'person',
       name: b.name,
-      summary: `${RACES[b.race].label} ${BACKGROUNDS[b.background].label.toLowerCase()}, an adventurer who died on day ${state.time.day}`,
+      summary: `${[RACES[b.race].label, callingName(b)].filter(Boolean).join(' ')}, an adventurer who died on day ${state.time.day}`,
       facts: [`Died: ${cause}`, ...fallen.deeds.slice(-3)],
       status: 'dead',
       relation: child ? 'parent' : undefined,

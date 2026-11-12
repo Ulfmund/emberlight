@@ -124,7 +124,8 @@ export function CreatorScreen() {
   const heirAge = heir?.child?.age
   const [build, setBuild] = useState<CharacterBuild>(() => {
     const mode = heir?.settings.sexModifiers ?? DEFAULT_SETTINGS.sexModifiers
-    const b = randomBuild(rng, mode, '')
+    // No calling until one is picked, so nothing steers the story's start (a roll picks one).
+    const b = randomBuild(rng, mode, '', { background: 'none' })
     if (heir?.child) {
       // Their card from the Journal, with their parent's people and family name; grown, and only
       // lately on the road.
@@ -592,7 +593,7 @@ function OriginStep({
 function CallingStep({ build, update }: { build: CharacterBuild; update: (p: Partial<CharacterBuild>) => void }) {
   return (
     <>
-      <StepTitle title="Calling" text={`What you did before the adventure, among the ${RACES[build.race].plural.toLowerCase()}. It sets your first skills, your gear and what you have a gift for.`} />
+      <StepTitle title="Calling" text={`What you did before the adventure, among the ${RACES[build.race].plural.toLowerCase()}. It sets your first skills, your gear and what you have a gift for. It's optional, and it's only your past: the story can start anywhere.`} />
       <div className="grid gap-3 md:grid-cols-2">
         {RACE_BACKGROUNDS[build.race].map((id) => {
           const bg = BACKGROUNDS[id]
@@ -615,6 +616,11 @@ function CallingStep({ build, update }: { build: CharacterBuild; update: (p: Par
           )
         })}
       </div>
+      <label className="mt-5 block">
+        <span className="mb-1.5 block text-xs font-semibold tracking-[0.14em] text-gold-400 uppercase">In your own words</span>
+        <input value={build.job ?? ''} onChange={(e) => update({ job: e.target.value })} maxLength={80} placeholder="Optional: deserter, ferryman, hive ganger…" className="input" />
+        <span className="mt-1 block text-xs text-parchment-500">What the DM is told you did, in place of the calling's name.</span>
+      </label>
     </>
   )
 }
@@ -1164,7 +1170,7 @@ function Preview({ build, sexMode, rolling, image, companions }: { build: Charac
       <div className="text-sm text-parchment-400">
         {RACES[build.race].label} · {SEXES[sexMode][build.sex].label} · {startingAge(build)}, {AGES[build.age].label.toLowerCase()}
       </div>
-      <div className="text-sm text-gold-300/80">{BACKGROUNDS[build.background].label}</div>
+      <div className="text-sm text-gold-300/80">{build.job?.trim() || BACKGROUNDS[build.background].label}</div>
 
       <div className="gilt-rule my-5 w-full" />
       <div className="grid w-full grid-cols-3 gap-2 text-center">

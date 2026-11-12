@@ -1,7 +1,7 @@
 import type { Hono } from 'hono'
 import { z } from 'zod'
 import { ImageSettingsSchema, emblemPrompt, portraitPrompt, scenePrompt, stillLifePrompt } from '@shared/images'
-import { ageYears, BACKGROUNDS } from '@shared/rules'
+import { ageYears, callingName } from '@shared/rules'
 import { projectMemory, sameName, type Entity } from '@shared/memory'
 import { bornAt, personKind } from '@shared/people'
 import type { Genre } from '@shared/genre'
@@ -218,5 +218,5 @@ function portraitFor(campaigns: Campaigns, settings: SettingsStore, id: string, 
   const b = view.build
   const kind = personKind({ race: b.race, sex: b.sex, born: bornAt(ageYears(view.state), view.state.time.day) }, view.state.time.day)
   const cue = view.genre === 'scifi' ? `${style.trim() ? `${style.trim()}, ` : ''}${SCIFI_CUE}` : style
-  return portraitPrompt(cue, { kind, details: [b.job?.trim() || BACKGROUNDS[b.background].label.toLowerCase(), b.appearance.slice(0, 500)] })
+  return portraitPrompt(cue, { kind, details: [callingName(b), b.appearance.slice(0, 500)] })
 }
